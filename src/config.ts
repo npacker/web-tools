@@ -1,4 +1,5 @@
 import { createConfigSchematics } from "@lmstudio/sdk"
+import { AUTO_CONFIG_VALUE } from "./constants"
 
 export const configSchematics = createConfigSchematics()
   .field(
@@ -26,10 +27,10 @@ export const configSchematics = createConfigSchematics()
         { value: "strict", displayName: "Strict" },
         { value: "moderate", displayName: "Moderate" },
         { value: "off", displayName: "Off" },
-        { value: "auto", displayName: "Auto" },
+        { value: AUTO_CONFIG_VALUE, displayName: "Auto" },
       ],
       displayName: "Safe Search",
     },
-    "auto"
+    AUTO_CONFIG_VALUE
   )
   .build()

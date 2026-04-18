@@ -1,358 +1,326 @@
+/**
+ * Tool definitions for DuckDuckGo search functionality
+ */
+
 import { tool, Tool, ToolsProviderController } from "@lmstudio/sdk"
 import { z } from "zod"
-import { join } from "path"
-import { writeFile } from "fs/promises"
-import { JSDOM } from "jsdom"
 import { Impit } from "impit"
-import { configSchematics } from "./config"
+import {
+  SEARCH_CACHE_TTL_MS,
+  SEARCH_CACHE_MAX_SIZE,
+  VQD_CACHE_TTL_MS,
+  VQD_CACHE_MAX_SIZE,
+  MIN_REQUEST_INTERVAL_MS,
+  IMAGE_FETCH_DELAY_MS,
+  MIN_PAGE_SIZE,
+  MAX_PAGE_SIZE,
+  MAX_PAGE_NUMBER,
+  MIN_PAGE_NUMBER,
+  DEFAULT_PAGE_NUMBER,
+  DEFAULT_PAGE_SIZE,
+  DEFAULT_SAFE_SEARCH,
+} from "./constants"
+import type { SafeSearch } from "./types"
+import { TTLCache } from "./cache"
+import { RateLimiter } from "./utils/RateLimiter"
+import { DuckDuckGoService } from "./services/DuckDuckGoService"
+import { extractImageUrls } from "./parsers"
+import { downloadImage } from "./services/ImageDownloadService"
+import { resolveConfig } from "./config/configResolver"
+import { SearchAbortedError, NoResultsError, VqdTokenError, FetchError, isAbortError, getErrorMessage } from "./errors"
 
-class TTLCache<T> {
-  private cache = new Map<string, { value: T; expiry: number }>()
-
-  public constructor(
-    private ttlMs: number,
-    private maxSize: number
-  ) {}
-
-  public get(key: string): T | undefined {
-    const entry = this.cache.get(key)
-
-    if (!entry) return undefined
-
-    if (Date.now() > entry.expiry) {
-      this.cache.delete(key)
-
-      return undefined
-    }
-
-    return entry.value
-  }
-
-  public set(key: string, value: T): void {
-    if (this.cache.size >= this.maxSize) {
-      this.evictExpired()
-    }
-
-    if (this.cache.size >= this.maxSize) {
-      const firstKey = this.cache.keys().next().value
-
-      if (firstKey !== undefined) this.cache.delete(firstKey)
-    }
-
-    this.cache.set(key, { value, expiry: Date.now() + this.ttlMs })
-  }
-
-  private evictExpired(): void {
-    const now = Date.now()
-
-    for (const [key, entry] of this.cache) {
-      if (now > entry.expiry) this.cache.delete(key)
-    }
-  }
-}
-
-interface DuckDuckGoImageResult {
-  image: string
-}
-
-type SafeSearch = "strict" | "moderate" | "off"
-
-const IMAGE_EXTENSIONS_RE = /\.(jpg|jpeg|png|gif|webp)(\?|$)/i
-const CONTENT_TYPE_EXT_RE = /image\/(jpeg|jpg|png|gif|webp)/
-
+/**
+ * Creates and configures the DuckDuckGo tools provider
+ */
 export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[]> {
-  const TIME_BETWEEN_REQUESTS_MS = 5000
-  const IMAGE_FETCH_DELAY_MS = 2000
-
-  const searchCache = new TTLCache<{ links: [string, string][]; count: number }>(15 * 60_000, 100)
-  const vqdCache = new TTLCache<string>(10 * 60_000, 50)
-
   const impit = new Impit({ browser: "chrome" })
+  const rateLimiter = new RateLimiter(MIN_REQUEST_INTERVAL_MS)
+  const duckDuckGoService = new DuckDuckGoService(impit)
 
-  let lastRequestTimestamp = 0
+  const searchCache = new TTLCache<SearchCacheEntry>(SEARCH_CACHE_TTL_MS, SEARCH_CACHE_MAX_SIZE)
+  const vqdCache = new TTLCache<string>(VQD_CACHE_TTL_MS, VQD_CACHE_MAX_SIZE)
 
-  const waitIfNeeded = async () => {
-    const timestamp = Date.now()
-    const difference = timestamp - lastRequestTimestamp
-    lastRequestTimestamp = timestamp
+  const webSearchTool = createWebSearchTool(ctl, duckDuckGoService, searchCache, rateLimiter)
 
-    if (difference < TIME_BETWEEN_REQUESTS_MS)
-      return new Promise(resolve => setTimeout(resolve, TIME_BETWEEN_REQUESTS_MS - difference))
+  const imageSearchTool = createImageSearchTool(ctl, duckDuckGoService, vqdCache, rateLimiter, impit)
 
-    return Promise.resolve()
-  }
+  return [webSearchTool, imageSearchTool]
+}
 
-  const duckDuckGoWebSearchTool = tool({
+/**
+ * Cache entry for search results
+ */
+interface SearchCacheEntry {
+  results: Array<[string, string]>
+  count: number
+}
+
+/**
+ * Creates the web search tool
+ */
+function createWebSearchTool(
+  ctl: ToolsProviderController,
+  service: DuckDuckGoService,
+  cache: TTLCache<SearchCacheEntry>,
+  rateLimiter: RateLimiter
+): Tool {
+  return tool({
     name: "Web Search",
     description: "Search for web pages on DuckDuckGo using a query string, returning a list of URLs.",
     parameters: {
       query: z.string().describe("The search query for finding web pages"),
-      pageSize: z.number().int().min(1).max(10).optional().describe("Number of web results per page"),
+      pageSize: z
+        .number()
+        .int()
+        .min(MIN_PAGE_SIZE)
+        .max(MAX_PAGE_SIZE)
+        .optional()
+        .describe("Number of web results per page"),
       safeSearch: z.enum(["strict", "moderate", "off"]).optional().describe("Safe Search"),
-      page: z.number().int().min(1).max(100).optional().default(1).describe("Page number for pagination"),
+      page: z
+        .number()
+        .int()
+        .min(MIN_PAGE_NUMBER)
+        .max(MAX_PAGE_NUMBER)
+        .optional()
+        .default(DEFAULT_PAGE_NUMBER)
+        .describe("Page number for pagination"),
     },
     implementation: async ({ query, pageSize: paramPageSize, safeSearch: paramSafeSearch, page }, ctx) => {
       ctx.status("Initiating DuckDuckGo web search...")
-      await waitIfNeeded()
+      await rateLimiter.waitIfNeeded()
 
       try {
-        const { pageSize, safeSearch } = resolveConfig(ctl, paramPageSize, paramSafeSearch)
-        const cacheKey = `web:${query}:${safeSearch}:${page}`
-        const cached = searchCache.get(cacheKey)
-
-        if (cached) {
-          ctx.status(`Found ${cached.count} web pages (cached).`)
-
-          return cached
-        }
-
-        const searchUrl = new URL("https://duckduckgo.com/html/")
-
-        searchUrl.searchParams.append("q", query)
-
-        if (safeSearch !== "moderate") searchUrl.searchParams.append("p", safeSearch === "strict" ? "1" : "-1")
-
-        if (page > 1) searchUrl.searchParams.append("s", (pageSize * (page - 1)).toString())
-
-        const response = await impit.fetch(searchUrl.toString(), {
-          method: "GET",
-          signal: ctx.signal,
+        const { pageSize, safeSearch } = resolveConfig(ctl, {
+          pageSize: paramPageSize,
+          safeSearch: paramSafeSearch,
         })
 
-        if (!response.ok) {
-          ctx.warn(`Failed to fetch search results: ${response.statusText}`)
-          return `Error: Failed to fetch search results: ${response.statusText}`
+        const cached = getFromCache(cache, "web", query, safeSearch, page)
+
+        if (cached !== undefined) {
+          ctx.status(`Found ${cached.count} web pages (cached).`)
+          return cached.results
         }
 
-        const html = await response.text()
-        const links = parseSearchResults(html, pageSize)
+        const params = { query, pageSize, safeSearch, page }
+        const result = await service.searchWeb(params, { signal: ctx.signal })
 
-        if (links.length === 0) {
-          return "No web pages found for the query."
+        if (result.results.length === 0) {
+          throw new NoResultsError("web")
         }
 
-        ctx.status(`Found ${links.length} web pages.`)
+        ctx.status(`Found ${result.results.length} web pages.`)
 
-        const result = { links, count: links.length }
-
-        searchCache.set(cacheKey, result)
-
-        return result
-      } catch (error: unknown) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return "Search aborted by user."
+        const cacheEntry = {
+          results: result.results.map(({ label, url }) => [label, url] as [string, string]),
+          count: result.results.length,
         }
 
-        const message = getErrorMessage(error)
-        ctx.warn(`Error during search: ${message}`)
-        return `Error: ${message}`
+        setInCache(cache, "web", query, safeSearch, page, cacheEntry)
+
+        return cacheEntry.results
+      } catch (error) {
+        return handleSearchError(error, ctx)
       }
     },
   })
+}
 
-  const duckDuckGoImageSearchTool = tool({
+/**
+ * Creates the image search tool
+ */
+function createImageSearchTool(
+  ctl: ToolsProviderController,
+  service: DuckDuckGoService,
+  vqdCache: TTLCache<string>,
+  rateLimiter: RateLimiter,
+  impit: Impit
+): Tool {
+  return tool({
     name: "Image Search",
     description: "Search for images on DuckDuckGo using a query string and return a list of image URLs.",
     parameters: {
       query: z.string().describe("The search query for finding images"),
-      pageSize: z.number().int().min(1).max(10).optional().default(10).describe("Number of image results per page"),
-      safeSearch: z.enum(["strict", "moderate", "off"]).optional().default("moderate").describe("Safe Search"),
-      page: z.number().int().min(1).max(100).optional().default(1).describe("Page number for pagination"),
+      pageSize: z
+        .number()
+        .int()
+        .min(MIN_PAGE_SIZE)
+        .max(MAX_PAGE_SIZE)
+        .optional()
+        .default(DEFAULT_PAGE_SIZE)
+        .describe("Number of image results per page"),
+      safeSearch: z.enum(["strict", "moderate", "off"]).optional().default(DEFAULT_SAFE_SEARCH).describe("Safe Search"),
+      page: z
+        .number()
+        .int()
+        .min(MIN_PAGE_NUMBER)
+        .max(MAX_PAGE_NUMBER)
+        .optional()
+        .default(DEFAULT_PAGE_NUMBER)
+        .describe("Page number for pagination"),
     },
     implementation: async ({ query, pageSize: paramPageSize, safeSearch: paramSafeSearch, page }, ctx) => {
       ctx.status("Initiating DuckDuckGo image search...")
-      await waitIfNeeded()
+      await rateLimiter.waitIfNeeded()
 
       try {
-        const { pageSize, safeSearch } = resolveConfig(ctl, paramPageSize, paramSafeSearch)
-        const vqdCacheKey = `vqd:${query}`
-        let vqd = vqdCache.get(vqdCacheKey)
+        const { pageSize, safeSearch } = resolveConfig(ctl, {
+          pageSize: paramPageSize,
+          safeSearch: paramSafeSearch,
+        })
+
+        const vqd = await getVqdToken(query, service, vqdCache, ctx.signal)
 
         if (vqd === undefined) {
-          vqd = await fetchVqdToken(query, impit, ctx.signal)
-
-          if (vqd === undefined) {
-            ctx.warn("Failed to extract vqd token.")
-
-            return "Error: Unable to extract vqd token."
-          }
-
-          vqdCache.set(vqdCacheKey, vqd)
-          await new Promise(resolve => setTimeout(resolve, IMAGE_FETCH_DELAY_MS))
+          ctx.warn("Failed to extract vqd token.")
+          throw new VqdTokenError()
         }
 
-        const searchUrl = new URL("https://duckduckgo.com/i.js")
-        searchUrl.searchParams.append("q", query)
-        searchUrl.searchParams.append("o", "json")
-        searchUrl.searchParams.append("l", "us-en")
-        searchUrl.searchParams.append("vqd", vqd)
-        searchUrl.searchParams.append("f", ",,,,,")
+        await delay(IMAGE_FETCH_DELAY_MS)
 
-        if (safeSearch !== "moderate") searchUrl.searchParams.append("p", safeSearch === "strict" ? "1" : "-1")
-
-        if (page > 1) searchUrl.searchParams.append("s", (pageSize * (page - 1)).toString())
-
-        const searchResponse = await impit.fetch(searchUrl.toString(), {
-          method: "GET",
+        const params = { query, pageSize, safeSearch, page }
+        const imageResults = await service.searchImages(params, vqd, {
           signal: ctx.signal,
         })
 
-        if (!searchResponse.ok) {
-          ctx.warn(`Failed to fetch image results: ${searchResponse.statusText}`)
-          return `Error: Failed to fetch image results: ${searchResponse.statusText}`
+        const imageUrls = extractImageUrls(imageResults, pageSize)
+
+        if (imageUrls.length === 0) {
+          throw new NoResultsError("image")
         }
 
-        const data = (await searchResponse.json()) as { results?: DuckDuckGoImageResult[] }
-        const imageURLs = extractImageURLs(data.results ?? [], pageSize)
-
-        if (imageURLs.length === 0) return "No images found for the query."
-
-        ctx.status(`Found ${imageURLs.length} images. Fetching...`)
+        ctx.status(`Found ${imageUrls.length} images. Fetching...`)
 
         const workingDirectory = ctl.getWorkingDirectory()
         const timestamp = Date.now()
-        const downloadPromises = imageURLs.map(async (url, i) =>
-          downloadImage(url, i + 1, impit, ctx.signal, workingDirectory, timestamp, ctx.warn)
+
+        const downloadPromises = imageUrls.map(async (url, index) =>
+          downloadImage(
+            url,
+            impit,
+            {
+              workingDirectory,
+              timestamp,
+              index: index + 1,
+            },
+            {
+              warn: ctx.warn,
+              signal: ctx.signal,
+            }
+          )
         )
+
         const downloadedPaths = (await Promise.all(downloadPromises)).filter((path): path is string => path !== null)
 
         if (downloadedPaths.length === 0) {
           ctx.warn("Error fetching images")
-          return imageURLs
+          return imageUrls
         }
 
         ctx.status(`Downloaded ${downloadedPaths.length} images successfully.`)
 
         return downloadedPaths
-      } catch (error: unknown) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return "Search aborted by user."
-        }
-
-        const message = getErrorMessage(error)
-        ctx.warn(`Error during search: ${message}`)
-        return `Error: ${message}`
+      } catch (error) {
+        return handleSearchError(error, ctx)
       }
     },
   })
-
-  return [duckDuckGoWebSearchTool, duckDuckGoImageSearchTool]
 }
 
-function resolveConfig(
-  ctl: ToolsProviderController,
-  paramPageSize: number | undefined,
-  paramSafeSearch: SafeSearch | undefined
-) {
-  const config = ctl.getPluginConfig(configSchematics)
-  const rawPageSize = config.get("pageSize")
-  const rawSafeSearch = config.get("safeSearch")
+/**
+ * Retrieves VQD token from cache or fetches it
+ */
+async function getVqdToken(
+  query: string,
+  service: DuckDuckGoService,
+  cache: TTLCache<string>,
+  signal: AbortSignal
+): Promise<string | undefined> {
+  const cacheKey = `vqd:${query}`
+  const cached = cache.get(cacheKey)
 
-  return {
-    pageSize: (rawPageSize !== 0 ? (rawPageSize as number) : undefined) ?? paramPageSize ?? 5,
-    safeSearch: (rawSafeSearch !== "auto" ? (rawSafeSearch as SafeSearch) : undefined) ?? paramSafeSearch ?? "moderate",
-  }
-}
-
-function parseSearchResults(html: string, pageSize: number): [string, string][] {
-  const links: [string, string][] = []
-  const dom = new JSDOM(html)
-  const linkElements = dom.window.document.querySelectorAll(".result__a")
-
-  for (const link of linkElements) {
-    if (links.length >= pageSize) break
-
-    const href = link.getAttribute("href")
-    const label = link.textContent.replace(/\s+/g, " ").trim()
-
-    if (href !== null && label !== "" && !links.some(([, existingUrl]) => existingUrl === href)) {
-      links.push([label, href])
-    }
+  if (cached !== undefined) {
+    return cached
   }
 
-  return links
-}
-
-async function fetchVqdToken(query: string, impit: Impit, signal: AbortSignal): Promise<string | undefined> {
-  const url = new URL("https://duckduckgo.com/")
-
-  url.searchParams.append("q", query)
-  url.searchParams.append("iax", "images")
-  url.searchParams.append("ia", "images")
-
-  const response = await impit.fetch(url.toString(), {
-    method: "GET",
-    signal,
-  })
-
-  if (!response.ok) return undefined
-
-  const html = await response.text()
-  const dom = new JSDOM(html)
-  const vqd = dom.window.document.querySelector('input[name="vqd"]')?.getAttribute("value") ?? undefined
-
-  if (vqd === undefined || vqd === "") return undefined
-
-  return vqd
-}
-
-function extractImageURLs(results: DuckDuckGoImageResult[], pageSize: number): string[] {
-  return results
-    .slice(0, pageSize)
-    .map(result => result.image)
-    .filter(url => IMAGE_EXTENSIONS_RE.test(url))
-    .filter((url, i, arr) => arr.indexOf(url) === i)
-}
-
-async function downloadImage(
-  url: string,
-  index: number,
-  impit: Impit,
-  signal: AbortSignal,
-  workingDirectory: string,
-  timestamp: number,
-  warn: (message: string) => void
-): Promise<string | null> {
   try {
-    const timeoutSignal = AbortSignal.timeout(10_000)
-    const combinedSignal = AbortSignal.any([signal, timeoutSignal])
-    const response = await impit.fetch(url, {
-      method: "GET",
-      signal: combinedSignal,
-    })
-
-    if (!response.ok) {
-      warn(`Failed to fetch image ${index}: ${response.statusText}`)
-      return null
-    }
-
-    const bytes = await response.bytes()
-
-    if (bytes.length === 0) {
-      warn(`Image ${index} is empty: ${url}`)
-      return null
-    }
-
-    const contentTypeExt = CONTENT_TYPE_EXT_RE.exec(response.headers.get("content-type") ?? "")?.[1]?.replace(
-      "jpeg",
-      "jpg"
-    )
-    const urlExt = IMAGE_EXTENSIONS_RE.exec(url)?.[1]
-    const fileExtension = contentTypeExt ?? urlExt ?? "jpg"
-    const fileName = `${timestamp}-${index}.${fileExtension}`
-    const filePath = join(workingDirectory, fileName)
-    const localPath = filePath.replace(/\\/g, "/").replace(/^(?:\/)?[A-Z]:/, "")
-    await writeFile(filePath, bytes)
-
-    return localPath
-  } catch (error: unknown) {
-    if (error instanceof DOMException && error.name === "AbortError") return null
-
-    warn(`Error fetching image ${index}: ${getErrorMessage(error)}`)
-    return null
+    const vqd = await service.fetchVqdToken(query, { signal })
+    cache.set(cacheKey, vqd)
+    return vqd
+  } catch {
+    return undefined
   }
 }
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+/**
+ * Retrieves search results from cache
+ */
+function getFromCache(
+  cache: TTLCache<SearchCacheEntry>,
+  type: "web" | "image",
+  query: string,
+  safeSearch: SafeSearch,
+  page: number
+): SearchCacheEntry | undefined {
+  const cacheKey = `${type}:${query}:${safeSearch}:${page}`
+
+  return cache.get(cacheKey)
+}
+
+/**
+ * Stores search results in cache
+ */
+function setInCache(
+  cache: TTLCache<SearchCacheEntry>,
+  type: "web" | "image",
+  query: string,
+  safeSearch: SafeSearch,
+  page: number,
+  entry: SearchCacheEntry
+): void {
+  const cacheKey = `${type}:${query}:${safeSearch}:${page}`
+  cache.set(cacheKey, entry)
+}
+
+/**
+ * Handles search errors and returns appropriate response
+ */
+function handleSearchError(
+  error: unknown,
+  ctx: {
+    warn: (message: string) => void
+  }
+): string | string[] {
+  if (isAbortError(error)) {
+    return "Search aborted by user."
+  }
+
+  if (error instanceof SearchAbortedError) {
+    return error.message
+  }
+
+  if (error instanceof NoResultsError) {
+    return error.message
+  }
+
+  if (error instanceof VqdTokenError) {
+    return `Error: ${error.message}`
+  }
+
+  if (error instanceof FetchError) {
+    ctx.warn(`Failed to fetch search results: ${error.message}`)
+    return `Error: Failed to fetch search results: ${error.message}`
+  }
+
+  const message = getErrorMessage(error)
+  ctx.warn(`Error during search: ${message}`)
+  return `Error: ${message}`
+}
+
+/**
+ * Creates a delay promise
+ */
+async function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
 }
