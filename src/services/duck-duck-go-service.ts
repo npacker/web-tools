@@ -77,7 +77,7 @@ export class DuckDuckGoService {
    */
   public async getVqdToken(query: string, options: FetchOptions): Promise<string> {
     const cacheKey = `vqd:${query}`
-    const cached = this.vqdCache.get(cacheKey)
+    const cached = await this.vqdCache.get(cacheKey)
 
     if (cached !== undefined) {
       return cached
@@ -92,7 +92,7 @@ export class DuckDuckGoService {
       throw new VqdTokenError()
     }
 
-    this.vqdCache.set(cacheKey, vqd)
+    await this.vqdCache.set(cacheKey, vqd)
 
     return vqd
   }

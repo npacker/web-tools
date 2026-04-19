@@ -1,22 +1,23 @@
 /**
- * Time-to-live cache implementation with automatic expiration.
+ * Time-to-live cache backed by `cacache` for on-disk persistence.
  */
 
+import * as cacache from "cacache"
+
 /**
- * A single cache entry holding the stored value and its expiration timestamp.
+ * Metadata attached to every cacache entry to track its expiry.
  */
-export interface CacheEntry<T> {
-  /** The cached value. */
-  value: T
+interface CacheMetadata {
   /** Absolute epoch millisecond timestamp at which the entry expires. */
   expiry: number
 }
+
 /**
- * In-memory cache with per-entry time-to-live and bounded capacity.
+ * Disk-backed cache with per-entry time-to-live and bounded capacity.
  */
 export class TTLCache<T> {
-  /** Underlying key-to-entry map. */
-  private readonly cache: Map<string, CacheEntry<T>>
+  /** Directory passed to `cacache` for all operations on this instance. */
+  private readonly cachePath: string
   /** Time-to-live applied to every inserted entry, in milliseconds. */
   private readonly ttlMs: number
   /** Upper bound on the number of entries retained. */
@@ -25,11 +26,12 @@ export class TTLCache<T> {
   /**
    * Create a new cache bound by TTL and capacity.
    *
+   * @param cachePath Filesystem path where cacache stores index and content.
    * @param ttlMs Lifetime of each entry in milliseconds.
    * @param maxSize Maximum number of entries retained before eviction.
    */
-  public constructor(ttlMs: number, maxSize: number) {
-    this.cache = new Map()
+  public constructor(cachePath: string, ttlMs: number, maxSize: number) {
+    this.cachePath = cachePath
     this.ttlMs = ttlMs
     this.maxSize = maxSize
   }
@@ -40,20 +42,24 @@ export class TTLCache<T> {
    * @param key Lookup key.
    * @returns The stored value, or `undefined` when absent or expired.
    */
-  public get(key: string): T | undefined {
-    const entry = this.cache.get(key)
+  public async get(key: string): Promise<T | undefined> {
+    const info = await cacache.get.info(this.cachePath, key)
 
-    if (entry === undefined) {
+    if (info === null) {
       return undefined
     }
 
-    if (this.isExpired(entry)) {
-      this.cache.delete(key)
+    const metadata = info.metadata as CacheMetadata | undefined
+
+    if (metadata === undefined || this.isExpired(metadata)) {
+      await this.delete(key)
 
       return undefined
     }
 
-    return entry.value
+    const { data } = await cacache.get(this.cachePath, key)
+
+    return JSON.parse(data.toString("utf8")) as T
   }
 
   /**
@@ -62,12 +68,10 @@ export class TTLCache<T> {
    * @param key Key to store the value under.
    * @param value Value to associate with the key.
    */
-  public set(key: string, value: T): void {
-    this.evictIfNeeded()
-    this.cache.set(key, {
-      value,
-      expiry: Date.now() + this.ttlMs,
-    })
+  public async set(key: string, value: T): Promise<void> {
+    await this.evictIfNeeded()
+    const metadata: CacheMetadata = { expiry: Date.now() + this.ttlMs }
+    await cacache.put(this.cachePath, key, JSON.stringify(value), { metadata })
   }
 
   /**
@@ -76,10 +80,16 @@ export class TTLCache<T> {
    * @param key Key to look up.
    * @returns `true` when a live entry is present, otherwise `false`.
    */
-  public has(key: string): boolean {
-    const entry = this.cache.get(key)
+  public async has(key: string): Promise<boolean> {
+    const info = await cacache.get.info(this.cachePath, key)
 
-    return entry !== undefined && !this.isExpired(entry)
+    if (info === null) {
+      return false
+    }
+
+    const metadata = info.metadata as CacheMetadata | undefined
+
+    return metadata !== undefined && !this.isExpired(metadata)
   }
 
   /**
@@ -87,66 +97,56 @@ export class TTLCache<T> {
    *
    * @param key Key to remove.
    */
-  public delete(key: string): void {
-    this.cache.delete(key)
+  public async delete(key: string): Promise<void> {
+    await cacache.rm.entry(this.cachePath, key)
   }
 
   /**
    * Remove every entry from the cache.
    */
-  public clear(): void {
-    this.cache.clear()
-  }
-
-  /**
-   * Current count of stored entries, including any that have expired but not yet been evicted.
-   *
-   * @returns The number of entries currently held.
-   */
-  public get size(): number {
-    return this.cache.size
+  public async clear(): Promise<void> {
+    await cacache.rm.all(this.cachePath)
   }
 
   /**
    * Determine whether an entry has passed its expiry timestamp.
    *
-   * @param entry Entry to inspect.
+   * @param metadata Metadata to inspect.
    * @returns `true` when the entry is expired.
    */
-  private isExpired(entry: CacheEntry<T>): boolean {
-    return Date.now() > entry.expiry
+  private isExpired(metadata: CacheMetadata): boolean {
+    return Date.now() > metadata.expiry
   }
 
   /**
    * Make room for a new insertion by purging expired entries, then evicting
    * the oldest entry when the cache is still full.
    */
-  private evictIfNeeded(): void {
-    if (this.cache.size < this.maxSize) {
+  private async evictIfNeeded(): Promise<void> {
+    const entries = Object.values(await cacache.ls(this.cachePath))
+
+    if (entries.length < this.maxSize) {
       return
     }
 
-    this.evictExpired()
-
-    if (this.cache.size >= this.maxSize) {
-      const firstKey = this.cache.keys().next().value
-
-      if (firstKey !== undefined) {
-        this.cache.delete(firstKey)
-      }
-    }
-  }
-
-  /**
-   * Remove every entry whose expiry timestamp has elapsed.
-   */
-  private evictExpired(): void {
     const now = Date.now()
+    const live: typeof entries = []
 
-    for (const [key, entry] of this.cache) {
-      if (now > entry.expiry) {
-        this.cache.delete(key)
+    for (const entry of entries) {
+      const metadata = entry.metadata as CacheMetadata | undefined
+
+      if (metadata === undefined || now > metadata.expiry) {
+        await cacache.rm.entry(this.cachePath, entry.key)
+      } else {
+        live.push(entry)
       }
     }
+
+    if (live.length < this.maxSize) {
+      return
+    }
+
+    live.sort((a, b) => a.time - b.time)
+    await cacache.rm.entry(this.cachePath, live[0].key)
   }
 }

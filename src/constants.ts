@@ -19,6 +19,18 @@ export const VQD_CACHE_TTL_MS = 10 * 60_000
  */
 export const VQD_CACHE_MAX_SIZE = 50
 /**
+ * Root directory name used for the plugin's on-disk `cacache` store.
+ */
+export const CACHE_DIRECTORY_NAME = "lms-plugin-duckduckgo-cache"
+/**
+ * Subdirectory under the cache root dedicated to web/image search results.
+ */
+export const SEARCH_CACHE_SUBDIR = "search"
+/**
+ * Subdirectory under the cache root dedicated to VQD tokens.
+ */
+export const VQD_CACHE_SUBDIR = "vqd"
+/**
  * Minimum interval enforced between outbound DuckDuckGo requests, in milliseconds.
  */
 export const MIN_REQUEST_INTERVAL_MS = 5000

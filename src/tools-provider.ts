@@ -2,6 +2,8 @@
  * Tool definitions for DuckDuckGo search functionality.
  */
 
+import path from "node:path"
+
 import { tool, Tool, ToolsProviderController } from "@lmstudio/sdk"
 import { Impit } from "impit"
 import { z } from "zod"
@@ -9,10 +11,13 @@ import { z } from "zod"
 import { TTLCache, searchCacheKey } from "./cache"
 import { resolveConfig } from "./config/config-resolver"
 import {
+  CACHE_DIRECTORY_NAME,
   SEARCH_CACHE_TTL_MS,
   SEARCH_CACHE_MAX_SIZE,
+  SEARCH_CACHE_SUBDIR,
   VQD_CACHE_TTL_MS,
   VQD_CACHE_MAX_SIZE,
+  VQD_CACHE_SUBDIR,
   MIN_REQUEST_INTERVAL_MS,
   IMAGE_FETCH_DELAY_MS,
   MIN_PAGE_SIZE,
@@ -40,10 +45,15 @@ import type { CachedSearchResults } from "./cache"
 export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[]> {
   const impit = new Impit({ browser: "chrome" })
   const rateLimiter = new RateLimiter(MIN_REQUEST_INTERVAL_MS)
-  const vqdCache = new TTLCache<string>(VQD_CACHE_TTL_MS, VQD_CACHE_MAX_SIZE)
+  const cacheRoot = path.join(ctl.getWorkingDirectory(), CACHE_DIRECTORY_NAME)
+  const vqdCache = new TTLCache<string>(path.join(cacheRoot, VQD_CACHE_SUBDIR), VQD_CACHE_TTL_MS, VQD_CACHE_MAX_SIZE)
   const duckDuckGoService = new DuckDuckGoService(impit, vqdCache)
 
-  const searchCache = new TTLCache<CachedSearchResults>(SEARCH_CACHE_TTL_MS, SEARCH_CACHE_MAX_SIZE)
+  const searchCache = new TTLCache<CachedSearchResults>(
+    path.join(cacheRoot, SEARCH_CACHE_SUBDIR),
+    SEARCH_CACHE_TTL_MS,
+    SEARCH_CACHE_MAX_SIZE
+  )
 
   const webSearchTool = createWebSearchTool(ctl, duckDuckGoService, searchCache, rateLimiter)
 
@@ -111,7 +121,7 @@ function createWebSearchTool(
         })
 
         const cacheKey = searchCacheKey("web", query, safeSearch, page)
-        const cached = cache.get(cacheKey)
+        const cached = await cache.get(cacheKey)
 
         if (cached !== undefined) {
           context.status(`Found ${cached.count} web pages (cached).`)
@@ -131,7 +141,7 @@ function createWebSearchTool(
           results: result.results.map(({ label, url }) => [label, url] as [string, string]),
           count: result.results.length,
         }
-        cache.set(cacheKey, cacheEntry)
+        await cache.set(cacheKey, cacheEntry)
 
         return cacheEntry.results
       } catch (error) {
