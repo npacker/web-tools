@@ -8,7 +8,6 @@ import sonarjs from "eslint-plugin-sonarjs";
 import importX from "eslint-plugin-import-x";
 import jsdoc from "eslint-plugin-jsdoc";
 import nodePlugin from "eslint-plugin-n";
-import promisePlugin from "eslint-plugin-promise";
 import regexpPlugin from "eslint-plugin-regexp";
 import securityPlugin from "eslint-plugin-security";
 import unicorn from "eslint-plugin-unicorn";
@@ -23,7 +22,6 @@ export default [
   nodePlugin.configs["flat/recommended-module"],
   regexpPlugin.configs["flat/recommended"],
   unicorn.configs.recommended,
-  promisePlugin.configs["flat/recommended"],
   securityPlugin.configs.recommended,
   jsdoc.configs["flat/recommended-typescript-error"],
   {
