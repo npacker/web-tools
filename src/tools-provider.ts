@@ -6,14 +6,24 @@ import path from "node:path"
 
 import { tool, Tool, ToolsProviderController } from "@lmstudio/sdk"
 import { Impit } from "impit"
+import { JSDOM } from "jsdom"
 import { z } from "zod"
 
 import { TTLCache, searchCacheKey } from "./cache"
 import { DEFAULT_PAGE_SIZE, DEFAULT_SAFE_SEARCH, resolveConfig } from "./config/config-resolver"
-import { NoResultsError, formatSearchError } from "./errors"
-import { extractImageUrls } from "./parsers"
+import { NoResultsError, formatSearchError, formatToolError } from "./errors"
+import {
+  extractHeadings,
+  extractImageUrls,
+  extractLinks,
+  extractPageImages,
+  extractVisibleText,
+  parseWebsiteDocument,
+  sliceAroundTerms,
+} from "./parsers"
 import { DuckDuckGoService } from "./services/duck-duck-go-service"
-import { downloadImage } from "./services/image-download-service"
+import { downloadImageBatch } from "./services/image-batch-service"
+import { WebsiteFetchService } from "./services/website-fetch-service"
 import { RateLimiter, delay } from "./utils"
 
 import type { CachedSearchResults } from "./cache"
@@ -47,6 +57,18 @@ const VQD_CACHE_TTL_MS = 10 * 60_000
  */
 const VQD_CACHE_MAX_SIZE = 50
 /**
+ * Subdirectory under the cache root dedicated to fetched website HTML payloads.
+ */
+const WEBSITE_CACHE_SUBDIR = "website"
+/**
+ * Time-to-live for cached website HTML payloads, in milliseconds.
+ */
+const WEBSITE_CACHE_TTL_MS = 10 * 60_000
+/**
+ * Maximum number of website HTML payloads retained in the website cache.
+ */
+const WEBSITE_CACHE_MAX_SIZE = 50
+/**
  * Minimum interval enforced between outbound DuckDuckGo requests, in milliseconds.
  */
 const MIN_REQUEST_INTERVAL_MS = 5000
@@ -75,6 +97,30 @@ const MAX_PAGE_NUMBER = 100
  */
 const DEFAULT_PAGE_NUMBER = 1
 /**
+ * Lower bound on the extraction counts exposed by the Visit Website tool.
+ */
+const MIN_EXTRACTION_COUNT = 0
+/**
+ * Upper bound on the extraction counts exposed by the Visit Website and View Images tools.
+ */
+const MAX_EXTRACTION_COUNT = 200
+/**
+ * Lower bound on the image count requested by the View Images tool.
+ */
+const MIN_VIEW_IMAGES_COUNT = 1
+/**
+ * Lower bound on the visible-text character budget exposed by the Visit Website tool.
+ */
+const MIN_CONTENT_LIMIT = 0
+/**
+ * Upper bound on the visible-text character budget exposed by the Visit Website tool.
+ */
+const MAX_CONTENT_LIMIT = 10_000
+/**
+ * User-facing warning used when a batch of image downloads yields no files.
+ */
+const IMAGE_FETCH_FAILURE_MESSAGE = "Error fetching images"
+/**
  * Module-scoped rate limiter shared across every tools-provider session. The LM Studio SDK invokes
  * `toolsProvider` once per session, so holding this at module scope is what makes the minimum
  * interval apply across concurrent chats within the same plugin process.
@@ -82,10 +128,20 @@ const DEFAULT_PAGE_NUMBER = 1
 const sharedRateLimiter = new RateLimiter(MIN_REQUEST_INTERVAL_MS)
 
 /**
+ * Runtime hooks consumed by the image-batch helper: warning logger and cancellation signal.
+ */
+interface ImageBatchContext {
+  /** Logger used to surface non-fatal download failures. */
+  warn: (message: string) => void
+  /** Signal used to abort the in-flight downloads. */
+  signal: AbortSignal
+}
+
+/**
  * Creates and configures the DuckDuckGo tools provider.
  *
  * @param ctl Tools provider controller supplied by the LM Studio SDK.
- * @returns The registered web and image search tools.
+ * @returns The registered web search, image search, visit website, and view images tools.
  */
 export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[]> {
   const impit = new Impit({ browser: "chrome" })
@@ -97,10 +153,18 @@ export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[
     SEARCH_CACHE_TTL_MS,
     SEARCH_CACHE_MAX_SIZE
   )
+  const websiteCache = new TTLCache<string>(
+    path.join(cacheRoot, WEBSITE_CACHE_SUBDIR),
+    WEBSITE_CACHE_TTL_MS,
+    WEBSITE_CACHE_MAX_SIZE
+  )
+  const websiteFetch = new WebsiteFetchService(impit, websiteCache)
   const webSearchTool = createWebSearchTool(ctl, duckDuckGoService, searchCache, sharedRateLimiter)
   const imageSearchTool = createImageSearchTool(ctl, duckDuckGoService, sharedRateLimiter, impit)
+  const visitWebsiteTool = createVisitWebsiteTool(ctl, websiteFetch, impit, sharedRateLimiter)
+  const viewImagesTool = createViewImagesTool(ctl, websiteFetch, impit, sharedRateLimiter)
 
-  return [webSearchTool, imageSearchTool]
+  return [webSearchTool, imageSearchTool, visitWebsiteTool, viewImagesTool]
 }
 
 /**
@@ -262,30 +326,22 @@ function createImageSearchTool(
         }
 
         context.status(`Found ${imageUrls.length} images. Fetching...`)
-        const workingDirectory = ctl.getWorkingDirectory()
-        const timestamp = Date.now()
-        const downloadPromises = imageUrls.map(async (url, index) =>
-          downloadImage(
-            url,
-            impit,
-            {
-              workingDirectory,
-              timestamp,
-              index: index + 1,
-            },
-            {
-              warn: context.warn,
-              signal: context.signal,
-            }
-          )
+        const batch = await downloadImageBatch(
+          imageUrls,
+          impit,
+          { workingDirectory: ctl.getWorkingDirectory(), timestamp: Date.now() },
+          { warn: context.warn, signal: context.signal }
         )
-        const settled = await Promise.all(downloadPromises)
-        const downloadedPaths = settled.filter(
-          (downloadedPath): downloadedPath is string => downloadedPath !== undefined
-        )
+        const downloadedPaths: string[] = []
+
+        for (const result of batch) {
+          if (result.ok) {
+            downloadedPaths.push(result.localPath)
+          }
+        }
 
         if (downloadedPaths.length === 0) {
-          context.warn("Error fetching images")
+          context.warn(IMAGE_FETCH_FAILURE_MESSAGE)
 
           return imageUrls
         }
@@ -298,4 +354,292 @@ function createImageSearchTool(
       }
     },
   })
+}
+
+/**
+ * Creates the Visit Website tool, which fetches an arbitrary web page and returns its
+ * headings, links, downloaded images, and a search-term-aware slice of its visible text.
+ *
+ * @param ctl Tools provider controller supplied by the LM Studio SDK.
+ * @param websiteFetch Shared website-fetch service used to retrieve HTML.
+ * @param impit Shared HTTP client reused for image downloads.
+ * @param rateLimiter Shared limiter enforcing the minimum gap between outbound requests.
+ * @returns The configured Visit Website tool.
+ */
+function createVisitWebsiteTool(
+  ctl: ToolsProviderController,
+  websiteFetch: WebsiteFetchService,
+  impit: Impit,
+  rateLimiter: RateLimiter
+): Tool {
+  return tool({
+    name: "Visit Website",
+    description:
+      "Visit a website and return its title, headings, links, images, and text content. Images are automatically downloaded and viewable.",
+    parameters: {
+      url: z.string().url().describe("The URL of the website to visit"),
+      findInPage: z
+        .array(z.string())
+        .optional()
+        .describe(
+          "Highly recommended! Optional search terms to prioritize which links, images, and content to return."
+        ),
+      maxLinks: z
+        .number()
+        .int()
+        .min(MIN_EXTRACTION_COUNT)
+        .max(MAX_EXTRACTION_COUNT)
+        .optional()
+        .describe("Maximum number of links to extract from the page."),
+      maxImages: z
+        .number()
+        .int()
+        .min(MIN_EXTRACTION_COUNT)
+        .max(MAX_EXTRACTION_COUNT)
+        .optional()
+        .describe("Maximum number of images to extract from the page."),
+      contentLimit: z
+        .number()
+        .int()
+        .min(MIN_CONTENT_LIMIT)
+        .max(MAX_CONTENT_LIMIT)
+        .optional()
+        .describe("Maximum text content length to extract from the page."),
+    },
+    /**
+     * Executes a website visit, parsing the HTML and downloading any referenced images.
+     *
+     * @param args Validated tool parameters.
+     * @param args.url URL of the website to visit.
+     * @param args.findInPage Optional search terms that bias ranking and content slicing.
+     * @param args.maxLinks Optional per-call override for the number of extracted links.
+     * @param args.maxImages Optional per-call override for the number of extracted images.
+     * @param args.contentLimit Optional per-call override for the visible-text character budget.
+     * @param context Runtime tool context supplied by the SDK.
+     * @returns The structured page summary or a user-facing error string.
+     */
+    implementation: async (
+      {
+        url,
+        findInPage,
+        maxLinks: parameterMaxLinks,
+        maxImages: parameterMaxImages,
+        contentLimit: parameterContentLimit,
+      },
+      context
+    ) => {
+      context.status("Visiting website...")
+      await rateLimiter.waitIfNeeded()
+
+      try {
+        const { maxLinks, maxImages, contentLimit } = resolveConfig(ctl, {
+          maxLinks: parameterMaxLinks,
+          maxImages: parameterMaxImages,
+          contentLimit: parameterContentLimit,
+        })
+        const html = await websiteFetch.fetchHtml(url, { signal: context.signal })
+        context.status("Website visited successfully.")
+        const dom = parseWebsiteDocument(html)
+        const headings = extractHeadings(dom)
+        const links = extractLinks(dom, url, maxLinks, findInPage)
+        const images = await extractAndDownloadImages(
+          dom,
+          url,
+          maxImages,
+          findInPage,
+          impit,
+          ctl.getWorkingDirectory(),
+          { warn: context.warn, signal: context.signal }
+        )
+        const content = buildContent(dom, contentLimit, findInPage)
+
+        return {
+          url,
+          ...headings,
+          ...(links.length > 0 ? { links } : {}),
+          ...(images.length > 0 ? { images } : {}),
+          ...(content.length > 0 ? { content } : {}),
+        }
+      } catch (error) {
+        return formatToolError(error, context, "website")
+      }
+    },
+  })
+}
+
+/**
+ * Creates the View Images tool, which downloads images from an explicit URL list, from a
+ * website, or both, exposing the results as Markdown image references.
+ *
+ * @param ctl Tools provider controller supplied by the LM Studio SDK.
+ * @param websiteFetch Shared website-fetch service used when extracting images from a page.
+ * @param impit Shared HTTP client reused for image downloads.
+ * @param rateLimiter Shared limiter enforcing the minimum gap between outbound requests.
+ * @returns The configured View Images tool.
+ */
+function createViewImagesTool(
+  ctl: ToolsProviderController,
+  websiteFetch: WebsiteFetchService,
+  impit: Impit,
+  rateLimiter: RateLimiter
+): Tool {
+  return tool({
+    name: "View Images",
+    description: "Download images from a website or a list of image URLs to make them viewable.",
+    parameters: {
+      imageURLs: z
+        .array(z.string().url())
+        .optional()
+        .describe("List of image URLs to view that were not obtained via the Visit Website tool."),
+      websiteURL: z.string().url().optional().describe("The URL of the website, whose images to view."),
+      maxImages: z
+        .number()
+        .int()
+        .min(MIN_VIEW_IMAGES_COUNT)
+        .max(MAX_EXTRACTION_COUNT)
+        .optional()
+        .describe("Maximum number of images to view when websiteURL is provided."),
+    },
+    /**
+     * Executes an image download batch, optionally preceded by scraping image URLs from a page.
+     *
+     * @param args Validated tool parameters.
+     * @param args.imageURLs Explicit URLs to download.
+     * @param args.websiteURL Optional page to scrape for additional image URLs.
+     * @param args.maxImages Optional per-call override for the number of page-scraped images.
+     * @param context Runtime tool context supplied by the SDK.
+     * @returns Markdown image strings interleaved with per-URL error messages, or a user-facing error string.
+     */
+    implementation: async ({ imageURLs, websiteURL, maxImages: parameterMaxImages }, context) => {
+      const explicitUrls = imageURLs ?? []
+      const hasWebsite = websiteURL !== undefined && websiteURL !== ""
+
+      if (explicitUrls.length === 0 && !hasWebsite) {
+        return "Error: Provide at least one of imageURLs or websiteURL."
+      }
+
+      try {
+        const { maxImages } = resolveConfig(ctl, { maxImages: parameterMaxImages })
+        const collected: string[] = [...explicitUrls]
+
+        if (hasWebsite) {
+          context.status("Fetching image URLs from website...")
+          await rateLimiter.waitIfNeeded()
+          const html = await websiteFetch.fetchHtml(websiteURL, { signal: context.signal })
+          const dom = parseWebsiteDocument(html)
+          const scraped = extractPageImages(dom, websiteURL, maxImages)
+
+          for (const image of scraped) {
+            collected.push(image.src)
+          }
+        }
+
+        if (collected.length === 0) {
+          context.warn(IMAGE_FETCH_FAILURE_MESSAGE)
+
+          return collected
+        }
+
+        context.status("Downloading images...")
+        const batch = await downloadImageBatch(
+          collected,
+          impit,
+          { workingDirectory: ctl.getWorkingDirectory(), timestamp: Date.now() },
+          { warn: context.warn, signal: context.signal }
+        )
+        const rendered = batch.map((result, index) =>
+          result.ok ? `![Image ${index + 1}](${result.localPath})` : `Error fetching image from URL: ${result.url}`
+        )
+
+        if (rendered.length === 0) {
+          context.warn(IMAGE_FETCH_FAILURE_MESSAGE)
+
+          return collected
+        }
+
+        context.status(`Downloaded ${rendered.length} images successfully.`)
+
+        return rendered
+      } catch (error) {
+        return formatToolError(error, context, "image-download")
+      }
+    },
+  })
+}
+
+/**
+ * Extract up to `maxImages` images from the parsed page, download them through the shared
+ * batch helper, and return `[alt, markdownOrError]` tuples in document order.
+ *
+ * @param dom Parsed website DOM.
+ * @param url Absolute URL of the page, used as the resolution base for relative sources.
+ * @param maxImages Upper bound on the number of images to extract and download.
+ * @param searchTerms Optional terms biasing extraction ranking.
+ * @param impit Shared HTTP client used for the downloads.
+ * @param workingDirectory Directory into which downloaded files are written.
+ * @param context Runtime hooks used for cancellation and warning output.
+ * @returns Tuples of alt text paired with a Markdown image reference or a per-image error string.
+ */
+async function extractAndDownloadImages(
+  dom: JSDOM,
+  url: string,
+  maxImages: number,
+  searchTerms: string[] | undefined,
+  impit: Impit,
+  workingDirectory: string,
+  context: ImageBatchContext
+): Promise<Array<[string, string]>> {
+  if (maxImages === 0) {
+    return []
+  }
+
+  const images = extractPageImages(dom, url, maxImages, searchTerms)
+
+  if (images.length === 0) {
+    return []
+  }
+
+  const batch = await downloadImageBatch(
+    images.map(image => image.src),
+    impit,
+    { workingDirectory, timestamp: Date.now() },
+    context
+  )
+
+  return images.map((image, index) => {
+    const result = batch[index]
+    const markdown = result.ok
+      ? `![Image ${index + 1}](${result.localPath})`
+      : `Error fetching image from URL: ${image.src}`
+
+    return [image.alt, markdown] as [string, string]
+  })
+}
+
+/**
+ * Build the visible-text payload for the Visit Website tool: when search terms are supplied
+ * and the full text exceeds the budget, concatenate dedup-merged windows around each term;
+ * otherwise return a head slice of the full text.
+ *
+ * @param dom Parsed website DOM.
+ * @param contentLimit Character budget for the returned text.
+ * @param searchTerms Optional search terms biasing content selection.
+ * @returns The formatted content string, or an empty string when `contentLimit` is zero.
+ */
+function buildContent(dom: JSDOM, contentLimit: number, searchTerms: string[] | undefined): string {
+  if (contentLimit <= 0) {
+    return ""
+  }
+
+  const allContent = extractVisibleText(dom)
+
+  if (searchTerms !== undefined && searchTerms.length > 0 && contentLimit < allContent.length) {
+    const sliced = sliceAroundTerms(allContent, searchTerms, contentLimit)
+
+    if (sliced.length > 0) {
+      return sliced
+    }
+  }
+
+  return allContent.slice(0, contentLimit)
 }

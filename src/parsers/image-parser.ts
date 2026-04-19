@@ -7,8 +7,15 @@ import type { DuckDuckGoImageResult } from "../types"
 /**
  * Image file extensions recognized as supported download targets.
  */
-const SUPPORTED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp"] as const
-const IMAGE_EXTENSION_PATTERN = /\.(jpg|jpeg|png|gif|webp)(?:\?|$)/i
+const SUPPORTED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "svg"] as const
+/**
+ * Pattern matching recognised image extensions at the end of a URL path, optionally followed by a query string.
+ */
+const IMAGE_EXTENSION_PATTERN = /\.(jpg|jpeg|png|gif|webp|svg)(?:\?|$)/i
+/**
+ * Pattern matching recognised image MIME subtypes inside a `content-type` header value.
+ */
+const IMAGE_CONTENT_TYPE_PATTERN = /image\/(jpeg|jpg|png|gif|webp|svg\+xml)/i
 
 /**
  * Extracts and validates image URLs from search results.
@@ -79,7 +86,7 @@ function extractExtensionFromContentType(contentType: string | null): string | u
     return undefined
   }
 
-  const match = /image\/(jpeg|jpg|png|gif|webp)/i.exec(contentType)
+  const match = IMAGE_CONTENT_TYPE_PATTERN.exec(contentType)
 
   return match?.[1]
 }
@@ -97,13 +104,23 @@ function extractExtensionFromUrl(url: string): string | undefined {
 }
 
 /**
- * Normalizes image extension (jpeg -> jpg).
+ * Normalizes image extension (`jpeg` to `jpg`, `svg+xml` to `svg`).
  *
  * @param extension Raw extension string.
  * @returns The canonical extension form.
  */
 function normalizeExtension(extension: string): string {
-  return extension === "jpeg" ? "jpg" : extension
+  const lower = extension.toLowerCase()
+
+  if (lower === "jpeg") {
+    return "jpg"
+  }
+
+  if (lower === "svg+xml") {
+    return "svg"
+  }
+
+  return lower
 }
 
 /**

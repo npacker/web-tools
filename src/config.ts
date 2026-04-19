@@ -40,4 +40,55 @@ export const configSchematics = createConfigSchematics()
     },
     AUTO_CONFIG_VALUE
   )
+  .field(
+    "maxLinks",
+    "numeric",
+    {
+      displayName: "Visit Website: Max Links",
+      subtitle: "Between 0 and 200, 0 = auto",
+      min: 0,
+      max: 200,
+      int: true,
+      slider: {
+        step: 1,
+        min: 0,
+        max: 200,
+      },
+    },
+    0
+  )
+  .field(
+    "maxImages",
+    "numeric",
+    {
+      displayName: "Visit Website: Max Images",
+      subtitle: "Between 0 and 200, 0 = auto",
+      min: 0,
+      max: 200,
+      int: true,
+      slider: {
+        step: 1,
+        min: 0,
+        max: 200,
+      },
+    },
+    0
+  )
+  .field(
+    "contentLimit",
+    "numeric",
+    {
+      displayName: "Visit Website: Content Character Limit",
+      subtitle: "Between 0 and 10000, 0 = auto",
+      min: 0,
+      max: 10_000,
+      int: true,
+      slider: {
+        step: 100,
+        min: 0,
+        max: 10_000,
+      },
+    },
+    0
+  )
   .build()

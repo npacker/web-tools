@@ -17,6 +17,18 @@ export const DEFAULT_PAGE_SIZE = 5
  */
 export const DEFAULT_SAFE_SEARCH = "moderate" as const
 /**
+ * Default number of links extracted by the Visit Website tool when no value is provided.
+ */
+export const DEFAULT_MAX_LINKS = 40
+/**
+ * Default number of images extracted by the Visit Website and View Images tools when no value is provided.
+ */
+export const DEFAULT_MAX_IMAGES = 10
+/**
+ * Default visible-text character budget for the Visit Website tool when no value is provided.
+ */
+export const DEFAULT_CONTENT_LIMIT = 2000
+/**
  * Fully resolved configuration used by a tool invocation.
  */
 export interface ResolvedConfig {
@@ -24,6 +36,12 @@ export interface ResolvedConfig {
   pageSize: number
   /** Safe-search mode to apply to the request. */
   safeSearch: SafeSearch
+  /** Maximum number of links returned by the Visit Website tool. */
+  maxLinks: number
+  /** Maximum number of images returned by the Visit Website and View Images tools. */
+  maxImages: number
+  /** Visible-text character budget for the Visit Website tool. */
+  contentLimit: number
 }
 /**
  * Optional per-invocation overrides applied on top of plugin configuration.
@@ -33,6 +51,12 @@ export interface ConfigOverrides {
   pageSize?: number
   /** Safe-search override provided by the caller. */
   safeSearch?: SafeSearch
+  /** Max-links override provided by the caller. */
+  maxLinks?: number
+  /** Max-images override provided by the caller. */
+  maxImages?: number
+  /** Content-limit override provided by the caller. */
+  contentLimit?: number
 }
 
 /**
@@ -47,10 +71,17 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
   const pluginConfig = ctl.getPluginConfig(configSchematics)
   const pluginPageSize = pluginConfig.get("pageSize") as number | null
   const pluginSafeSearch = pluginConfig.get("safeSearch") as SafeSearch | typeof AUTO_CONFIG_VALUE
-  const pageSize = resolvePageSize(pluginPageSize, overrides.pageSize)
-  const safeSearch = resolveSafeSearch(pluginSafeSearch, overrides.safeSearch)
+  const pluginMaxLinks = pluginConfig.get("maxLinks") as number | null
+  const pluginMaxImages = pluginConfig.get("maxImages") as number | null
+  const pluginContentLimit = pluginConfig.get("contentLimit") as number | null
 
-  return { pageSize, safeSearch }
+  return {
+    pageSize: resolvePageSize(pluginPageSize, overrides.pageSize),
+    safeSearch: resolveSafeSearch(pluginSafeSearch, overrides.safeSearch),
+    maxLinks: resolveAutoNumeric(pluginMaxLinks, overrides.maxLinks, DEFAULT_MAX_LINKS),
+    maxImages: resolveAutoNumeric(pluginMaxImages, overrides.maxImages, DEFAULT_MAX_IMAGES),
+    contentLimit: resolveAutoNumeric(pluginContentLimit, overrides.contentLimit, DEFAULT_CONTENT_LIMIT),
+  }
 }
 
 /**
@@ -80,4 +111,18 @@ function resolveSafeSearch(
   const fromPlugin = pluginValue === AUTO_CONFIG_VALUE ? undefined : pluginValue
 
   return fromPlugin ?? override ?? DEFAULT_SAFE_SEARCH
+}
+
+/**
+ * Resolves a numeric plugin value that treats `0` as an "auto" sentinel.
+ *
+ * @param pluginValue Value read from plugin configuration, or `null` when unset.
+ * @param override Runtime override from the tool invocation.
+ * @param defaultValue Fallback value when neither plugin nor override supplies a concrete number.
+ * @returns The effective numeric value.
+ */
+function resolveAutoNumeric(pluginValue: number | null, override: number | undefined, defaultValue: number): number {
+  const fromPlugin = pluginValue !== null && pluginValue !== 0 ? pluginValue : undefined
+
+  return fromPlugin ?? override ?? defaultValue
 }

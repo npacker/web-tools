@@ -9,6 +9,7 @@ import { Impit } from "impit"
 
 import { isAbortError, getErrorMessage } from "../errors"
 import { determineImageExtension } from "../parsers"
+import { normalizePath } from "../utils"
 
 /**
  * Timeout applied to each image download, in milliseconds.
@@ -105,14 +106,4 @@ async function fetchImageWithTimeout(
     method: "GET",
     signal: combinedSignal,
   })
-}
-
-/**
- * Normalizes file path for cross-platform compatibility.
- *
- * @param filePath Absolute filesystem path produced by `path.join`.
- * @returns Path using forward slashes and with Windows drive letters removed.
- */
-function normalizePath(filePath: string): string {
-  return filePath.replaceAll("\\", "/").replace(/^\/?[A-Z]:/, "")
 }
