@@ -2,7 +2,10 @@
  * User-facing error formatting for tool invocations.
  */
 
-import { FetchError, NoResultsError, SearchAbortedError, VqdTokenError, errorMessage, isAbortError } from "../errors"
+import { VqdTokenError } from "../duckduckgo/vqd-token-error"
+import { FetchError } from "../http/fetch-error"
+
+import { NoResultsError, SearchAbortedError } from "./search-errors"
 
 /**
  * Minimal context surface required by the tool-error formatter for warning output.
@@ -83,4 +86,24 @@ export function formatToolError(error: unknown, context: ToolErrorContext, kind:
   context.warn(`${templates.unexpectedPrefix}: ${message}`)
 
   return `Error: ${message}`
+}
+
+/**
+ * Determine whether a thrown value represents an abort signal firing.
+ *
+ * @param error Thrown value to inspect.
+ * @returns `true` when the value is a DOM abort error.
+ */
+export function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError"
+}
+
+/**
+ * Extract a human-readable message from an arbitrary thrown value.
+ *
+ * @param error Thrown value to stringify.
+ * @returns The error message when the value is an `Error`, otherwise the stringified value.
+ */
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }

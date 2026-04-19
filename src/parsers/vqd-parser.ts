@@ -4,7 +4,7 @@
 
 import { JSDOM } from "jsdom"
 
-import { VqdTokenError } from "../errors"
+import { VqdTokenError } from "../duckduckgo/vqd-token-error"
 
 /**
  * CSS selector matching the VQD token input element on the DuckDuckGo homepage.

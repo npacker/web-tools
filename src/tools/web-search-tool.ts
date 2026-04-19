@@ -8,8 +8,8 @@ import { z } from "zod"
 import { type TTLCache, searchCacheKey, type SearchResultsPayload } from "../cache"
 import { resolveConfig } from "../config/resolve-config"
 import { searchWeb } from "../duckduckgo"
-import { NoResultsError } from "../errors"
 
+import { NoResultsError } from "./search-errors"
 import { formatToolError } from "./tool-error"
 
 import type { RateLimiter } from "../timing"

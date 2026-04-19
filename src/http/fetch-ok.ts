@@ -2,7 +2,7 @@
  * Shared `impit` GET helper that throws on non-2xx responses.
  */
 
-import { FetchError } from "../errors"
+import { FetchError } from "./fetch-error"
 
 import type { Impit } from "impit"
 

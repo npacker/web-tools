@@ -7,9 +7,9 @@ import path from "node:path"
 
 import { fileTypeFromBuffer } from "file-type"
 
-import { isAbortError, errorMessage } from "../errors"
 import { toMarkdownPath } from "../fs"
 import { imageExtensionFromHeaders, isSupportedImageExtension, normalizeImageExtension } from "../parsers"
+import { isAbortError, errorMessage } from "../tools/tool-error"
 
 import type { Impit } from "impit"
 
