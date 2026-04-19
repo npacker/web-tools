@@ -9,8 +9,8 @@ export const VQD_CACHE_TTL_MS = 10 * 60_000 // 10 minutes
 export const VQD_CACHE_MAX_SIZE = 50
 
 // Rate limiting
-export const MIN_REQUEST_INTERVAL_MS = 5_000 // 5 seconds between requests
-export const IMAGE_FETCH_DELAY_MS = 2_000 // 2 seconds delay after VQD token fetch
+export const MIN_REQUEST_INTERVAL_MS = 5000 // 5 seconds between requests
+export const IMAGE_FETCH_DELAY_MS = 2000 // 2 seconds delay after VQD token fetch
 
 // Image download
 export const IMAGE_DOWNLOAD_TIMEOUT_MS = 10_000 // 10 seconds timeout

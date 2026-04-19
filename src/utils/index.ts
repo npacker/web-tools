@@ -1,1 +1,1 @@
-export { RateLimiter } from "./RateLimiter"
+export { RateLimiter } from "./rate-limiter"

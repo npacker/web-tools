@@ -1,2 +1,2 @@
-export { resolveConfig } from "./configResolver"
-export type { ResolvedConfig, ConfigOverrides } from "./configResolver"
+export { resolveConfig } from "./config-resolver"
+export type { ResolvedConfig, ConfigOverrides } from "./config-resolver"

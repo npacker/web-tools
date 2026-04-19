@@ -3,8 +3,10 @@
  */
 
 import { ToolsProviderController } from "@lmstudio/sdk"
+
 import { configSchematics } from "../config"
 import { DEFAULT_PAGE_SIZE, DEFAULT_SAFE_SEARCH, AUTO_CONFIG_VALUE } from "../constants"
+
 import type { SafeSearch } from "../types"
 
 export interface ResolvedConfig {
@@ -36,10 +38,8 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
  * Resolves page size with proper priority
  */
 function resolvePageSize(pluginValue: number | null, override: number | undefined): number {
-  // Plugin config: 0 means auto/use default
   const fromPlugin = pluginValue !== null && pluginValue !== 0 ? pluginValue : undefined
 
-  // Priority: override > plugin > default
   return fromPlugin ?? override ?? DEFAULT_PAGE_SIZE
 }
 
@@ -50,9 +50,7 @@ function resolveSafeSearch(
   pluginValue: SafeSearch | typeof AUTO_CONFIG_VALUE,
   override: SafeSearch | undefined
 ): SafeSearch {
-  // Plugin config: "auto" means use default
-  const fromPlugin = pluginValue !== AUTO_CONFIG_VALUE ? pluginValue : undefined
+  const fromPlugin = pluginValue === AUTO_CONFIG_VALUE ? undefined : pluginValue
 
-  // Priority: override > plugin > default
   return fromPlugin ?? override ?? DEFAULT_SAFE_SEARCH
 }

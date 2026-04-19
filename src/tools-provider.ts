@@ -3,8 +3,11 @@
  */
 
 import { tool, Tool, ToolsProviderController } from "@lmstudio/sdk"
-import { z } from "zod"
 import { Impit } from "impit"
+import { z } from "zod"
+
+import { TTLCache } from "./cache"
+import { resolveConfig } from "./config/config-resolver"
 import {
   SEARCH_CACHE_TTL_MS,
   SEARCH_CACHE_MAX_SIZE,
@@ -20,14 +23,13 @@ import {
   DEFAULT_PAGE_SIZE,
   DEFAULT_SAFE_SEARCH,
 } from "./constants"
-import type { SafeSearch } from "./types"
-import { TTLCache } from "./cache"
-import { RateLimiter } from "./utils/RateLimiter"
-import { DuckDuckGoService } from "./services/DuckDuckGoService"
-import { extractImageUrls } from "./parsers"
-import { downloadImage } from "./services/ImageDownloadService"
-import { resolveConfig } from "./config/configResolver"
 import { SearchAbortedError, NoResultsError, VqdTokenError, FetchError, isAbortError, getErrorMessage } from "./errors"
+import { extractImageUrls } from "./parsers"
+import { DuckDuckGoService } from "./services/duck-duck-go-service"
+import { downloadImage } from "./services/image-download-service"
+import { RateLimiter } from "./utils/rate-limiter"
+
+import type { SafeSearch } from "./types"
 
 /**
  * Creates and configures the DuckDuckGo tools provider
@@ -86,31 +88,31 @@ function createWebSearchTool(
         .default(DEFAULT_PAGE_NUMBER)
         .describe("Page number for pagination"),
     },
-    implementation: async ({ query, pageSize: paramPageSize, safeSearch: paramSafeSearch, page }, ctx) => {
-      ctx.status("Initiating DuckDuckGo web search...")
+    implementation: async ({ query, pageSize: parameterPageSize, safeSearch: parameterSafeSearch, page }, context) => {
+      context.status("Initiating DuckDuckGo web search...")
       await rateLimiter.waitIfNeeded()
 
       try {
         const { pageSize, safeSearch } = resolveConfig(ctl, {
-          pageSize: paramPageSize,
-          safeSearch: paramSafeSearch,
+          pageSize: parameterPageSize,
+          safeSearch: parameterSafeSearch,
         })
 
         const cached = getFromCache(cache, "web", query, safeSearch, page)
 
         if (cached !== undefined) {
-          ctx.status(`Found ${cached.count} web pages (cached).`)
+          context.status(`Found ${cached.count} web pages (cached).`)
           return cached.results
         }
 
-        const params = { query, pageSize, safeSearch, page }
-        const result = await service.searchWeb(params, { signal: ctx.signal })
+        const parameters = { query, pageSize, safeSearch, page }
+        const result = await service.searchWeb(parameters, { signal: context.signal })
 
         if (result.results.length === 0) {
           throw new NoResultsError("web")
         }
 
-        ctx.status(`Found ${result.results.length} web pages.`)
+        context.status(`Found ${result.results.length} web pages.`)
 
         const cacheEntry = {
           results: result.results.map(({ label, url }) => [label, url] as [string, string]),
@@ -121,7 +123,7 @@ function createWebSearchTool(
 
         return cacheEntry.results
       } catch (error) {
-        return handleSearchError(error, ctx)
+        return handleSearchError(error, context)
       }
     },
   })
@@ -160,28 +162,28 @@ function createImageSearchTool(
         .default(DEFAULT_PAGE_NUMBER)
         .describe("Page number for pagination"),
     },
-    implementation: async ({ query, pageSize: paramPageSize, safeSearch: paramSafeSearch, page }, ctx) => {
-      ctx.status("Initiating DuckDuckGo image search...")
+    implementation: async ({ query, pageSize: parameterPageSize, safeSearch: parameterSafeSearch, page }, context) => {
+      context.status("Initiating DuckDuckGo image search...")
       await rateLimiter.waitIfNeeded()
 
       try {
         const { pageSize, safeSearch } = resolveConfig(ctl, {
-          pageSize: paramPageSize,
-          safeSearch: paramSafeSearch,
+          pageSize: parameterPageSize,
+          safeSearch: parameterSafeSearch,
         })
 
-        const vqd = await getVqdToken(query, service, vqdCache, ctx.signal)
+        const vqd = await getVqdToken(query, service, vqdCache, context.signal)
 
         if (vqd === undefined) {
-          ctx.warn("Failed to extract vqd token.")
+          context.warn("Failed to extract vqd token.")
           throw new VqdTokenError()
         }
 
         await delay(IMAGE_FETCH_DELAY_MS)
 
-        const params = { query, pageSize, safeSearch, page }
-        const imageResults = await service.searchImages(params, vqd, {
-          signal: ctx.signal,
+        const parameters = { query, pageSize, safeSearch, page }
+        const imageResults = await service.searchImages(parameters, vqd, {
+          signal: context.signal,
         })
 
         const imageUrls = extractImageUrls(imageResults, pageSize)
@@ -190,7 +192,7 @@ function createImageSearchTool(
           throw new NoResultsError("image")
         }
 
-        ctx.status(`Found ${imageUrls.length} images. Fetching...`)
+        context.status(`Found ${imageUrls.length} images. Fetching...`)
 
         const workingDirectory = ctl.getWorkingDirectory()
         const timestamp = Date.now()
@@ -205,24 +207,27 @@ function createImageSearchTool(
               index: index + 1,
             },
             {
-              warn: ctx.warn,
-              signal: ctx.signal,
+              warn: context.warn,
+              signal: context.signal,
             }
           )
         )
 
-        const downloadedPaths = (await Promise.all(downloadPromises)).filter((path): path is string => path !== null)
+        const settled = await Promise.all(downloadPromises)
+        const downloadedPaths = settled.filter(
+          (downloadedPath): downloadedPath is string => downloadedPath !== undefined
+        )
 
         if (downloadedPaths.length === 0) {
-          ctx.warn("Error fetching images")
+          context.warn("Error fetching images")
           return imageUrls
         }
 
-        ctx.status(`Downloaded ${downloadedPaths.length} images successfully.`)
+        context.status(`Downloaded ${downloadedPaths.length} images successfully.`)
 
         return downloadedPaths
       } catch (error) {
-        return handleSearchError(error, ctx)
+        return handleSearchError(error, context)
       }
     },
   })
@@ -288,7 +293,7 @@ function setInCache(
  */
 function handleSearchError(
   error: unknown,
-  ctx: {
+  context: {
     warn: (message: string) => void
   }
 ): string | string[] {
@@ -309,12 +314,12 @@ function handleSearchError(
   }
 
   if (error instanceof FetchError) {
-    ctx.warn(`Failed to fetch search results: ${error.message}`)
+    context.warn(`Failed to fetch search results: ${error.message}`)
     return `Error: Failed to fetch search results: ${error.message}`
   }
 
   const message = getErrorMessage(error)
-  ctx.warn(`Error during search: ${message}`)
+  context.warn(`Error during search: ${message}`)
   return `Error: ${message}`
 }
 

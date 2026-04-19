@@ -5,8 +5,9 @@
  */
 
 import { PluginContext } from "@lmstudio/sdk"
-import { toolsProvider } from "./toolsProvider"
+
 import { configSchematics } from "./config"
+import { toolsProvider } from "./tools-provider"
 
 export async function main(context: PluginContext): Promise<void> {
   context.withConfigSchematics(configSchematics)

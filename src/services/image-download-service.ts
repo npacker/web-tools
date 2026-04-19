@@ -2,12 +2,14 @@
  * Image download service
  */
 
-import { join } from "path"
-import { writeFile } from "fs/promises"
+import { writeFile } from "node:fs/promises"
+import path from "node:path"
+
 import { Impit } from "impit"
+
 import { IMAGE_DOWNLOAD_TIMEOUT_MS } from "../constants"
-import { determineImageExtension } from "../parsers"
 import { isAbortError, getErrorMessage } from "../errors"
+import { determineImageExtension } from "../parsers"
 
 export interface DownloadContext {
   warn: (message: string) => void
@@ -28,25 +30,25 @@ export async function downloadImage(
   impit: Impit,
   options: DownloadOptions,
   context: DownloadContext
-): Promise<string | null> {
+): Promise<string | undefined> {
   try {
     const response = await fetchImageWithTimeout(url, impit, context.signal)
 
     if (!response.ok) {
       context.warn(`Failed to fetch image ${options.index}: ${response.statusText}`)
-      return null
+      return undefined
     }
 
     const bytes = await response.bytes()
 
     if (bytes.length === 0) {
       context.warn(`Image ${options.index} is empty: ${url}`)
-      return null
+      return undefined
     }
 
     const fileExtension = determineImageExtension(response.headers.get("content-type"), url)
     const fileName = `${options.timestamp}-${options.index}.${fileExtension}`
-    const filePath = join(options.workingDirectory, fileName)
+    const filePath = path.join(options.workingDirectory, fileName)
 
     await writeFile(filePath, bytes)
 
@@ -55,11 +57,11 @@ export async function downloadImage(
     return localPath
   } catch (error) {
     if (isAbortError(error)) {
-      return null
+      return undefined
     }
 
     context.warn(`Error fetching image ${options.index}: ${getErrorMessage(error)}`)
-    return null
+    return undefined
   }
 }
 
@@ -84,5 +86,5 @@ async function fetchImageWithTimeout(
  * Normalizes file path for cross-platform compatibility
  */
 function normalizePath(filePath: string): string {
-  return filePath.replace(/\\/g, "/").replace(/^(?:\/)?[A-Z]:/, "")
+  return filePath.replaceAll("\\", "/").replace(/^\/?[A-Z]:/, "")
 }

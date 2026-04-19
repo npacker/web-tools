@@ -2,7 +2,8 @@
   "compilerOptions": {
     "strict": true,
     "module": "CommonJS",
-    "target": "ES2021",
+    "target": "ES2023",
+    "lib": ["ES2023"],
     "declaration": true,
     "noImplicitOverride": true,
     "sourceMap": true,

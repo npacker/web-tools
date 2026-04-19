@@ -1,2 +1,2 @@
-export { parseWebSearchResults, extractVqdToken } from "./htmlParser"
-export { extractImageUrls, determineImageExtension, isSupportedImageExtension } from "./imageParser"
+export { parseWebSearchResults, extractVqdToken } from "./html-parser"
+export { extractImageUrls, determineImageExtension, isSupportedImageExtension } from "./image-parser"

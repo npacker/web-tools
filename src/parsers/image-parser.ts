@@ -3,9 +3,10 @@
  */
 
 import { SUPPORTED_IMAGE_EXTENSIONS } from "../constants"
+
 import type { DuckDuckGoImageResult } from "../types"
 
-const IMAGE_EXTENSION_PATTERN = /\.(jpg|jpeg|png|gif|webp)(\?|$)/i
+const IMAGE_EXTENSION_PATTERN = /\.(jpg|jpeg|png|gif|webp)(?:\?|$)/i
 
 /**
  * Extracts and validates image URLs from search results
@@ -16,7 +17,7 @@ export function extractImageUrls(results: DuckDuckGoImageResult[], maxResults: n
   return results
     .slice(0, maxResults)
     .map(result => result.image)
-    .filter(isValidImageUrl)
+    .filter(url => isValidImageUrl(url))
     .filter(url => {
       if (seenUrls.has(url)) {
         return false
@@ -37,16 +38,16 @@ function isValidImageUrl(url: string): boolean {
  * Determines file extension from content type or URL
  */
 export function determineImageExtension(contentType: string | null, url: string): string {
-  const contentTypeExt = extractExtensionFromContentType(contentType)
+  const contentTypeExtension = extractExtensionFromContentType(contentType)
 
-  if (contentTypeExt !== undefined) {
-    return normalizeExtension(contentTypeExt)
+  if (contentTypeExtension !== undefined) {
+    return normalizeExtension(contentTypeExtension)
   }
 
-  const urlExt = extractExtensionFromUrl(url)
+  const urlExtension = extractExtensionFromUrl(url)
 
-  if (urlExt !== undefined) {
-    return normalizeExtension(urlExt)
+  if (urlExtension !== undefined) {
+    return normalizeExtension(urlExtension)
   }
 
   return "jpg"
@@ -60,7 +61,7 @@ function extractExtensionFromContentType(contentType: string | null): string | u
     return undefined
   }
 
-  const match = contentType.match(/image\/(jpeg|jpg|png|gif|webp)/i)
+  const match = /image\/(jpeg|jpg|png|gif|webp)/i.exec(contentType)
 
   return match?.[1]
 }
@@ -69,7 +70,7 @@ function extractExtensionFromContentType(contentType: string | null): string | u
  * Extracts extension from URL
  */
 function extractExtensionFromUrl(url: string): string | undefined {
-  const match = url.match(IMAGE_EXTENSION_PATTERN)
+  const match = IMAGE_EXTENSION_PATTERN.exec(url)
 
   return match?.[1]
 }
@@ -77,13 +78,13 @@ function extractExtensionFromUrl(url: string): string | undefined {
 /**
  * Normalizes image extension (jpeg -> jpg)
  */
-function normalizeExtension(ext: string): string {
-  return ext === "jpeg" ? "jpg" : ext
+function normalizeExtension(extension: string): string {
+  return extension === "jpeg" ? "jpg" : extension
 }
 
 /**
  * Checks if an extension is a supported image format
  */
-export function isSupportedImageExtension(ext: string): ext is (typeof SUPPORTED_IMAGE_EXTENSIONS)[number] {
-  return SUPPORTED_IMAGE_EXTENSIONS.includes(ext as (typeof SUPPORTED_IMAGE_EXTENSIONS)[number])
+export function isSupportedImageExtension(extension: string): extension is (typeof SUPPORTED_IMAGE_EXTENSIONS)[number] {
+  return SUPPORTED_IMAGE_EXTENSIONS.includes(extension as (typeof SUPPORTED_IMAGE_EXTENSIONS)[number])
 }

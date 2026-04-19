@@ -1,2 +1,2 @@
-export { TTLCache } from "./TTLCache"
-export type { CacheEntry } from "./TTLCache"
+export { TTLCache } from "./ttl-cache"
+export type { CacheEntry } from "./ttl-cache"

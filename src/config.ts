@@ -1,4 +1,5 @@
 import { createConfigSchematics } from "@lmstudio/sdk"
+
 import { AUTO_CONFIG_VALUE } from "./constants"
 
 export const configSchematics = createConfigSchematics()

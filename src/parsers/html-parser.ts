@@ -3,7 +3,9 @@
  */
 
 import { JSDOM } from "jsdom"
+
 import { RESULT_LINK_SELECTOR, VQD_INPUT_SELECTOR } from "../constants"
+
 import type { SearchResult } from "../types"
 
 /**
@@ -67,5 +69,5 @@ function normalizeText(text: string | null | undefined): string {
     return ""
   }
 
-  return text.replace(/\s+/g, " ").trim()
+  return text.replaceAll(/\s+/g, " ").trim()
 }

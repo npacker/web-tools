@@ -3,10 +3,12 @@
  */
 
 import { Impit } from "impit"
+
 import { DUCKDUCKGO_BASE_URL, WEB_SEARCH_PATH, IMAGE_SEARCH_PATH, VQD_FETCH_PATH } from "../constants"
-import type { SafeSearch, SearchParameters, SearchCacheEntry, DuckDuckGoImageResult } from "../types"
-import { extractVqdToken, parseWebSearchResults } from "../parsers"
 import { FetchError } from "../errors"
+import { extractVqdToken, parseWebSearchResults } from "../parsers"
+
+import type { SafeSearch, SearchParameters, SearchCacheEntry, DuckDuckGoImageResult } from "../types"
 
 export interface FetchOptions {
   signal: AbortSignal
@@ -22,11 +24,11 @@ export class DuckDuckGoService {
   /**
    * Performs a web search on DuckDuckGo
    */
-  public async searchWeb(params: SearchParameters, options: FetchOptions): Promise<SearchCacheEntry> {
-    const url = this.buildWebSearchUrl(params).toString()
+  public async searchWeb(parameters: SearchParameters, options: FetchOptions): Promise<SearchCacheEntry> {
+    const url = this.buildWebSearchUrl(parameters).toString()
     const response = await this.fetch(url, options)
     const html = await response.text()
-    const results = this.parseWebResults(html, params.pageSize)
+    const results = this.parseWebResults(html, parameters.pageSize)
 
     return {
       results,
@@ -54,11 +56,11 @@ export class DuckDuckGoService {
    * Performs an image search on DuckDuckGo
    */
   public async searchImages(
-    params: SearchParameters,
+    parameters: SearchParameters,
     vqd: string,
     options: FetchOptions
   ): Promise<DuckDuckGoImageResult[]> {
-    const url = this.buildImageSearchUrl(params, vqd).toString()
+    const url = this.buildImageSearchUrl(parameters, vqd).toString()
     const response = await this.fetch(url, options)
     const data = (await response.json()) as { results?: DuckDuckGoImageResult[] }
 
@@ -84,13 +86,13 @@ export class DuckDuckGoService {
   /**
    * Builds the URL for web search
    */
-  private buildWebSearchUrl(params: SearchParameters): URL {
+  private buildWebSearchUrl(parameters: SearchParameters): URL {
     const url = new URL(WEB_SEARCH_PATH, DUCKDUCKGO_BASE_URL)
-    url.searchParams.append("q", params.query)
-    url.searchParams.append("p", this.getSafeSearchParam(params.safeSearch))
+    url.searchParams.append("q", parameters.query)
+    url.searchParams.append("p", this.getSafeSearchParam(parameters.safeSearch))
 
-    if (params.page > 1) {
-      url.searchParams.append("s", this.calculateOffset(params.pageSize, params.page).toString())
+    if (parameters.page > 1) {
+      url.searchParams.append("s", this.calculateOffset(parameters.pageSize, parameters.page).toString())
     }
 
     return url
@@ -111,17 +113,17 @@ export class DuckDuckGoService {
   /**
    * Builds the URL for image search
    */
-  private buildImageSearchUrl(params: SearchParameters, vqd: string): URL {
+  private buildImageSearchUrl(parameters: SearchParameters, vqd: string): URL {
     const url = new URL(IMAGE_SEARCH_PATH, DUCKDUCKGO_BASE_URL)
-    url.searchParams.append("q", params.query)
+    url.searchParams.append("q", parameters.query)
     url.searchParams.append("o", "json")
     url.searchParams.append("l", "us-en")
     url.searchParams.append("vqd", vqd)
     url.searchParams.append("f", ",,,,,")
-    url.searchParams.append("p", this.getSafeSearchParam(params.safeSearch))
+    url.searchParams.append("p", this.getSafeSearchParam(parameters.safeSearch))
 
-    if (params.page > 1) {
-      url.searchParams.append("s", this.calculateOffset(params.pageSize, params.page).toString())
+    if (parameters.page > 1) {
+      url.searchParams.append("s", this.calculateOffset(parameters.pageSize, parameters.page).toString())
     }
 
     return url
