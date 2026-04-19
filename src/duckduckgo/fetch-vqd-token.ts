@@ -5,7 +5,6 @@
 import { Impit } from "impit"
 
 import { TTLCache } from "../cache"
-import { VqdTokenError } from "../errors"
 import { fetchOk } from "../http"
 import { extractVqdToken } from "../parsers"
 
@@ -41,11 +40,6 @@ export async function fetchVqdToken(
   const response = await fetchOk(impit, url, options)
   const html = await response.text()
   const vqd = extractVqdToken(html)
-
-  if (vqd === undefined) {
-    throw new VqdTokenError()
-  }
-
   await vqdCache.set(cacheKey, vqd)
 
   return vqd
