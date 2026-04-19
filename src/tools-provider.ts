@@ -74,6 +74,12 @@ const MAX_PAGE_NUMBER = 100
  * Default page number when no value is provided.
  */
 const DEFAULT_PAGE_NUMBER = 1
+/**
+ * Module-scoped rate limiter shared across every tools-provider session. The LM Studio SDK invokes
+ * `toolsProvider` once per session, so holding this at module scope is what makes the minimum
+ * interval apply across concurrent chats within the same plugin process.
+ */
+const sharedRateLimiter = new RateLimiter(MIN_REQUEST_INTERVAL_MS)
 
 /**
  * Creates and configures the DuckDuckGo tools provider.
@@ -83,7 +89,6 @@ const DEFAULT_PAGE_NUMBER = 1
  */
 export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[]> {
   const impit = new Impit({ browser: "chrome" })
-  const rateLimiter = new RateLimiter(MIN_REQUEST_INTERVAL_MS)
   const cacheRoot = path.join(ctl.getWorkingDirectory(), CACHE_DIRECTORY_NAME)
   const vqdCache = new TTLCache<string>(path.join(cacheRoot, VQD_CACHE_SUBDIR), VQD_CACHE_TTL_MS, VQD_CACHE_MAX_SIZE)
   const duckDuckGoService = new DuckDuckGoService(impit, vqdCache)
@@ -92,8 +97,8 @@ export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[
     SEARCH_CACHE_TTL_MS,
     SEARCH_CACHE_MAX_SIZE
   )
-  const webSearchTool = createWebSearchTool(ctl, duckDuckGoService, searchCache, rateLimiter)
-  const imageSearchTool = createImageSearchTool(ctl, duckDuckGoService, rateLimiter, impit)
+  const webSearchTool = createWebSearchTool(ctl, duckDuckGoService, searchCache, sharedRateLimiter)
+  const imageSearchTool = createImageSearchTool(ctl, duckDuckGoService, sharedRateLimiter, impit)
 
   return [webSearchTool, imageSearchTool]
 }

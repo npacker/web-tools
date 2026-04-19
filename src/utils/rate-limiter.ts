@@ -10,6 +10,8 @@ export class RateLimiter {
   private lastRequestTimestamp: number = 0
   /** Minimum gap enforced between requests, in milliseconds. */
   private readonly minIntervalMs: number
+  /** Tail of the pending-caller chain; each new caller awaits this before computing its own delay. */
+  private queue: Promise<void> = Promise.resolve()
 
   /**
    * Create a limiter configured with the given minimum interval.
@@ -22,19 +24,25 @@ export class RateLimiter {
 
   /**
    * Await the remainder of the configured interval when a prior request is still within the window.
+   * Concurrent callers are serialized so each one observes the completion of the one before it.
    *
    * @returns A promise that resolves once the caller is cleared to proceed.
    */
   public async waitIfNeeded(): Promise<void> {
-    const currentTimestamp = Date.now()
-    const timeSinceLastRequest = currentTimestamp - this.lastRequestTimestamp
+    const next = this.queue.then(async () => {
+      const timeSinceLastRequest = Date.now() - this.lastRequestTimestamp
 
-    if (timeSinceLastRequest < this.minIntervalMs) {
-      const delay = this.minIntervalMs - timeSinceLastRequest
-      await this.delay(delay)
-    }
+      if (timeSinceLastRequest < this.minIntervalMs) {
+        await this.delay(this.minIntervalMs - timeSinceLastRequest)
+      }
 
-    this.lastRequestTimestamp = Date.now()
+      this.lastRequestTimestamp = Date.now()
+    })
+    this.queue = next.catch(() => {
+      // Swallow rejections on the shared chain so one failure does not break subsequent callers.
+    })
+
+    return next
   }
 
   /**
