@@ -1,7 +1,6 @@
 {
   "name": "lms-plugin-web-tools",
   "version": "1.0.0",
-  "type": "module",
   "description": "LM Studio plugin offering DuckDuckGo web and image search, website visits, and image viewing for local LLMs",
   "main": "index.js",
   "scripts": {
