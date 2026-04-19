@@ -7,10 +7,13 @@ import path from "node:path"
 
 import { Impit } from "impit"
 
-import { IMAGE_DOWNLOAD_TIMEOUT_MS } from "../constants"
 import { isAbortError, getErrorMessage } from "../errors"
 import { determineImageExtension } from "../parsers"
 
+/**
+ * Timeout applied to each image download, in milliseconds.
+ */
+const IMAGE_DOWNLOAD_TIMEOUT_MS = 10_000
 /**
  * Contextual hooks provided by the caller for logging and cancellation.
  */

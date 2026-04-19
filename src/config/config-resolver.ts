@@ -4,11 +4,18 @@
 
 import { ToolsProviderController } from "@lmstudio/sdk"
 
-import { configSchematics } from "../config"
-import { DEFAULT_PAGE_SIZE, DEFAULT_SAFE_SEARCH, AUTO_CONFIG_VALUE } from "../constants"
+import { AUTO_CONFIG_VALUE, configSchematics } from "../config"
 
 import type { SafeSearch } from "../types"
 
+/**
+ * Default page size when no plugin or override value is provided.
+ */
+export const DEFAULT_PAGE_SIZE = 5
+/**
+ * Default safe-search mode when neither plugin nor override supplies a value.
+ */
+export const DEFAULT_SAFE_SEARCH = "moderate" as const
 /**
  * Fully resolved configuration used by a tool invocation.
  */

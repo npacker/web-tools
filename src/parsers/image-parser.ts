@@ -2,10 +2,12 @@
  * Image URL parsing utilities.
  */
 
-import { SUPPORTED_IMAGE_EXTENSIONS } from "../constants"
-
 import type { DuckDuckGoImageResult } from "../types"
 
+/**
+ * Image file extensions recognized as supported download targets.
+ */
+const SUPPORTED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp"] as const
 const IMAGE_EXTENSION_PATTERN = /\.(jpg|jpeg|png|gif|webp)(?:\?|$)/i
 
 /**

@@ -5,12 +5,27 @@
 import { Impit } from "impit"
 
 import { TTLCache } from "../cache"
-import { DUCKDUCKGO_BASE_URL, WEB_SEARCH_PATH, IMAGE_SEARCH_PATH, VQD_FETCH_PATH } from "../constants"
 import { FetchError, VqdTokenError } from "../errors"
 import { extractVqdToken, parseWebSearchResults } from "../parsers"
 
 import type { SafeSearch, SearchParameters, SearchCacheEntry, DuckDuckGoImageResult } from "../types"
 
+/**
+ * Base URL used for all DuckDuckGo requests.
+ */
+const DUCKDUCKGO_BASE_URL = "https://duckduckgo.com"
+/**
+ * Path of the DuckDuckGo HTML web search endpoint.
+ */
+const WEB_SEARCH_PATH = "/html/"
+/**
+ * Path of the DuckDuckGo JSON image search endpoint.
+ */
+const IMAGE_SEARCH_PATH = "/i.js"
+/**
+ * Path of the DuckDuckGo homepage used to scrape VQD tokens.
+ */
+const VQD_FETCH_PATH = "/"
 /**
  * Options passed to every outbound request, primarily to support cancellation.
  */

@@ -2,7 +2,7 @@
  * Type definitions for the DuckDuckGo plugin.
  */
 
-import { AUTO_CONFIG_VALUE } from "./constants"
+import { AUTO_CONFIG_VALUE } from "./config"
 
 /** Safe-search modes accepted by the DuckDuckGo endpoints. */
 export type SafeSearch = "strict" | "moderate" | "off"

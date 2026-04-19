@@ -4,9 +4,16 @@
 
 import { JSDOM } from "jsdom"
 
-import { RESULT_LINK_SELECTOR, VQD_INPUT_SELECTOR } from "../constants"
-
 import type { SearchResult } from "../types"
+
+/**
+ * CSS selector matching web search result links.
+ */
+const RESULT_LINK_SELECTOR = ".result__a"
+/**
+ * CSS selector matching the VQD token input element.
+ */
+const VQD_INPUT_SELECTOR = 'input[name="vqd"]'
 
 /**
  * Parses web search results from DuckDuckGo HTML.

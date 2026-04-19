@@ -1,7 +1,9 @@
 import { createConfigSchematics } from "@lmstudio/sdk"
 
-import { AUTO_CONFIG_VALUE } from "./constants"
-
+/**
+ * Sentinel value indicating that a configuration field should use its automatic default.
+ */
+export const AUTO_CONFIG_VALUE = "auto" as const
 /**
  * Plugin configuration schematics registered with LM Studio.
  * Exposes the page size and safe search settings shown in the plugin UI.

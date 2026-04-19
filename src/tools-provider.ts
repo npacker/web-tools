@@ -9,25 +9,7 @@ import { Impit } from "impit"
 import { z } from "zod"
 
 import { TTLCache, searchCacheKey } from "./cache"
-import { resolveConfig } from "./config/config-resolver"
-import {
-  CACHE_DIRECTORY_NAME,
-  SEARCH_CACHE_TTL_MS,
-  SEARCH_CACHE_MAX_SIZE,
-  SEARCH_CACHE_SUBDIR,
-  VQD_CACHE_TTL_MS,
-  VQD_CACHE_MAX_SIZE,
-  VQD_CACHE_SUBDIR,
-  MIN_REQUEST_INTERVAL_MS,
-  IMAGE_FETCH_DELAY_MS,
-  MIN_PAGE_SIZE,
-  MAX_PAGE_SIZE,
-  MAX_PAGE_NUMBER,
-  MIN_PAGE_NUMBER,
-  DEFAULT_PAGE_NUMBER,
-  DEFAULT_PAGE_SIZE,
-  DEFAULT_SAFE_SEARCH,
-} from "./constants"
+import { DEFAULT_PAGE_SIZE, DEFAULT_SAFE_SEARCH, resolveConfig } from "./config/config-resolver"
 import { NoResultsError, formatSearchError } from "./errors"
 import { extractImageUrls } from "./parsers"
 import { DuckDuckGoService } from "./services/duck-duck-go-service"
@@ -35,6 +17,63 @@ import { downloadImage } from "./services/image-download-service"
 import { RateLimiter, delay } from "./utils"
 
 import type { CachedSearchResults } from "./cache"
+
+/**
+ * Root directory name used for the plugin's on-disk `cacache` store.
+ */
+const CACHE_DIRECTORY_NAME = "lms-plugin-duckduckgo-cache"
+/**
+ * Subdirectory under the cache root dedicated to web/image search results.
+ */
+const SEARCH_CACHE_SUBDIR = "search"
+/**
+ * Time-to-live for cached web search results, in milliseconds.
+ */
+const SEARCH_CACHE_TTL_MS = 15 * 60_000
+/**
+ * Maximum number of search result entries retained in the search cache.
+ */
+const SEARCH_CACHE_MAX_SIZE = 100
+/**
+ * Subdirectory under the cache root dedicated to VQD tokens.
+ */
+const VQD_CACHE_SUBDIR = "vqd"
+/**
+ * Time-to-live for cached VQD tokens, in milliseconds.
+ */
+const VQD_CACHE_TTL_MS = 10 * 60_000
+/**
+ * Maximum number of VQD tokens retained in the VQD cache.
+ */
+const VQD_CACHE_MAX_SIZE = 50
+/**
+ * Minimum interval enforced between outbound DuckDuckGo requests, in milliseconds.
+ */
+const MIN_REQUEST_INTERVAL_MS = 5000
+/**
+ * Delay inserted between a VQD token fetch and the subsequent image search, in milliseconds.
+ */
+const IMAGE_FETCH_DELAY_MS = 2000
+/**
+ * Lower bound on the configurable page size.
+ */
+const MIN_PAGE_SIZE = 1
+/**
+ * Upper bound on the configurable page size.
+ */
+const MAX_PAGE_SIZE = 10
+/**
+ * Lower bound on the requested page number.
+ */
+const MIN_PAGE_NUMBER = 1
+/**
+ * Upper bound on the requested page number.
+ */
+const MAX_PAGE_NUMBER = 100
+/**
+ * Default page number when no value is provided.
+ */
+const DEFAULT_PAGE_NUMBER = 1
 
 /**
  * Creates and configures the DuckDuckGo tools provider.
