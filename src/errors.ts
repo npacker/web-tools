@@ -1,11 +1,11 @@
 /**
- * Error handling utilities.
+ * Error classes and primitives raised by the plugin.
  */
 
 /**
  * Base error class for all DuckDuckGo-related failures raised by the plugin.
  */
-export class DuckDuckGoError extends Error {
+class DuckDuckGoError extends Error {
   /**
    * Create a new error bound to a machine-readable code.
    *
@@ -94,102 +94,6 @@ export function isAbortError(error: unknown): boolean {
  * @param error Thrown value to stringify.
  * @returns The error message when the value is an `Error`, otherwise the stringified value.
  */
-export function getErrorMessage(error: unknown): string {
+export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
-}
-
-/**
- * Minimal context surface required by the error formatters for warning output.
- */
-export interface ToolErrorContext {
-  /** Logger used to surface non-fatal failures. */
-  warn: (message: string) => void
-}
-/**
- * Alias retained for callers written against the original DuckDuckGo-search formatter.
- */
-export type SearchErrorContext = ToolErrorContext
-/**
- * Kinds of tool flows supported by `formatToolError`, used to tailor user-facing messages.
- */
-export type ToolErrorKind = "search" | "website" | "image-download"
-
-/**
- * Tool-kind-specific message templates used by `formatToolError`.
- */
-interface ToolErrorTemplates {
-  /** Message returned when the caller aborts the flow. */
-  aborted: string
-  /** Prefix applied to `FetchError` warning and response messages. */
-  fetchPrefix: string
-  /** Prefix applied to generic unexpected errors in warning output. */
-  unexpectedPrefix: string
-}
-
-/**
- * Static mapping from tool kind to its user-facing message templates.
- */
-const TOOL_ERROR_TEMPLATES: Record<ToolErrorKind, ToolErrorTemplates> = {
-  search: {
-    aborted: "Search aborted by user.",
-    fetchPrefix: "Failed to fetch search results",
-    unexpectedPrefix: "Error during search",
-  },
-  website: {
-    aborted: "Website visit aborted by user.",
-    fetchPrefix: "Failed to fetch website",
-    unexpectedPrefix: "Error during website visit",
-  },
-  "image-download": {
-    aborted: "Image download aborted by user.",
-    fetchPrefix: "Failed to fetch image",
-    unexpectedPrefix: "Error during image download",
-  },
-}
-
-/**
- * Map a tool error to a user-facing string, warning on unexpected failures.
- *
- * @param error Error caught during tool execution.
- * @param context Minimal context surface used to emit warnings.
- * @param kind Tool flow the error originated from, controlling message phrasing.
- * @returns A user-facing error string.
- */
-export function formatToolError(error: unknown, context: ToolErrorContext, kind: ToolErrorKind): string {
-  const templates = TOOL_ERROR_TEMPLATES[kind]
-
-  if (isAbortError(error) || error instanceof SearchAbortedError) {
-    return templates.aborted
-  }
-
-  if (error instanceof NoResultsError) {
-    return error.message
-  }
-
-  if (error instanceof VqdTokenError) {
-    return `Error: ${error.message}`
-  }
-
-  if (error instanceof FetchError) {
-    context.warn(`${templates.fetchPrefix}: ${error.message}`)
-
-    return `Error: ${templates.fetchPrefix}: ${error.message}`
-  }
-
-  const message = getErrorMessage(error)
-  context.warn(`${templates.unexpectedPrefix}: ${message}`)
-
-  return `Error: ${message}`
-}
-
-/**
- * Map a search error to a user-facing string, warning on unexpected failures.
- * Thin wrapper around `formatToolError` preserved for the DuckDuckGo search tools.
- *
- * @param error Error caught during search execution.
- * @param context Minimal context surface used to emit warnings.
- * @returns A user-facing error string.
- */
-export function formatSearchError(error: unknown, context: ToolErrorContext): string {
-  return formatToolError(error, context, "search")
 }

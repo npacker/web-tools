@@ -1,36 +1,35 @@
 /**
- * Batch image download orchestration shared by the Visit Website and View Images tools.
+ * Concurrent multi-URL image download, preserving input order in the result array.
  */
 
 import { Impit } from "impit"
-import { JSDOM } from "jsdom"
 
-import { extractPageImages } from "../parsers"
-
-import { downloadImage } from "./image-download-service"
+import { downloadImage } from "./download-image"
 
 /**
  * Options controlling placement of the downloaded batch.
  */
-export interface ImageBatchOptions {
+interface DownloadImagesOptions {
   /** Directory into which downloaded files are written. */
   workingDirectory: string
   /** Epoch-millisecond timestamp used as the filename prefix for every file in the batch. */
   timestamp: number
 }
+
 /**
  * Contextual hooks provided by the caller for logging and cancellation.
  */
-export interface ImageBatchContext {
+interface DownloadImagesContext {
   /** Logger used to surface non-fatal download failures. */
   warn: (message: string) => void
   /** Signal used to abort the in-flight downloads. */
   signal: AbortSignal
 }
+
 /**
- * Per-URL outcome reported by `downloadImageBatch`.
+ * Per-URL outcome reported by `downloadImages`.
  */
-export type ImageBatchResult =
+type DownloadedImage =
   | {
       /** Discriminant marking a successful download or passthrough. */
       ok: true
@@ -55,62 +54,13 @@ export type ImageBatchResult =
  * @param context Logging and cancellation hooks provided by the caller.
  * @returns A parallel array of per-URL outcomes.
  */
-export async function downloadImageBatch(
+export async function downloadImages(
   urls: string[],
   impit: Impit,
-  options: ImageBatchOptions,
-  context: ImageBatchContext
-): Promise<ImageBatchResult[]> {
-  return Promise.all(urls.map(async (url, position) => downloadSingle(url, position, impit, options, context)))
-}
-
-/**
- * Extract up to `maxImages` images from the parsed page, download them through the shared
- * batch helper, and return `[alt, markdownOrError]` tuples in document order.
- *
- * @param dom Parsed website DOM.
- * @param url Absolute URL of the page, used as the resolution base for relative sources.
- * @param maxImages Upper bound on the number of images to extract and download.
- * @param searchTerms Optional terms biasing extraction ranking.
- * @param impit Shared HTTP client used for the downloads.
- * @param workingDirectory Directory into which downloaded files are written.
- * @param context Runtime hooks used for cancellation and warning output.
- * @returns Tuples of alt text paired with a Markdown image reference or a per-image error string.
- */
-export async function extractAndDownloadPageImages(
-  dom: JSDOM,
-  url: string,
-  maxImages: number,
-  searchTerms: string[] | undefined,
-  impit: Impit,
-  workingDirectory: string,
-  context: ImageBatchContext
-): Promise<Array<[string, string]>> {
-  if (maxImages === 0) {
-    return []
-  }
-
-  const images = extractPageImages(dom, url, maxImages, searchTerms)
-
-  if (images.length === 0) {
-    return []
-  }
-
-  const batch = await downloadImageBatch(
-    images.map(image => image.src),
-    impit,
-    { workingDirectory, timestamp: Date.now() },
-    context
-  )
-
-  return images.map((image, index) => {
-    const result = batch[index]
-    const markdown = result.ok
-      ? `![Image ${index + 1}](${result.localPath})`
-      : `Error fetching image from URL: ${image.src}`
-
-    return [image.alt, markdown] as [string, string]
-  })
+  options: DownloadImagesOptions,
+  context: DownloadImagesContext
+): Promise<DownloadedImage[]> {
+  return Promise.all(urls.map(async (url, position) => downloadOne(url, position, impit, options, context)))
 }
 
 /**
@@ -124,14 +74,14 @@ export async function extractAndDownloadPageImages(
  * @param context Logging and cancellation hooks provided by the caller.
  * @returns The outcome for this slot.
  */
-async function downloadSingle(
+async function downloadOne(
   url: string,
   position: number,
   impit: Impit,
-  options: ImageBatchOptions,
-  context: ImageBatchContext
-): Promise<ImageBatchResult> {
-  if (isLocalReference(url, options.workingDirectory)) {
+  options: DownloadImagesOptions,
+  context: DownloadImagesContext
+): Promise<DownloadedImage> {
+  if (isLocalOrNonHttpUrl(url, options.workingDirectory)) {
     return { ok: true, localPath: url }
   }
 
@@ -154,13 +104,13 @@ async function downloadSingle(
 }
 
 /**
- * Report whether a URL is already local to the working directory or is otherwise non-remote.
+ * Report whether a URL is already local to the working directory or uses a non-HTTP scheme.
  *
  * @param url URL to inspect.
  * @param workingDirectory Directory treated as local to the plugin session.
  * @returns `true` when the URL should bypass the HTTP download path.
  */
-function isLocalReference(url: string, workingDirectory: string): boolean {
+function isLocalOrNonHttpUrl(url: string, workingDirectory: string): boolean {
   if (url.startsWith(workingDirectory)) {
     return true
   }

@@ -9,7 +9,7 @@ import Bottleneck from "bottleneck"
  *
  * @returns A resolved promise.
  */
-async function noopTask(): Promise<void> {
+async function noop(): Promise<void> {
   return
 }
 
@@ -35,7 +35,7 @@ export class RateLimiter {
    *
    * @returns A promise that resolves once the caller is cleared to proceed.
    */
-  public async waitIfNeeded(): Promise<void> {
-    await this.limiter.schedule(noopTask)
+  public async wait(): Promise<void> {
+    await this.limiter.schedule(noop)
   }
 }

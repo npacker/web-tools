@@ -1,18 +1,8 @@
 /**
- * Cache-key and payload definitions for search-result caching.
+ * Cache-key helpers for search-result caching.
  */
 
-import type { SafeSearch } from "../types"
-
-/**
- * Cached payload for a web or image search.
- */
-export interface CachedSearchResults {
-  /** Result tuples of `[label, url]` pairs. */
-  results: Array<[string, string]>
-  /** Number of results in `results`. */
-  count: number
-}
+import type { SafeSearch } from "../duckduckgo/safe-search"
 
 /**
  * Build the cache key used for a search-result lookup or insertion.

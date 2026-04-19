@@ -52,7 +52,7 @@ export class TTLCache<T> {
     const metadata = info.metadata as CacheMetadata | undefined
 
     if (metadata === undefined || this.isExpired(metadata)) {
-      await this.delete(key)
+      await this.deleteEntry(key)
 
       return undefined
     }
@@ -75,37 +75,12 @@ export class TTLCache<T> {
   }
 
   /**
-   * Report whether a non-expired entry exists for the key.
-   *
-   * @param key Key to look up.
-   * @returns `true` when a live entry is present, otherwise `false`.
-   */
-  public async has(key: string): Promise<boolean> {
-    const info = await cacache.get.info(this.cachePath, key)
-
-    if (info === null) {
-      return false
-    }
-
-    const metadata = info.metadata as CacheMetadata | undefined
-
-    return metadata !== undefined && !this.isExpired(metadata)
-  }
-
-  /**
    * Remove an entry by key, if present.
    *
    * @param key Key to remove.
    */
-  public async delete(key: string): Promise<void> {
+  private async deleteEntry(key: string): Promise<void> {
     await cacache.rm.entry(this.cachePath, key)
-  }
-
-  /**
-   * Remove every entry from the cache.
-   */
-  public async clear(): Promise<void> {
-    await cacache.rm.all(this.cachePath)
   }
 
   /**

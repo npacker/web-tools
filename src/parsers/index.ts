@@ -1,17 +1,11 @@
-export { parseWebSearchResults, extractVqdToken } from "./html-parser"
+export { parseSearchResults } from "./search-results-parser"
+export { extractVqdToken } from "./vqd-parser"
 export {
   extractImageUrls,
-  determineImageExtension,
+  imageExtensionFromHeaders,
   isSupportedImageExtension,
-  normalizeExtension,
-} from "./image-parser"
-export {
-  parseWebsiteDocument,
-  extractHeadings,
-  extractLinks,
-  extractPageImages,
-  extractVisibleText,
-  sliceAroundTerms,
-  buildPageContent,
-} from "./website-parser"
-export type { WebsiteHeadings, PageImage } from "./website-parser"
+  normalizeImageExtension,
+} from "./image-results-parser"
+export { extractLinks } from "./page/page-links"
+export { extractPageImages } from "./page/page-images"
+export { extractHeadings, buildPageExcerpt } from "./page/page-text"

@@ -4,9 +4,11 @@
 
 import { ToolsProviderController } from "@lmstudio/sdk"
 
-import { AUTO_CONFIG_VALUE, configSchematics } from "../config"
+import { configSchematics } from "../config-schematics"
 
-import type { SafeSearch } from "../types"
+import { AUTO_CONFIG_VALUE } from "./auto-sentinel"
+
+import type { SafeSearch } from "../duckduckgo/safe-search"
 
 /**
  * Default page size when no plugin or override value is provided.
@@ -19,19 +21,20 @@ export const DEFAULT_SAFE_SEARCH = "moderate" as const
 /**
  * Default number of links extracted by the Visit Website tool when no value is provided.
  */
-export const DEFAULT_MAX_LINKS = 40
+const DEFAULT_MAX_LINKS = 40
 /**
  * Default number of images extracted by the Visit Website and View Images tools when no value is provided.
  */
-export const DEFAULT_MAX_IMAGES = 10
+const DEFAULT_MAX_IMAGES = 10
 /**
  * Default visible-text character budget for the Visit Website tool when no value is provided.
  */
-export const DEFAULT_CONTENT_LIMIT = 2000
+const DEFAULT_CONTENT_LIMIT = 2000
+
 /**
  * Fully resolved configuration used by a tool invocation.
  */
-export interface ResolvedConfig {
+interface ResolvedConfig {
   /** Number of results to request per page. */
   pageSize: number
   /** Safe-search mode to apply to the request. */
@@ -43,10 +46,11 @@ export interface ResolvedConfig {
   /** Visible-text character budget for the Visit Website tool. */
   contentLimit: number
 }
+
 /**
  * Optional per-invocation overrides applied on top of plugin configuration.
  */
-export interface ConfigOverrides {
+interface ConfigOverrides {
   /** Page size override provided by the caller. */
   pageSize?: number
   /** Safe-search override provided by the caller. */
