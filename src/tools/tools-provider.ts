@@ -7,6 +7,7 @@ import os from "node:os"
 import path from "node:path"
 
 import { TTLCache } from "../cache"
+import { resolveTimingConfig } from "../config/resolve-config"
 import { createImpit } from "../http"
 import { RateLimiter } from "../timing"
 
@@ -31,10 +32,6 @@ const IMAGE_DOWNLOAD_DIRECTORY_NAME = "lms-plugin-duckduckgo-images"
  */
 const SEARCH_CACHE_SUBDIR = "search"
 /**
- * Time-to-live for cached web search results, in milliseconds.
- */
-const SEARCH_CACHE_TTL_MS = 15 * 60_000
-/**
  * Maximum number of search result entries retained in the search cache.
  */
 const SEARCH_CACHE_MAX_SIZE = 100
@@ -42,10 +39,6 @@ const SEARCH_CACHE_MAX_SIZE = 100
  * Subdirectory under the cache root dedicated to VQD tokens.
  */
 const VQD_CACHE_SUBDIR = "vqd"
-/**
- * Time-to-live for cached VQD tokens, in milliseconds.
- */
-const VQD_CACHE_TTL_MS = 10 * 60_000
 /**
  * Maximum number of VQD tokens retained in the VQD cache.
  */
@@ -55,51 +48,46 @@ const VQD_CACHE_MAX_SIZE = 50
  */
 const WEBSITE_CACHE_SUBDIR = "website"
 /**
- * Time-to-live for cached website HTML payloads, in milliseconds.
- */
-const WEBSITE_CACHE_TTL_MS = 10 * 60_000
-/**
  * Maximum number of website HTML payloads retained in the website cache.
  */
 const WEBSITE_CACHE_MAX_SIZE = 50
-/**
- * Minimum interval enforced between outbound DuckDuckGo requests, in milliseconds.
- */
-const MIN_REQUEST_INTERVAL_MS = 5000
-/**
- * Module-scoped rate limiter shared across every tools-provider session. The LM Studio SDK invokes
- * `toolsProvider` once per session, so holding this at module scope is what makes the minimum
- * interval apply across concurrent chats within the same plugin process.
- */
-const sharedRateLimiter = new RateLimiter(MIN_REQUEST_INTERVAL_MS)
 
 /**
  * Register the plugin's four tools with the LM Studio SDK controller.
+ *
+ * The rate limiter is constructed per-session (rather than module-scoped) so user-configured
+ * intervals from plugin settings take effect on plugin reload.
  *
  * @param ctl Tools provider controller supplied by the LM Studio SDK.
  * @returns The registered Web Search, Image Search, Visit Website, and View Images tools.
  */
 export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[]> {
+  const timing = resolveTimingConfig(ctl)
   const impit = createImpit()
   const pluginDataRoot = path.join(os.homedir(), ".lmstudio", "plugin-data")
   const cacheRoot = path.join(pluginDataRoot, CACHE_DIRECTORY_NAME)
   const imageDownloadDirectory = path.join(pluginDataRoot, IMAGE_DOWNLOAD_DIRECTORY_NAME)
-  const vqdCache = new TTLCache<string>(path.join(cacheRoot, VQD_CACHE_SUBDIR), VQD_CACHE_TTL_MS, VQD_CACHE_MAX_SIZE)
+  const rateLimiter = new RateLimiter(timing.requestIntervalMs)
+  const vqdCache = new TTLCache<string>(
+    path.join(cacheRoot, VQD_CACHE_SUBDIR),
+    timing.vqdCacheTtlMs,
+    VQD_CACHE_MAX_SIZE
+  )
   const searchCache = new TTLCache<SearchResultsPayload>(
     path.join(cacheRoot, SEARCH_CACHE_SUBDIR),
-    SEARCH_CACHE_TTL_MS,
+    timing.searchCacheTtlMs,
     SEARCH_CACHE_MAX_SIZE
   )
   const websiteCache = new TTLCache<string>(
     path.join(cacheRoot, WEBSITE_CACHE_SUBDIR),
-    WEBSITE_CACHE_TTL_MS,
+    timing.websiteCacheTtlMs,
     WEBSITE_CACHE_MAX_SIZE
   )
 
   return [
-    createWebSearchTool(ctl, impit, searchCache, sharedRateLimiter),
-    createImageSearchTool(ctl, impit, vqdCache, sharedRateLimiter, imageDownloadDirectory),
-    createVisitWebsiteTool(ctl, impit, websiteCache, sharedRateLimiter, imageDownloadDirectory),
-    createViewImagesTool(ctl, impit, websiteCache, sharedRateLimiter, imageDownloadDirectory),
+    createWebSearchTool(ctl, impit, searchCache, rateLimiter),
+    createImageSearchTool(ctl, impit, vqdCache, rateLimiter, imageDownloadDirectory),
+    createVisitWebsiteTool(ctl, impit, websiteCache, rateLimiter, imageDownloadDirectory),
+    createViewImagesTool(ctl, impit, websiteCache, rateLimiter, imageDownloadDirectory),
   ]
 }

@@ -89,4 +89,89 @@ export const configSchematics = createConfigSchematics()
     },
     0
   )
+  .field(
+    "searchCacheTtlSeconds",
+    "numeric",
+    {
+      displayName: "Search Cache TTL (seconds)",
+      subtitle: "Between 0 and 3600, 0 = auto",
+      min: 0,
+      max: 3600,
+      int: true,
+      slider: {
+        step: 60,
+        min: 0,
+        max: 3600,
+      },
+    },
+    0
+  )
+  .field(
+    "vqdCacheTtlSeconds",
+    "numeric",
+    {
+      displayName: "VQD Token Cache TTL (seconds)",
+      subtitle: "Between 0 and 3600, 0 = auto",
+      min: 0,
+      max: 3600,
+      int: true,
+      slider: {
+        step: 60,
+        min: 0,
+        max: 3600,
+      },
+    },
+    0
+  )
+  .field(
+    "websiteCacheTtlSeconds",
+    "numeric",
+    {
+      displayName: "Website Cache TTL (seconds)",
+      subtitle: "Between 0 and 3600, 0 = auto",
+      min: 0,
+      max: 3600,
+      int: true,
+      slider: {
+        step: 60,
+        min: 0,
+        max: 3600,
+      },
+    },
+    0
+  )
+  .field(
+    "requestIntervalSeconds",
+    "numeric",
+    {
+      displayName: "Min Interval Between Requests (seconds)",
+      subtitle: "Between 0 and 30, 0 = auto",
+      min: 0,
+      max: 30,
+      int: true,
+      slider: {
+        step: 1,
+        min: 0,
+        max: 30,
+      },
+    },
+    0
+  )
+  .field(
+    "vqdImageDelaySeconds",
+    "numeric",
+    {
+      displayName: "VQD to Image API Delay (seconds)",
+      subtitle: "Between 0 and 10, 0 = auto",
+      min: 0,
+      max: 10,
+      int: true,
+      slider: {
+        step: 1,
+        min: 0,
+        max: 10,
+      },
+    },
+    0
+  )
   .build()

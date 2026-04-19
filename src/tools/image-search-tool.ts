@@ -38,11 +38,6 @@ const MAX_PAGE_NUMBER = 100
  * Default page number when no value is provided.
  */
 const DEFAULT_PAGE_NUMBER = 1
-/**
- * Delay inserted between the VQD-token scrape and the image-search API call, in milliseconds.
- * Pacing here keeps the plugin inside DuckDuckGo's anti-bot tolerance.
- */
-const VQD_TO_IMAGE_SEARCH_DELAY_MS = 2000
 
 /**
  * Create the Image Search tool.
@@ -100,12 +95,12 @@ export function createImageSearchTool(
       await rateLimiter.wait()
 
       try {
-        const { pageSize, safeSearch } = resolveConfig(ctl, {
+        const { pageSize, safeSearch, vqdImageDelayMs } = resolveConfig(ctl, {
           pageSize: parameterPageSize,
           safeSearch: parameterSafeSearch,
         })
         const vqd = await fetchVqdToken(impit, vqdCache, query, { signal: context.signal })
-        await sleep(VQD_TO_IMAGE_SEARCH_DELAY_MS)
+        await sleep(vqdImageDelayMs)
         const parameters = { query, pageSize, safeSearch, page }
         const imageResults = await searchImages(impit, parameters, vqd, {
           signal: context.signal,

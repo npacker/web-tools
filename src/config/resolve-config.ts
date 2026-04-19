@@ -29,6 +29,30 @@ const DEFAULT_MAX_IMAGES = 10
  * Default visible-text character budget for the Visit Website tool when no value is provided.
  */
 const DEFAULT_CONTENT_LIMIT = 2000
+/**
+ * Default TTL for the web/image search result cache, in milliseconds.
+ */
+const DEFAULT_SEARCH_CACHE_TTL_MS = 15 * 60_000
+/**
+ * Default TTL for the VQD token cache, in milliseconds.
+ */
+const DEFAULT_VQD_CACHE_TTL_MS = 10 * 60_000
+/**
+ * Default TTL for the website HTML cache, in milliseconds.
+ */
+const DEFAULT_WEBSITE_CACHE_TTL_MS = 10 * 60_000
+/**
+ * Default minimum interval enforced between outbound DuckDuckGo requests, in milliseconds.
+ */
+const DEFAULT_REQUEST_INTERVAL_MS = 5000
+/**
+ * Default delay inserted between the VQD-token scrape and the image-search API call, in milliseconds.
+ */
+const DEFAULT_VQD_IMAGE_DELAY_MS = 2000
+/**
+ * Conversion factor from seconds to milliseconds.
+ */
+const MS_PER_SECOND = 1000
 
 /**
  * Fully resolved configuration used by a tool invocation.
@@ -44,6 +68,22 @@ interface ResolvedConfig {
   maxImages: number
   /** Visible-text character budget for the Visit Website tool. */
   contentLimit: number
+  /** Delay before the image-search API call, in milliseconds. */
+  vqdImageDelayMs: number
+}
+
+/**
+ * Timing configuration captured once at tools-provider initialization.
+ */
+export interface ResolvedTimingConfig {
+  /** TTL for the search result cache, in milliseconds. */
+  searchCacheTtlMs: number
+  /** TTL for the VQD token cache, in milliseconds. */
+  vqdCacheTtlMs: number
+  /** TTL for the website HTML cache, in milliseconds. */
+  websiteCacheTtlMs: number
+  /** Minimum interval between outbound requests, in milliseconds. */
+  requestIntervalMs: number
 }
 
 /**
@@ -77,6 +117,7 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
   const pluginMaxLinks = pluginConfig.get("maxLinks") as number | null
   const pluginMaxImages = pluginConfig.get("maxImages") as number | null
   const pluginContentLimit = pluginConfig.get("contentLimit") as number | null
+  const pluginVqdImageDelaySeconds = pluginConfig.get("vqdImageDelaySeconds") as number | null
 
   return {
     pageSize: resolvePageSize(pluginPageSize, overrides.pageSize),
@@ -84,7 +125,46 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
     maxLinks: resolveAutoNumeric(pluginMaxLinks, overrides.maxLinks, DEFAULT_MAX_LINKS),
     maxImages: resolveAutoNumeric(pluginMaxImages, overrides.maxImages, DEFAULT_MAX_IMAGES),
     contentLimit: resolveAutoNumeric(pluginContentLimit, overrides.contentLimit, DEFAULT_CONTENT_LIMIT),
+    vqdImageDelayMs: resolveSecondsToMs(pluginVqdImageDelaySeconds, DEFAULT_VQD_IMAGE_DELAY_MS),
   }
+}
+
+/**
+ * Resolves timing configuration once at tools-provider initialization.
+ * Values feed into cache construction and the shared rate limiter, so they are
+ * fixed for the lifetime of the session and require a plugin reload to change.
+ *
+ * @param ctl Tools provider controller exposing plugin configuration.
+ * @returns Timing values in milliseconds.
+ */
+export function resolveTimingConfig(ctl: ToolsProviderController): ResolvedTimingConfig {
+  const pluginConfig = ctl.getPluginConfig(configSchematics)
+  const searchTtlSeconds = pluginConfig.get("searchCacheTtlSeconds") as number | null
+  const vqdTtlSeconds = pluginConfig.get("vqdCacheTtlSeconds") as number | null
+  const websiteTtlSeconds = pluginConfig.get("websiteCacheTtlSeconds") as number | null
+  const intervalSeconds = pluginConfig.get("requestIntervalSeconds") as number | null
+
+  return {
+    searchCacheTtlMs: resolveSecondsToMs(searchTtlSeconds, DEFAULT_SEARCH_CACHE_TTL_MS),
+    vqdCacheTtlMs: resolveSecondsToMs(vqdTtlSeconds, DEFAULT_VQD_CACHE_TTL_MS),
+    websiteCacheTtlMs: resolveSecondsToMs(websiteTtlSeconds, DEFAULT_WEBSITE_CACHE_TTL_MS),
+    requestIntervalMs: resolveSecondsToMs(intervalSeconds, DEFAULT_REQUEST_INTERVAL_MS),
+  }
+}
+
+/**
+ * Converts a seconds-valued plugin field (with `0` treated as "auto") to milliseconds.
+ *
+ * @param pluginSeconds Value read from plugin configuration, or `null` when unset.
+ * @param defaultMs Fallback milliseconds value when the field is unset or `0`.
+ * @returns The effective value in milliseconds.
+ */
+function resolveSecondsToMs(pluginSeconds: number | null, defaultMs: number): number {
+  if (pluginSeconds !== null && pluginSeconds !== 0) {
+    return pluginSeconds * MS_PER_SECOND
+  }
+
+  return defaultMs
 }
 
 /**
