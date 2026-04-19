@@ -1,5 +1,5 @@
 /**
- * DuckDuckGo API service for web and image searches
+ * DuckDuckGo API service for web and image searches.
  */
 
 import { Impit } from "impit"
@@ -10,19 +10,44 @@ import { extractVqdToken, parseWebSearchResults } from "../parsers"
 
 import type { SafeSearch, SearchParameters, SearchCacheEntry, DuckDuckGoImageResult } from "../types"
 
+/**
+ * Options passed to every outbound request, primarily to support cancellation.
+ */
 export interface FetchOptions {
+  /** Signal used to abort the in-flight request. */
   signal: AbortSignal
 }
 
+/**
+ * Shape of the JSON body returned by the DuckDuckGo image search endpoint.
+ */
+interface ImageSearchResponseBody {
+  /** Collection of image results, absent when the query yields nothing. */
+  results?: DuckDuckGoImageResult[]
+}
+
+/**
+ * Thin wrapper around the DuckDuckGo endpoints used for web and image search.
+ */
 export class DuckDuckGoService {
+  /** Shared HTTP client configured with browser-like TLS and header fingerprints. */
   private readonly impit: Impit
 
+  /**
+   * Create a service bound to the provided `impit` client.
+   *
+   * @param impit Shared HTTP client used for all outbound requests.
+   */
   public constructor(impit: Impit) {
     this.impit = impit
   }
 
   /**
-   * Performs a web search on DuckDuckGo
+   * Performs a web search on DuckDuckGo.
+   *
+   * @param parameters Query and pagination parameters for the search.
+   * @param options Options controlling the outbound request.
+   * @returns The parsed search results along with their count.
    */
   public async searchWeb(parameters: SearchParameters, options: FetchOptions): Promise<SearchCacheEntry> {
     const url = this.buildWebSearchUrl(parameters).toString()
@@ -37,7 +62,12 @@ export class DuckDuckGoService {
   }
 
   /**
-   * Fetches the VQD token required for image searches
+   * Fetches the VQD token required for image searches.
+   *
+   * @param query Search query whose VQD token should be retrieved.
+   * @param options Options controlling the outbound request.
+   * @returns The scraped VQD token.
+   * @throws {Error} When the token cannot be located in the response HTML.
    */
   public async fetchVqdToken(query: string, options: FetchOptions): Promise<string> {
     const url = this.buildVqdFetchUrl(query).toString()
@@ -53,7 +83,12 @@ export class DuckDuckGoService {
   }
 
   /**
-   * Performs an image search on DuckDuckGo
+   * Performs an image search on DuckDuckGo.
+   *
+   * @param parameters Query and pagination parameters for the search.
+   * @param vqd VQD token previously obtained via `fetchVqdToken`.
+   * @param options Options controlling the outbound request.
+   * @returns Raw image result entries returned by the DuckDuckGo API.
    */
   public async searchImages(
     parameters: SearchParameters,
@@ -62,13 +97,18 @@ export class DuckDuckGoService {
   ): Promise<DuckDuckGoImageResult[]> {
     const url = this.buildImageSearchUrl(parameters, vqd).toString()
     const response = await this.fetch(url, options)
-    const data = (await response.json()) as { results?: DuckDuckGoImageResult[] }
+    const data = (await response.json()) as ImageSearchResponseBody
 
     return data.results ?? []
   }
 
   /**
-   * Fetches a URL with error handling
+   * Fetches a URL with error handling.
+   *
+   * @param url Target URL to request.
+   * @param options Options controlling the outbound request.
+   * @returns The successful response.
+   * @throws {FetchError} When the response carries a non-2xx status.
    */
   private async fetch(url: string, options: FetchOptions): Promise<ReturnType<Impit["fetch"]>> {
     const response = await this.impit.fetch(url, {
@@ -84,7 +124,10 @@ export class DuckDuckGoService {
   }
 
   /**
-   * Builds the URL for web search
+   * Builds the URL for web search.
+   *
+   * @param parameters Query and pagination parameters for the search.
+   * @returns Fully constructed web-search URL.
    */
   private buildWebSearchUrl(parameters: SearchParameters): URL {
     const url = new URL(WEB_SEARCH_PATH, DUCKDUCKGO_BASE_URL)
@@ -99,7 +142,10 @@ export class DuckDuckGoService {
   }
 
   /**
-   * Builds the URL for VQD token fetch
+   * Builds the URL for VQD token fetch.
+   *
+   * @param query Search query associated with the VQD token request.
+   * @returns Fully constructed VQD-fetch URL.
    */
   private buildVqdFetchUrl(query: string): URL {
     const url = new URL(VQD_FETCH_PATH, DUCKDUCKGO_BASE_URL)
@@ -111,7 +157,11 @@ export class DuckDuckGoService {
   }
 
   /**
-   * Builds the URL for image search
+   * Builds the URL for image search.
+   *
+   * @param parameters Query and pagination parameters for the search.
+   * @param vqd VQD token previously obtained via `fetchVqdToken`.
+   * @returns Fully constructed image-search URL.
    */
   private buildImageSearchUrl(parameters: SearchParameters, vqd: string): URL {
     const url = new URL(IMAGE_SEARCH_PATH, DUCKDUCKGO_BASE_URL)
@@ -130,14 +180,21 @@ export class DuckDuckGoService {
   }
 
   /**
-   * Parses web search results from HTML
+   * Parses web search results from HTML.
+   *
+   * @param html Raw HTML payload returned by the web-search endpoint.
+   * @param maxResults Upper bound on the number of results to return.
+   * @returns The parsed search results.
    */
   private parseWebResults(html: string, maxResults: number): SearchCacheEntry["results"] {
     return parseWebSearchResults(html, maxResults)
   }
 
   /**
-   * Gets the safe search parameter value
+   * Gets the safe search parameter value.
+   *
+   * @param safeSearch Safe-search mode selected by the caller.
+   * @returns The DuckDuckGo-specific `p` parameter string for the mode.
    */
   private getSafeSearchParam(safeSearch: SafeSearch): string {
     if (safeSearch === "moderate") {
@@ -148,7 +205,11 @@ export class DuckDuckGoService {
   }
 
   /**
-   * Calculates the offset for pagination
+   * Calculates the offset for pagination.
+   *
+   * @param pageSize Number of results per page.
+   * @param page One-based page number.
+   * @returns Zero-based offset corresponding to the requested page.
    */
   private calculateOffset(pageSize: number, page: number): number {
     return pageSize * (page - 1)

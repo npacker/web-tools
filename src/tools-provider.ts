@@ -1,5 +1,5 @@
 /**
- * Tool definitions for DuckDuckGo search functionality
+ * Tool definitions for DuckDuckGo search functionality.
  */
 
 import { tool, Tool, ToolsProviderController } from "@lmstudio/sdk"
@@ -32,7 +32,10 @@ import { RateLimiter } from "./utils/rate-limiter"
 import type { SafeSearch } from "./types"
 
 /**
- * Creates and configures the DuckDuckGo tools provider
+ * Creates and configures the DuckDuckGo tools provider.
+ *
+ * @param ctl Tools provider controller supplied by the LM Studio SDK.
+ * @returns The registered web and image search tools.
  */
 export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[]> {
   const impit = new Impit({ browser: "chrome" })
@@ -50,15 +53,31 @@ export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[
 }
 
 /**
- * Cache entry for search results
+ * Cache entry for search results.
  */
 interface SearchCacheEntry {
+  /** Result tuples of `[label, url]` pairs. */
   results: Array<[string, string]>
+  /** Number of results in `results`. */
   count: number
 }
 
 /**
- * Creates the web search tool
+ * Minimal context surface required by `handleSearchError` for warning output.
+ */
+interface SearchErrorContext {
+  /** Logger used to surface non-fatal failures. */
+  warn: (message: string) => void
+}
+
+/**
+ * Creates the web search tool.
+ *
+ * @param ctl Tools provider controller supplied by the LM Studio SDK.
+ * @param service DuckDuckGo service used for outbound requests.
+ * @param cache Cache holding prior web search results.
+ * @param rateLimiter Shared limiter enforcing the minimum gap between requests.
+ * @returns The configured web search tool.
  */
 function createWebSearchTool(
   ctl: ToolsProviderController,
@@ -88,6 +107,17 @@ function createWebSearchTool(
         .default(DEFAULT_PAGE_NUMBER)
         .describe("Page number for pagination"),
     },
+    /**
+     * Executes a web search, honouring cached results when available.
+     *
+     * @param args Validated tool parameters.
+     * @param args.query Search query string.
+     * @param args.pageSize Optional per-call page size override.
+     * @param args.safeSearch Optional per-call safe-search override.
+     * @param args.page Page number being requested.
+     * @param context Runtime tool context supplied by the SDK.
+     * @returns Either the result tuples or a user-facing error string.
+     */
     implementation: async ({ query, pageSize: parameterPageSize, safeSearch: parameterSafeSearch, page }, context) => {
       context.status("Initiating DuckDuckGo web search...")
       await rateLimiter.waitIfNeeded()
@@ -130,7 +160,14 @@ function createWebSearchTool(
 }
 
 /**
- * Creates the image search tool
+ * Creates the image search tool.
+ *
+ * @param ctl Tools provider controller supplied by the LM Studio SDK.
+ * @param service DuckDuckGo service used for outbound requests.
+ * @param vqdCache Cache holding VQD tokens keyed by query.
+ * @param rateLimiter Shared limiter enforcing the minimum gap between requests.
+ * @param impit Shared HTTP client reused for image downloads.
+ * @returns The configured image search tool.
  */
 function createImageSearchTool(
   ctl: ToolsProviderController,
@@ -162,6 +199,17 @@ function createImageSearchTool(
         .default(DEFAULT_PAGE_NUMBER)
         .describe("Page number for pagination"),
     },
+    /**
+     * Executes an image search, downloading any matching images to the working directory.
+     *
+     * @param args Validated tool parameters.
+     * @param args.query Search query string.
+     * @param args.pageSize Optional per-call page size override.
+     * @param args.safeSearch Optional per-call safe-search override.
+     * @param args.page Page number being requested.
+     * @param context Runtime tool context supplied by the SDK.
+     * @returns Either the downloaded file paths, the remote URLs on download failure, or a user-facing error string.
+     */
     implementation: async ({ query, pageSize: parameterPageSize, safeSearch: parameterSafeSearch, page }, context) => {
       context.status("Initiating DuckDuckGo image search...")
       await rateLimiter.waitIfNeeded()
@@ -234,7 +282,13 @@ function createImageSearchTool(
 }
 
 /**
- * Retrieves VQD token from cache or fetches it
+ * Retrieves VQD token from cache or fetches it.
+ *
+ * @param query Search query whose VQD token is required.
+ * @param service DuckDuckGo service used when a fresh fetch is needed.
+ * @param cache Cache holding VQD tokens keyed by query.
+ * @param signal Signal used to abort the fetch if the caller cancels.
+ * @returns The cached or freshly fetched token, or `undefined` when the fetch fails.
  */
 async function getVqdToken(
   query: string,
@@ -259,7 +313,14 @@ async function getVqdToken(
 }
 
 /**
- * Retrieves search results from cache
+ * Retrieves search results from cache.
+ *
+ * @param cache Cache holding prior search results.
+ * @param type Whether the lookup is for a web or image search.
+ * @param query Search query string.
+ * @param safeSearch Safe-search mode that produced the cached entry.
+ * @param page One-based page number of the cached entry.
+ * @returns The cached entry, or `undefined` when absent.
  */
 function getFromCache(
   cache: TTLCache<SearchCacheEntry>,
@@ -274,7 +335,14 @@ function getFromCache(
 }
 
 /**
- * Stores search results in cache
+ * Stores search results in cache.
+ *
+ * @param cache Cache holding prior search results.
+ * @param type Whether the entry represents a web or image search.
+ * @param query Search query string.
+ * @param safeSearch Safe-search mode that produced the entry.
+ * @param page One-based page number of the entry.
+ * @param entry Cache entry to store.
  */
 function setInCache(
   cache: TTLCache<SearchCacheEntry>,
@@ -289,14 +357,13 @@ function setInCache(
 }
 
 /**
- * Handles search errors and returns appropriate response
+ * Handles search errors and returns appropriate response.
+ *
+ * @param error Error caught during search execution.
+ * @param context Minimal context surface used to emit warnings.
+ * @returns A user-facing error string, or the original URL list when downloads fail.
  */
-function handleSearchError(
-  error: unknown,
-  context: {
-    warn: (message: string) => void
-  }
-): string | string[] {
+function handleSearchError(error: unknown, context: SearchErrorContext): string | string[] {
   if (isAbortError(error)) {
     return "Search aborted by user."
   }
@@ -324,7 +391,10 @@ function handleSearchError(
 }
 
 /**
- * Creates a delay promise
+ * Creates a delay promise.
+ *
+ * @param ms Duration to sleep, in milliseconds.
+ * @returns A promise that resolves once the timer elapses.
  */
 async function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))

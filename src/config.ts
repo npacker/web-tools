@@ -2,6 +2,10 @@ import { createConfigSchematics } from "@lmstudio/sdk"
 
 import { AUTO_CONFIG_VALUE } from "./constants"
 
+/**
+ * Plugin configuration schematics registered with LM Studio.
+ * Exposes the page size and safe search settings shown in the plugin UI.
+ */
 export const configSchematics = createConfigSchematics()
   .field(
     "pageSize",
