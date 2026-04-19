@@ -61,7 +61,7 @@ export function createVisitWebsiteTool(
         .array(z.string())
         .optional()
         .describe(
-          "Highly recommended! Optional search terms to prioritize which links, images, and content to return."
+          "Strongly recommended: optional search terms to prioritize which links, images, and content to return."
         ),
       maxLinks: z
         .number()
