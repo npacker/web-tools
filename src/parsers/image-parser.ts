@@ -2,6 +2,10 @@
  * Image URL parsing utilities.
  */
 
+import path from "node:path"
+
+import { extension as mimeExtension } from "mime-types"
+
 import type { DuckDuckGoImageResult } from "../types"
 
 /**
@@ -9,13 +13,9 @@ import type { DuckDuckGoImageResult } from "../types"
  */
 const SUPPORTED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "svg"] as const
 /**
- * Pattern matching recognised image extensions at the end of a URL path, optionally followed by a query string.
+ * Fallback extension used when neither content-type nor URL yields a recognised image format.
  */
-const IMAGE_EXTENSION_PATTERN = /\.(jpg|jpeg|png|gif|webp|svg)(?:\?|$)/i
-/**
- * Pattern matching recognised image MIME subtypes inside a `content-type` header value.
- */
-const IMAGE_CONTENT_TYPE_PATTERN = /image\/(jpeg|jpg|png|gif|webp|svg\+xml)/i
+const FALLBACK_EXTENSION = "jpg"
 
 /**
  * Extracts and validates image URLs from search results.
@@ -46,10 +46,10 @@ export function extractImageUrls(results: DuckDuckGoImageResult[], maxResults: n
  * Checks if a URL has a valid image extension.
  *
  * @param url URL to test.
- * @returns `true` when the URL ends with a recognised image extension.
+ * @returns `true` when the URL's path ends with a recognised image extension.
  */
 function isValidImageUrl(url: string): boolean {
-  return IMAGE_EXTENSION_PATTERN.test(url)
+  return extensionFromUrl(url) !== undefined
 }
 
 /**
@@ -60,56 +60,64 @@ function isValidImageUrl(url: string): boolean {
  * @returns Normalized image extension, defaulting to `"jpg"` when neither source is conclusive.
  */
 export function determineImageExtension(contentType: string | null, url: string): string {
-  const contentTypeExtension = extractExtensionFromContentType(contentType)
-
-  if (contentTypeExtension !== undefined) {
-    return normalizeExtension(contentTypeExtension)
-  }
-
-  const urlExtension = extractExtensionFromUrl(url)
-
-  if (urlExtension !== undefined) {
-    return normalizeExtension(urlExtension)
-  }
-
-  return "jpg"
+  return extensionFromContentType(contentType) ?? extensionFromUrl(url) ?? FALLBACK_EXTENSION
 }
 
 /**
- * Extracts extension from content-type header.
+ * Extract a supported image extension from a content-type header.
  *
  * @param contentType HTTP `content-type` header value, or `null` when absent.
- * @returns The raw extension found in the header, or `undefined` when unrecognized.
+ * @returns The canonical extension when the header names a supported image type, otherwise `undefined`.
  */
-function extractExtensionFromContentType(contentType: string | null): string | undefined {
+function extensionFromContentType(contentType: string | null): string | undefined {
   if (contentType === null) {
     return undefined
   }
 
-  const match = IMAGE_CONTENT_TYPE_PATTERN.exec(contentType)
+  const raw = mimeExtension(contentType)
 
-  return match?.[1]
+  if (raw === false) {
+    return undefined
+  }
+
+  const normalized = normalizeExtension(raw)
+
+  return isSupportedImageExtension(normalized) ? normalized : undefined
 }
 
 /**
- * Extracts extension from URL.
+ * Extract a supported image extension from a URL's pathname.
  *
  * @param url URL to inspect.
- * @returns The raw extension found in the URL, or `undefined` when missing.
+ * @returns The canonical extension when the path ends with a supported image extension, otherwise `undefined`.
  */
-function extractExtensionFromUrl(url: string): string | undefined {
-  const match = IMAGE_EXTENSION_PATTERN.exec(url)
+function extensionFromUrl(url: string): string | undefined {
+  let pathname: string
 
-  return match?.[1]
+  try {
+    pathname = new URL(url).pathname
+  } catch {
+    return undefined
+  }
+
+  const raw = path.extname(pathname).slice(1).toLowerCase()
+
+  if (raw === "") {
+    return undefined
+  }
+
+  const normalized = normalizeExtension(raw)
+
+  return isSupportedImageExtension(normalized) ? normalized : undefined
 }
 
 /**
- * Normalizes image extension (`jpeg` to `jpg`, `svg+xml` to `svg`).
+ * Normalize an image extension to its canonical short form.
  *
  * @param extension Raw extension string.
- * @returns The canonical extension form.
+ * @returns The canonical extension form (`jpeg` to `jpg`, `svg+xml` to `svg`).
  */
-function normalizeExtension(extension: string): string {
+export function normalizeExtension(extension: string): string {
   const lower = extension.toLowerCase()
 
   if (lower === "jpeg") {

@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
     "strict": true,
-    "module": "CommonJS",
+    "module": "preserve",
+    "moduleResolution": "bundler",
     "target": "ES2023",
     "lib": ["ES2023"],
     "declaration": true,

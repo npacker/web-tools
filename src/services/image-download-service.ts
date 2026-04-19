@@ -5,10 +5,11 @@
 import { writeFile } from "node:fs/promises"
 import path from "node:path"
 
+import { fileTypeFromBuffer } from "file-type"
 import { Impit } from "impit"
 
 import { isAbortError, getErrorMessage } from "../errors"
-import { determineImageExtension } from "../parsers"
+import { determineImageExtension, isSupportedImageExtension, normalizeExtension } from "../parsers"
 import { normalizePath } from "../utils"
 
 /**
@@ -68,7 +69,7 @@ export async function downloadImage(
       return undefined
     }
 
-    const fileExtension = determineImageExtension(response.headers.get("content-type"), url)
+    const fileExtension = await resolveImageExtension(bytes, response.headers.get("content-type"), url)
     const fileName = `${options.timestamp}-${options.index}.${fileExtension}`
     const filePath = path.join(options.workingDirectory, fileName)
     await writeFile(filePath, bytes)
@@ -106,4 +107,27 @@ async function fetchImageWithTimeout(
     method: "GET",
     signal: combinedSignal,
   })
+}
+
+/**
+ * Resolve the extension for a downloaded image by first sniffing the raw bytes for a supported
+ * image signature and otherwise falling back to the `content-type` header and URL pathname.
+ *
+ * @param bytes Downloaded image payload.
+ * @param contentType HTTP `content-type` header value, or `null` when absent.
+ * @param url Source URL used as a fallback when neither the bytes nor the header are conclusive.
+ * @returns The canonical image extension for the payload.
+ */
+async function resolveImageExtension(bytes: Uint8Array, contentType: string | null, url: string): Promise<string> {
+  const sniffed = await fileTypeFromBuffer(bytes)
+
+  if (sniffed !== undefined) {
+    const normalized = normalizeExtension(sniffed.ext)
+
+    if (isSupportedImageExtension(normalized)) {
+      return normalized
+    }
+  }
+
+  return determineImageExtension(contentType, url)
 }

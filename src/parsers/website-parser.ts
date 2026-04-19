@@ -2,9 +2,8 @@
  * Website content extraction utilities built on `jsdom`.
  */
 
+import { Readability } from "@mozilla/readability"
 import { JSDOM } from "jsdom"
-
-import { escapeRegex } from "../utils/regex"
 
 import { isSupportedImageExtension } from "./image-parser"
 
@@ -147,21 +146,63 @@ export function extractPageImages(dom: JSDOM, baseUrl: string, maxImages: number
 }
 
 /**
- * Extract the visible plain-text content of the document body, with `<script>` and `<style>`
- * content removed and internal whitespace collapsed to single spaces.
+ * Extract the main readable content of the document via Mozilla Readability, falling back to a
+ * script/style-stripped `textContent` of the body when Readability cannot identify an article.
  *
- * @param dom Parsed website DOM.
- * @returns The cleaned body text, or an empty string when there is no body.
+ * @param html Raw HTML payload.
+ * @param url Absolute URL of the page, used by Readability to resolve relative references.
+ * @returns The cleaned article text, or an empty string when neither extraction strategy yields content.
  */
-export function extractVisibleText(dom: JSDOM): string {
-  const { body } = dom.window.document
-  const clone = body.cloneNode(true) as typeof body
+export function extractVisibleText(html: string, url: string): string {
+  const readabilityDom = new JSDOM(html, { url })
+  const article = new Readability(readabilityDom.window.document).parse()
 
-  for (const node of clone.querySelectorAll("script, style, noscript")) {
+  if (article !== null && article.textContent !== "") {
+    return normalizeText(article.textContent)
+  }
+
+  const fallbackDom = new JSDOM(html)
+  const { body } = fallbackDom.window.document
+
+  for (const node of body.querySelectorAll("script, style, noscript")) {
     node.remove()
   }
 
-  return normalizeText(clone.textContent)
+  return normalizeText(body.textContent)
+}
+
+/**
+ * Build the visible-text payload for the Visit Website tool: when search terms are supplied
+ * and the full text exceeds the budget, concatenate dedup-merged windows around each term;
+ * otherwise return a head slice of the full text.
+ *
+ * @param html Raw HTML payload used by Readability to extract the main article text.
+ * @param url Absolute URL of the page, passed to Readability for relative-link resolution.
+ * @param contentLimit Character budget for the returned text.
+ * @param searchTerms Optional search terms biasing content selection.
+ * @returns The formatted content string, or an empty string when `contentLimit` is zero.
+ */
+export function buildPageContent(
+  html: string,
+  url: string,
+  contentLimit: number,
+  searchTerms: string[] | undefined
+): string {
+  if (contentLimit <= 0) {
+    return ""
+  }
+
+  const allContent = extractVisibleText(html, url)
+
+  if (searchTerms !== undefined && searchTerms.length > 0 && contentLimit < allContent.length) {
+    const sliced = sliceAroundTerms(allContent, searchTerms, contentLimit)
+
+    if (sliced.length > 0) {
+      return sliced
+    }
+  }
+
+  return allContent.slice(0, contentLimit)
 }
 
 /**
@@ -179,8 +220,7 @@ export function sliceAroundTerms(text: string, terms: string[], limit: number): 
   }
 
   const windowSize = Math.max(1, Math.floor(limit / (terms.length * 2)))
-  const padding = `.{0,${windowSize}}`
-  const matches = collectTermMatches(text, terms, padding).toSorted((a, b) => a.index - b.index)
+  const matches = collectTermMatches(text, terms, windowSize).toSorted((a, b) => a.index - b.index)
   let output = ""
   let nextMinIndex = 0
 
@@ -384,25 +424,33 @@ function hasSupportedExtension(url: string): boolean {
 }
 
 /**
- * Find every `padding<term>padding` match in the source text across all supplied terms.
+ * Find every occurrence of each term in the source text and return a padded window around each
+ * match, using case-insensitive `indexOf` scanning rather than dynamically constructed regexes.
  *
  * @param text Text to scan.
  * @param terms Terms to search for.
- * @param padding Regex fragment placed on either side of each term.
+ * @param windowSize Number of characters of padding to include on either side of each match.
  * @returns Flattened list of term matches with their source offsets.
  */
-function collectTermMatches(text: string, terms: string[], padding: string): TermMatch[] {
+function collectTermMatches(text: string, terms: string[], windowSize: number): TermMatch[] {
   const matches: TermMatch[] = []
+  const haystack = text.toLowerCase()
 
   for (const term of terms) {
     if (term === "") {
       continue
     }
 
-    const pattern = new RegExp(padding + escapeRegex(term) + padding, "gi")
+    const needle = term.toLowerCase()
+    let from = 0
+    let hit = haystack.indexOf(needle, from)
 
-    for (const match of text.matchAll(pattern)) {
-      matches.push({ index: match.index, text: match[0] })
+    while (hit !== -1) {
+      const start = Math.max(0, hit - windowSize)
+      const end = Math.min(text.length, hit + needle.length + windowSize)
+      matches.push({ index: start, text: text.slice(start, end) })
+      from = hit + needle.length
+      hit = haystack.indexOf(needle, from)
     }
   }
 

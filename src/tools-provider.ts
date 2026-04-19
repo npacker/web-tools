@@ -6,23 +6,21 @@ import path from "node:path"
 
 import { tool, Tool, ToolsProviderController } from "@lmstudio/sdk"
 import { Impit } from "impit"
-import { JSDOM } from "jsdom"
 import { z } from "zod"
 
 import { TTLCache, searchCacheKey } from "./cache"
 import { DEFAULT_PAGE_SIZE, DEFAULT_SAFE_SEARCH, resolveConfig } from "./config/config-resolver"
 import { NoResultsError, formatSearchError, formatToolError } from "./errors"
 import {
+  buildPageContent,
   extractHeadings,
   extractImageUrls,
   extractLinks,
   extractPageImages,
-  extractVisibleText,
   parseWebsiteDocument,
-  sliceAroundTerms,
 } from "./parsers"
 import { DuckDuckGoService } from "./services/duck-duck-go-service"
-import { downloadImageBatch } from "./services/image-batch-service"
+import { downloadImageBatch, extractAndDownloadPageImages } from "./services/image-batch-service"
 import { WebsiteFetchService } from "./services/website-fetch-service"
 import { RateLimiter, delay } from "./utils"
 
@@ -126,16 +124,6 @@ const IMAGE_FETCH_FAILURE_MESSAGE = "Error fetching images"
  * interval apply across concurrent chats within the same plugin process.
  */
 const sharedRateLimiter = new RateLimiter(MIN_REQUEST_INTERVAL_MS)
-
-/**
- * Runtime hooks consumed by the image-batch helper: warning logger and cancellation signal.
- */
-interface ImageBatchContext {
-  /** Logger used to surface non-fatal download failures. */
-  warn: (message: string) => void
-  /** Signal used to abort the in-flight downloads. */
-  signal: AbortSignal
-}
 
 /**
  * Creates and configures the DuckDuckGo tools provider.
@@ -442,7 +430,7 @@ function createVisitWebsiteTool(
         const dom = parseWebsiteDocument(html)
         const headings = extractHeadings(dom)
         const links = extractLinks(dom, url, maxLinks, findInPage)
-        const images = await extractAndDownloadImages(
+        const images = await extractAndDownloadPageImages(
           dom,
           url,
           maxImages,
@@ -451,7 +439,7 @@ function createVisitWebsiteTool(
           ctl.getWorkingDirectory(),
           { warn: context.warn, signal: context.signal }
         )
-        const content = buildContent(dom, contentLimit, findInPage)
+        const content = buildPageContent(html, url, contentLimit, findInPage)
 
         return {
           url,
@@ -565,81 +553,4 @@ function createViewImagesTool(
       }
     },
   })
-}
-
-/**
- * Extract up to `maxImages` images from the parsed page, download them through the shared
- * batch helper, and return `[alt, markdownOrError]` tuples in document order.
- *
- * @param dom Parsed website DOM.
- * @param url Absolute URL of the page, used as the resolution base for relative sources.
- * @param maxImages Upper bound on the number of images to extract and download.
- * @param searchTerms Optional terms biasing extraction ranking.
- * @param impit Shared HTTP client used for the downloads.
- * @param workingDirectory Directory into which downloaded files are written.
- * @param context Runtime hooks used for cancellation and warning output.
- * @returns Tuples of alt text paired with a Markdown image reference or a per-image error string.
- */
-async function extractAndDownloadImages(
-  dom: JSDOM,
-  url: string,
-  maxImages: number,
-  searchTerms: string[] | undefined,
-  impit: Impit,
-  workingDirectory: string,
-  context: ImageBatchContext
-): Promise<Array<[string, string]>> {
-  if (maxImages === 0) {
-    return []
-  }
-
-  const images = extractPageImages(dom, url, maxImages, searchTerms)
-
-  if (images.length === 0) {
-    return []
-  }
-
-  const batch = await downloadImageBatch(
-    images.map(image => image.src),
-    impit,
-    { workingDirectory, timestamp: Date.now() },
-    context
-  )
-
-  return images.map((image, index) => {
-    const result = batch[index]
-    const markdown = result.ok
-      ? `![Image ${index + 1}](${result.localPath})`
-      : `Error fetching image from URL: ${image.src}`
-
-    return [image.alt, markdown] as [string, string]
-  })
-}
-
-/**
- * Build the visible-text payload for the Visit Website tool: when search terms are supplied
- * and the full text exceeds the budget, concatenate dedup-merged windows around each term;
- * otherwise return a head slice of the full text.
- *
- * @param dom Parsed website DOM.
- * @param contentLimit Character budget for the returned text.
- * @param searchTerms Optional search terms biasing content selection.
- * @returns The formatted content string, or an empty string when `contentLimit` is zero.
- */
-function buildContent(dom: JSDOM, contentLimit: number, searchTerms: string[] | undefined): string {
-  if (contentLimit <= 0) {
-    return ""
-  }
-
-  const allContent = extractVisibleText(dom)
-
-  if (searchTerms !== undefined && searchTerms.length > 0 && contentLimit < allContent.length) {
-    const sliced = sliceAroundTerms(allContent, searchTerms, contentLimit)
-
-    if (sliced.length > 0) {
-      return sliced
-    }
-  }
-
-  return allContent.slice(0, contentLimit)
 }
