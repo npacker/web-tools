@@ -6,7 +6,7 @@ import { tool, Tool, ToolsProviderController } from "@lmstudio/sdk"
 import { Impit } from "impit"
 import { z } from "zod"
 
-import { TTLCache } from "./cache"
+import { TTLCache, searchCacheKey } from "./cache"
 import { resolveConfig } from "./config/config-resolver"
 import {
   SEARCH_CACHE_TTL_MS,
@@ -23,13 +23,13 @@ import {
   DEFAULT_PAGE_SIZE,
   DEFAULT_SAFE_SEARCH,
 } from "./constants"
-import { SearchAbortedError, NoResultsError, VqdTokenError, FetchError, isAbortError, getErrorMessage } from "./errors"
+import { NoResultsError, formatSearchError } from "./errors"
 import { extractImageUrls } from "./parsers"
 import { DuckDuckGoService } from "./services/duck-duck-go-service"
 import { downloadImage } from "./services/image-download-service"
-import { RateLimiter } from "./utils/rate-limiter"
+import { RateLimiter, delay } from "./utils"
 
-import type { SafeSearch } from "./types"
+import type { CachedSearchResults } from "./cache"
 
 /**
  * Creates and configures the DuckDuckGo tools provider.
@@ -40,34 +40,16 @@ import type { SafeSearch } from "./types"
 export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[]> {
   const impit = new Impit({ browser: "chrome" })
   const rateLimiter = new RateLimiter(MIN_REQUEST_INTERVAL_MS)
-  const duckDuckGoService = new DuckDuckGoService(impit)
-
-  const searchCache = new TTLCache<SearchCacheEntry>(SEARCH_CACHE_TTL_MS, SEARCH_CACHE_MAX_SIZE)
   const vqdCache = new TTLCache<string>(VQD_CACHE_TTL_MS, VQD_CACHE_MAX_SIZE)
+  const duckDuckGoService = new DuckDuckGoService(impit, vqdCache)
+
+  const searchCache = new TTLCache<CachedSearchResults>(SEARCH_CACHE_TTL_MS, SEARCH_CACHE_MAX_SIZE)
 
   const webSearchTool = createWebSearchTool(ctl, duckDuckGoService, searchCache, rateLimiter)
 
-  const imageSearchTool = createImageSearchTool(ctl, duckDuckGoService, vqdCache, rateLimiter, impit)
+  const imageSearchTool = createImageSearchTool(ctl, duckDuckGoService, rateLimiter, impit)
 
   return [webSearchTool, imageSearchTool]
-}
-
-/**
- * Cache entry for search results.
- */
-interface SearchCacheEntry {
-  /** Result tuples of `[label, url]` pairs. */
-  results: Array<[string, string]>
-  /** Number of results in `results`. */
-  count: number
-}
-
-/**
- * Minimal context surface required by `handleSearchError` for warning output.
- */
-interface SearchErrorContext {
-  /** Logger used to surface non-fatal failures. */
-  warn: (message: string) => void
 }
 
 /**
@@ -82,7 +64,7 @@ interface SearchErrorContext {
 function createWebSearchTool(
   ctl: ToolsProviderController,
   service: DuckDuckGoService,
-  cache: TTLCache<SearchCacheEntry>,
+  cache: TTLCache<CachedSearchResults>,
   rateLimiter: RateLimiter
 ): Tool {
   return tool({
@@ -128,10 +110,12 @@ function createWebSearchTool(
           safeSearch: parameterSafeSearch,
         })
 
-        const cached = getFromCache(cache, "web", query, safeSearch, page)
+        const cacheKey = searchCacheKey("web", query, safeSearch, page)
+        const cached = cache.get(cacheKey)
 
         if (cached !== undefined) {
           context.status(`Found ${cached.count} web pages (cached).`)
+
           return cached.results
         }
 
@@ -143,17 +127,15 @@ function createWebSearchTool(
         }
 
         context.status(`Found ${result.results.length} web pages.`)
-
-        const cacheEntry = {
+        const cacheEntry: CachedSearchResults = {
           results: result.results.map(({ label, url }) => [label, url] as [string, string]),
           count: result.results.length,
         }
-
-        setInCache(cache, "web", query, safeSearch, page, cacheEntry)
+        cache.set(cacheKey, cacheEntry)
 
         return cacheEntry.results
       } catch (error) {
-        return handleSearchError(error, context)
+        return formatSearchError(error, context)
       }
     },
   })
@@ -164,7 +146,6 @@ function createWebSearchTool(
  *
  * @param ctl Tools provider controller supplied by the LM Studio SDK.
  * @param service DuckDuckGo service used for outbound requests.
- * @param vqdCache Cache holding VQD tokens keyed by query.
  * @param rateLimiter Shared limiter enforcing the minimum gap between requests.
  * @param impit Shared HTTP client reused for image downloads.
  * @returns The configured image search tool.
@@ -172,7 +153,6 @@ function createWebSearchTool(
 function createImageSearchTool(
   ctl: ToolsProviderController,
   service: DuckDuckGoService,
-  vqdCache: TTLCache<string>,
   rateLimiter: RateLimiter,
   impit: Impit
 ): Tool {
@@ -220,15 +200,8 @@ function createImageSearchTool(
           safeSearch: parameterSafeSearch,
         })
 
-        const vqd = await getVqdToken(query, service, vqdCache, context.signal)
-
-        if (vqd === undefined) {
-          context.warn("Failed to extract vqd token.")
-          throw new VqdTokenError()
-        }
-
+        const vqd = await service.getVqdToken(query, { signal: context.signal })
         await delay(IMAGE_FETCH_DELAY_MS)
-
         const parameters = { query, pageSize, safeSearch, page }
         const imageResults = await service.searchImages(parameters, vqd, {
           signal: context.signal,
@@ -241,7 +214,6 @@ function createImageSearchTool(
         }
 
         context.status(`Found ${imageUrls.length} images. Fetching...`)
-
         const workingDirectory = ctl.getWorkingDirectory()
         const timestamp = Date.now()
 
@@ -268,6 +240,7 @@ function createImageSearchTool(
 
         if (downloadedPaths.length === 0) {
           context.warn("Error fetching images")
+
           return imageUrls
         }
 
@@ -275,127 +248,8 @@ function createImageSearchTool(
 
         return downloadedPaths
       } catch (error) {
-        return handleSearchError(error, context)
+        return formatSearchError(error, context)
       }
     },
   })
-}
-
-/**
- * Retrieves VQD token from cache or fetches it.
- *
- * @param query Search query whose VQD token is required.
- * @param service DuckDuckGo service used when a fresh fetch is needed.
- * @param cache Cache holding VQD tokens keyed by query.
- * @param signal Signal used to abort the fetch if the caller cancels.
- * @returns The cached or freshly fetched token, or `undefined` when the fetch fails.
- */
-async function getVqdToken(
-  query: string,
-  service: DuckDuckGoService,
-  cache: TTLCache<string>,
-  signal: AbortSignal
-): Promise<string | undefined> {
-  const cacheKey = `vqd:${query}`
-  const cached = cache.get(cacheKey)
-
-  if (cached !== undefined) {
-    return cached
-  }
-
-  try {
-    const vqd = await service.fetchVqdToken(query, { signal })
-    cache.set(cacheKey, vqd)
-    return vqd
-  } catch {
-    return undefined
-  }
-}
-
-/**
- * Retrieves search results from cache.
- *
- * @param cache Cache holding prior search results.
- * @param type Whether the lookup is for a web or image search.
- * @param query Search query string.
- * @param safeSearch Safe-search mode that produced the cached entry.
- * @param page One-based page number of the cached entry.
- * @returns The cached entry, or `undefined` when absent.
- */
-function getFromCache(
-  cache: TTLCache<SearchCacheEntry>,
-  type: "web" | "image",
-  query: string,
-  safeSearch: SafeSearch,
-  page: number
-): SearchCacheEntry | undefined {
-  const cacheKey = `${type}:${query}:${safeSearch}:${page}`
-
-  return cache.get(cacheKey)
-}
-
-/**
- * Stores search results in cache.
- *
- * @param cache Cache holding prior search results.
- * @param type Whether the entry represents a web or image search.
- * @param query Search query string.
- * @param safeSearch Safe-search mode that produced the entry.
- * @param page One-based page number of the entry.
- * @param entry Cache entry to store.
- */
-function setInCache(
-  cache: TTLCache<SearchCacheEntry>,
-  type: "web" | "image",
-  query: string,
-  safeSearch: SafeSearch,
-  page: number,
-  entry: SearchCacheEntry
-): void {
-  const cacheKey = `${type}:${query}:${safeSearch}:${page}`
-  cache.set(cacheKey, entry)
-}
-
-/**
- * Handles search errors and returns appropriate response.
- *
- * @param error Error caught during search execution.
- * @param context Minimal context surface used to emit warnings.
- * @returns A user-facing error string, or the original URL list when downloads fail.
- */
-function handleSearchError(error: unknown, context: SearchErrorContext): string | string[] {
-  if (isAbortError(error)) {
-    return "Search aborted by user."
-  }
-
-  if (error instanceof SearchAbortedError) {
-    return error.message
-  }
-
-  if (error instanceof NoResultsError) {
-    return error.message
-  }
-
-  if (error instanceof VqdTokenError) {
-    return `Error: ${error.message}`
-  }
-
-  if (error instanceof FetchError) {
-    context.warn(`Failed to fetch search results: ${error.message}`)
-    return `Error: Failed to fetch search results: ${error.message}`
-  }
-
-  const message = getErrorMessage(error)
-  context.warn(`Error during search: ${message}`)
-  return `Error: ${message}`
-}
-
-/**
- * Creates a delay promise.
- *
- * @param ms Duration to sleep, in milliseconds.
- * @returns A promise that resolves once the timer elapses.
- */
-async function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
 }

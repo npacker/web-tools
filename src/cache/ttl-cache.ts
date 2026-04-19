@@ -11,7 +11,6 @@ export interface CacheEntry<T> {
   /** Absolute epoch millisecond timestamp at which the entry expires. */
   expiry: number
 }
-
 /**
  * In-memory cache with per-entry time-to-live and bounded capacity.
  */
@@ -50,6 +49,7 @@ export class TTLCache<T> {
 
     if (this.isExpired(entry)) {
       this.cache.delete(key)
+
       return undefined
     }
 
@@ -142,6 +142,7 @@ export class TTLCache<T> {
    */
   private evictExpired(): void {
     const now = Date.now()
+
     for (const [key, entry] of this.cache) {
       if (now > entry.expiry) {
         this.cache.delete(key)

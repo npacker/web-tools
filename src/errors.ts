@@ -20,7 +20,6 @@ export class DuckDuckGoError extends Error {
     this.name = "DuckDuckGoError"
   }
 }
-
 /**
  * Raised when a search is cancelled by the caller before completion.
  */
@@ -33,7 +32,6 @@ export class SearchAbortedError extends DuckDuckGoError {
     this.name = "SearchAbortedError"
   }
 }
-
 /**
  * Raised when a web or image search yields no usable results.
  */
@@ -49,7 +47,6 @@ export class NoResultsError extends DuckDuckGoError {
     this.name = "NoResultsError"
   }
 }
-
 /**
  * Raised when the VQD token required for image search cannot be extracted.
  */
@@ -62,7 +59,6 @@ export class VqdTokenError extends DuckDuckGoError {
     this.name = "VqdTokenError"
   }
 }
-
 /**
  * Raised when an HTTP request to DuckDuckGo returns a non-success status.
  */
@@ -100,4 +96,48 @@ export function isAbortError(error: unknown): boolean {
  */
 export function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+/**
+ * Minimal context surface required by `formatSearchError` for warning output.
+ */
+export interface SearchErrorContext {
+  /** Logger used to surface non-fatal failures. */
+  warn: (message: string) => void
+}
+
+/**
+ * Map a search error to a user-facing string, warning on unexpected failures.
+ *
+ * @param error Error caught during search execution.
+ * @param context Minimal context surface used to emit warnings.
+ * @returns A user-facing error string.
+ */
+export function formatSearchError(error: unknown, context: SearchErrorContext): string {
+  if (isAbortError(error)) {
+    return "Search aborted by user."
+  }
+
+  if (error instanceof SearchAbortedError) {
+    return error.message
+  }
+
+  if (error instanceof NoResultsError) {
+    return error.message
+  }
+
+  if (error instanceof VqdTokenError) {
+    return `Error: ${error.message}`
+  }
+
+  if (error instanceof FetchError) {
+    context.warn(`Failed to fetch search results: ${error.message}`)
+
+    return `Error: Failed to fetch search results: ${error.message}`
+  }
+
+  const message = getErrorMessage(error)
+  context.warn(`Error during search: ${message}`)
+
+  return `Error: ${message}`
 }

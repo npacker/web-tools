@@ -26,7 +26,9 @@ export function extractImageUrls(results: DuckDuckGoImageResult[], maxResults: n
       if (seenUrls.has(url)) {
         return false
       }
+
       seenUrls.add(url)
+
       return true
     })
 }

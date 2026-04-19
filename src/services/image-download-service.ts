@@ -20,7 +20,6 @@ export interface DownloadContext {
   /** Signal used to abort the in-flight download. */
   signal: AbortSignal
 }
-
 /**
  * Per-download options controlling file placement and naming.
  */
@@ -53,6 +52,7 @@ export async function downloadImage(
 
     if (!response.ok) {
       context.warn(`Failed to fetch image ${options.index}: ${response.statusText}`)
+
       return undefined
     }
 
@@ -60,15 +60,14 @@ export async function downloadImage(
 
     if (bytes.length === 0) {
       context.warn(`Image ${options.index} is empty: ${url}`)
+
       return undefined
     }
 
     const fileExtension = determineImageExtension(response.headers.get("content-type"), url)
     const fileName = `${options.timestamp}-${options.index}.${fileExtension}`
     const filePath = path.join(options.workingDirectory, fileName)
-
     await writeFile(filePath, bytes)
-
     const localPath = normalizePath(filePath)
 
     return localPath
@@ -78,6 +77,7 @@ export async function downloadImage(
     }
 
     context.warn(`Error fetching image ${options.index}: ${getErrorMessage(error)}`)
+
     return undefined
   }
 }

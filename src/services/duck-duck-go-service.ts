@@ -4,8 +4,9 @@
 
 import { Impit } from "impit"
 
+import { TTLCache } from "../cache"
 import { DUCKDUCKGO_BASE_URL, WEB_SEARCH_PATH, IMAGE_SEARCH_PATH, VQD_FETCH_PATH } from "../constants"
-import { FetchError } from "../errors"
+import { FetchError, VqdTokenError } from "../errors"
 import { extractVqdToken, parseWebSearchResults } from "../parsers"
 
 import type { SafeSearch, SearchParameters, SearchCacheEntry, DuckDuckGoImageResult } from "../types"
@@ -32,14 +33,18 @@ interface ImageSearchResponseBody {
 export class DuckDuckGoService {
   /** Shared HTTP client configured with browser-like TLS and header fingerprints. */
   private readonly impit: Impit
+  /** Cache of VQD tokens scraped from the DuckDuckGo homepage, keyed by query. */
+  private readonly vqdCache: TTLCache<string>
 
   /**
-   * Create a service bound to the provided `impit` client.
+   * Create a service bound to the provided `impit` client and VQD cache.
    *
    * @param impit Shared HTTP client used for all outbound requests.
+   * @param vqdCache Cache holding VQD tokens keyed by query.
    */
-  public constructor(impit: Impit) {
+  public constructor(impit: Impit, vqdCache: TTLCache<string>) {
     this.impit = impit
+    this.vqdCache = vqdCache
   }
 
   /**
@@ -62,22 +67,32 @@ export class DuckDuckGoService {
   }
 
   /**
-   * Fetches the VQD token required for image searches.
+   * Retrieves the VQD token required for image searches, using the shared cache
+   * when possible and falling back to scraping the DuckDuckGo homepage.
    *
-   * @param query Search query whose VQD token should be retrieved.
+   * @param query Search query whose VQD token is required.
    * @param options Options controlling the outbound request.
-   * @returns The scraped VQD token.
-   * @throws {Error} When the token cannot be located in the response HTML.
+   * @returns The cached or freshly scraped VQD token.
+   * @throws {VqdTokenError} When the token cannot be located in the response HTML.
    */
-  public async fetchVqdToken(query: string, options: FetchOptions): Promise<string> {
+  public async getVqdToken(query: string, options: FetchOptions): Promise<string> {
+    const cacheKey = `vqd:${query}`
+    const cached = this.vqdCache.get(cacheKey)
+
+    if (cached !== undefined) {
+      return cached
+    }
+
     const url = this.buildVqdFetchUrl(query).toString()
     const response = await this.fetch(url, options)
     const html = await response.text()
     const vqd = extractVqdToken(html)
 
     if (vqd === undefined) {
-      throw new Error("VQD token not found")
+      throw new VqdTokenError()
     }
+
+    this.vqdCache.set(cacheKey, vqd)
 
     return vqd
   }

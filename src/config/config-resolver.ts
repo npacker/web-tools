@@ -18,7 +18,6 @@ export interface ResolvedConfig {
   /** Safe-search mode to apply to the request. */
   safeSearch: SafeSearch
 }
-
 /**
  * Optional per-invocation overrides applied on top of plugin configuration.
  */

@@ -6,7 +6,6 @@ import { AUTO_CONFIG_VALUE } from "./constants"
 
 /** Safe-search modes accepted by the DuckDuckGo endpoints. */
 export type SafeSearch = "strict" | "moderate" | "off"
-
 /**
  * A single web search result returned to the caller.
  */
@@ -16,7 +15,6 @@ export interface SearchResult {
   /** Destination URL of the result link. */
   url: string
 }
-
 /**
  * Cached payload for a web search, holding the parsed results and their count.
  */
@@ -26,7 +24,6 @@ export interface SearchCacheEntry {
   /** Number of results in `results`. */
   count: number
 }
-
 /**
  * Raw image result entry as returned by the DuckDuckGo image endpoint.
  */
@@ -34,7 +31,6 @@ export interface DuckDuckGoImageResult {
   /** Remote URL of the full-resolution image. */
   image: string
 }
-
 /**
  * An image search result returned to the caller.
  */
@@ -44,7 +40,6 @@ export interface ImageSearchResult {
   /** Local filesystem path when the image was successfully downloaded. */
   localPath?: string
 }
-
 /**
  * Input parameters shared by web and image search requests.
  */
@@ -58,7 +53,6 @@ export interface SearchParameters {
   /** One-based page number of the request. */
   page: number
 }
-
 /**
  * Shape of the persisted plugin configuration values.
  */
@@ -68,7 +62,6 @@ export interface ConfigValue {
   /** Configured safe-search mode, or the auto sentinel when unset. */
   safeSearch: SafeSearch | typeof AUTO_CONFIG_VALUE
 }
-
 /**
  * Auto configuration value literal type.
  */
