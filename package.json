@@ -1,8 +1,8 @@
 {
-  "name": "lms-plugin-duckduckgo",
+  "name": "lms-plugin-web-tools",
   "version": "1.0.0",
   "type": "module",
-  "description": "LM Studio plugin for searching the web with DuckDuckGo",
+  "description": "LM Studio plugin offering DuckDuckGo web and image search, website visits, and image viewing for local LLMs",
   "main": "index.js",
   "scripts": {
     "dev": "lms dev",
@@ -12,7 +12,10 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\""
   },
-  "author": "Daniel Sig",
+  "author": "Nigel Packer <packene@gmail.com>",
+  "contributors": [
+    "Daniel Sig (original lms-plugin-duckduckgo and lms-plugin-visit-website)"
+  ],
   "license": "MIT",
   "engines": {
     "node": ">=22"

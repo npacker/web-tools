@@ -2,6 +2,6 @@
   "type": "plugin",
   "runner": "node",
   "owner": "local",
-  "name": "duckduckgo",
+  "name": "web-tools",
   "revision": 5
 }
