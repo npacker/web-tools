@@ -3,6 +3,7 @@
  * with the LM Studio SDK.
  */
 
+import os from "node:os"
 import path from "node:path"
 
 import { Tool, ToolsProviderController } from "@lmstudio/sdk"
@@ -22,6 +23,10 @@ import type { SearchResultsPayload } from "../cache"
  * Root directory name used for the plugin's on-disk `cacache` store.
  */
 const CACHE_DIRECTORY_NAME = "lms-plugin-duckduckgo-cache"
+/**
+ * Subdirectory name under the plugin data root where downloaded images are stored.
+ */
+const IMAGE_DOWNLOAD_DIRECTORY_NAME = "lms-plugin-duckduckgo-images"
 /**
  * Subdirectory under the cache root dedicated to web/image search results.
  */
@@ -77,7 +82,9 @@ const sharedRateLimiter = new RateLimiter(MIN_REQUEST_INTERVAL_MS)
  */
 export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[]> {
   const impit = createImpit()
-  const cacheRoot = path.join(ctl.getWorkingDirectory(), CACHE_DIRECTORY_NAME)
+  const pluginDataRoot = path.join(os.homedir(), ".lmstudio", "plugin-data")
+  const cacheRoot = path.join(pluginDataRoot, CACHE_DIRECTORY_NAME)
+  const imageDownloadDirectory = path.join(pluginDataRoot, IMAGE_DOWNLOAD_DIRECTORY_NAME)
   const vqdCache = new TTLCache<string>(path.join(cacheRoot, VQD_CACHE_SUBDIR), VQD_CACHE_TTL_MS, VQD_CACHE_MAX_SIZE)
   const searchCache = new TTLCache<SearchResultsPayload>(
     path.join(cacheRoot, SEARCH_CACHE_SUBDIR),
@@ -92,8 +99,8 @@ export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[
 
   return [
     createWebSearchTool(ctl, impit, searchCache, sharedRateLimiter),
-    createImageSearchTool(ctl, impit, vqdCache, sharedRateLimiter),
-    createVisitWebsiteTool(ctl, impit, websiteCache, sharedRateLimiter),
-    createViewImagesTool(ctl, impit, websiteCache, sharedRateLimiter),
+    createImageSearchTool(ctl, impit, vqdCache, sharedRateLimiter, imageDownloadDirectory),
+    createVisitWebsiteTool(ctl, impit, websiteCache, sharedRateLimiter, imageDownloadDirectory),
+    createViewImagesTool(ctl, impit, websiteCache, sharedRateLimiter, imageDownloadDirectory),
   ]
 }

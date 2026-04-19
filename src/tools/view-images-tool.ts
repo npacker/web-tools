@@ -4,12 +4,12 @@
 
 import { tool, Tool, ToolsProviderController } from "@lmstudio/sdk"
 import { Impit } from "impit"
+import { JSDOM } from "jsdom"
 import { z } from "zod"
 
 import { TTLCache } from "../cache"
 import { resolveConfig } from "../config/resolve-config"
 import { downloadImages } from "../images"
-import { JSDOM } from "jsdom"
 import { extractPageImages } from "../parsers"
 import { RateLimiter } from "../timing"
 import { fetchWebsite } from "../website"
@@ -33,13 +33,15 @@ const MAX_VIEW_IMAGES_COUNT = 200
  * @param impit Shared HTTP client used for HTML fetches and image downloads.
  * @param websiteCache Cache holding recent HTML payloads keyed by URL.
  * @param rateLimiter Shared limiter enforcing the minimum gap between outbound requests.
+ * @param imageDownloadDirectory Directory where downloaded images are written.
  * @returns The configured View Images tool.
  */
 export function createViewImagesTool(
   ctl: ToolsProviderController,
   impit: Impit,
   websiteCache: TTLCache<string>,
-  rateLimiter: RateLimiter
+  rateLimiter: RateLimiter,
+  imageDownloadDirectory: string
 ): Tool {
   return tool({
     name: "View Images",
@@ -102,7 +104,7 @@ export function createViewImagesTool(
         const batch = await downloadImages(
           collected,
           impit,
-          { workingDirectory: ctl.getWorkingDirectory(), timestamp: Date.now() },
+          { workingDirectory: imageDownloadDirectory, timestamp: Date.now() },
           { warn: context.warn, signal: context.signal }
         )
         const rendered = batch.map((result, index) =>

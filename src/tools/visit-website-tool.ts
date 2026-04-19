@@ -10,7 +10,6 @@ import { z } from "zod"
 import { TTLCache } from "../cache"
 import { resolveConfig } from "../config/resolve-config"
 import { downloadImages } from "../images"
-import { JSDOM } from "jsdom"
 import { buildPageExcerpt, extractHeadings, extractLinks, extractPageImages } from "../parsers"
 import { RateLimiter } from "../timing"
 import { fetchWebsite } from "../website"
@@ -41,13 +40,15 @@ const MAX_CONTENT_LIMIT = 10_000
  * @param impit Shared HTTP client used for HTML fetches and image downloads.
  * @param websiteCache Cache holding recent HTML payloads keyed by URL.
  * @param rateLimiter Shared limiter enforcing the minimum gap between outbound requests.
+ * @param imageDownloadDirectory Directory where downloaded page images are written.
  * @returns The configured Visit Website tool.
  */
 export function createVisitWebsiteTool(
   ctl: ToolsProviderController,
   impit: Impit,
   websiteCache: TTLCache<string>,
-  rateLimiter: RateLimiter
+  rateLimiter: RateLimiter,
+  imageDownloadDirectory: string
 ): Tool {
   return tool({
     name: "Visit Website",
@@ -119,7 +120,7 @@ export function createVisitWebsiteTool(
         const dom = new JSDOM(html)
         const headings = extractHeadings(dom)
         const links = extractLinks(dom, url, maxLinks, findInPage)
-        const images = await renderPageImages(dom, url, maxImages, findInPage, impit, ctl.getWorkingDirectory(), {
+        const images = await renderPageImages(dom, url, maxImages, findInPage, impit, imageDownloadDirectory, {
           warn: context.warn,
           signal: context.signal,
         })

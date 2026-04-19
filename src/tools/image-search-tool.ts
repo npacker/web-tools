@@ -50,13 +50,15 @@ const VQD_TO_IMAGE_SEARCH_DELAY_MS = 2000
  * @param impit Shared HTTP client used for outbound requests and image downloads.
  * @param vqdCache Cache holding VQD tokens keyed by query.
  * @param rateLimiter Shared limiter enforcing the minimum gap between requests.
+ * @param imageDownloadDirectory Directory where downloaded images are written.
  * @returns The configured image search tool.
  */
 export function createImageSearchTool(
   ctl: ToolsProviderController,
   impit: Impit,
   vqdCache: TTLCache<string>,
-  rateLimiter: RateLimiter
+  rateLimiter: RateLimiter,
+  imageDownloadDirectory: string
 ): Tool {
   return tool({
     name: "Image Search",
@@ -117,7 +119,7 @@ export function createImageSearchTool(
         const batch = await downloadImages(
           imageUrls,
           impit,
-          { workingDirectory: ctl.getWorkingDirectory(), timestamp: Date.now() },
+          { workingDirectory: imageDownloadDirectory, timestamp: Date.now() },
           { warn: context.warn, signal: context.signal }
         )
         const downloadedPaths: string[] = []
