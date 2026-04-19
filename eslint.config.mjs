@@ -8,8 +8,11 @@ import sonarjs from "eslint-plugin-sonarjs";
 import importX from "eslint-plugin-import-x";
 import jsdoc from "eslint-plugin-jsdoc";
 import nodePlugin from "eslint-plugin-n";
+import promisePlugin from "eslint-plugin-promise";
 import regexpPlugin from "eslint-plugin-regexp";
+import securityPlugin from "eslint-plugin-security";
 import unicorn from "eslint-plugin-unicorn";
+import unusedImports from "eslint-plugin-unused-imports";
 import globals from "globals";
 
 export default [
@@ -20,6 +23,8 @@ export default [
   nodePlugin.configs["flat/recommended-module"],
   regexpPlugin.configs["flat/recommended"],
   unicorn.configs.recommended,
+  promisePlugin.configs["flat/recommended"],
+  securityPlugin.configs.recommended,
   jsdoc.configs["flat/recommended-typescript-error"],
   {
     files: ["src/**/*.ts"],
@@ -37,6 +42,7 @@ export default [
       "@typescript-eslint": tseslint,
       "@stylistic": stylistic,
       prettier: prettierPlugin,
+      "unused-imports": unusedImports,
     },
     settings: {
       "import-x/resolver": {
@@ -49,8 +55,50 @@ export default [
     rules: {
       "no-inline-comments": "error",
       "no-unused-vars": "off",
-      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+      "@typescript-eslint/no-unused-vars": "off",
+      "unused-imports/no-unused-imports": "error",
+      "unused-imports/no-unused-vars": [
+        "error",
+        { args: "after-used", argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
       "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/no-unsafe-return": "error",
+      "@typescript-eslint/no-unsafe-argument": "error",
+      "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/await-thenable": "error",
+      "@typescript-eslint/require-await": "off",
+      "@typescript-eslint/switch-exhaustiveness-check": "error",
+      "@typescript-eslint/prefer-readonly": "error",
+      "@typescript-eslint/consistent-type-imports": ["error", { fixStyle: "inline-type-imports" }],
+      "@typescript-eslint/no-import-type-side-effects": "error",
+      "@typescript-eslint/prefer-includes": "error",
+      "@typescript-eslint/prefer-string-starts-ends-with": "error",
+      "@typescript-eslint/prefer-optional-chain": "error",
+      "@typescript-eslint/prefer-reduce-type-parameter": "error",
+      "@typescript-eslint/restrict-template-expressions": "error",
+      "@typescript-eslint/unbound-method": "error",
+      "@typescript-eslint/array-type": ["error", { default: "array" }],
+      "@typescript-eslint/consistent-indexed-object-style": "error",
+      "@typescript-eslint/method-signature-style": ["error", "property"],
+
+      "no-param-reassign": ["error", { props: true }],
+      "no-await-in-loop": "error",
+      "no-implicit-coercion": "error",
+      "no-useless-concat": "error",
+      "prefer-template": "error",
+      curly: ["error", "all"],
+      "default-case-last": "error",
+      "no-fallthrough": "error",
+      radix: "error",
+      "no-else-return": ["error", { allowElseIf: false }],
+      "prefer-object-spread": "error",
+      "object-shorthand": "error",
+      "no-lonely-if": "error",
+      "no-nested-ternary": "error",
+      "no-unneeded-ternary": "error",
+      "prefer-destructuring": ["error", { object: true, array: false }],
+      "no-throw-literal": "off",
+      "@typescript-eslint/only-throw-error": "error",
       "@typescript-eslint/explicit-function-return-type": "off",
       "@typescript-eslint/no-empty-function": "error",
       "prettier/prettier": "error",
@@ -92,8 +140,17 @@ export default [
 
       "sonarjs/cognitive-complexity": ["error", 15],
       "sonarjs/no-duplicate-string": ["error", { threshold: 4 }],
+      "sonarjs/no-nested-template-literals": "error",
+      "sonarjs/no-identical-functions": "error",
+      "sonarjs/prefer-immediate-return": "error",
+      "sonarjs/no-small-switch": "error",
 
       "import-x/no-cycle": ["error", { maxDepth: 3 }],
+      "import-x/no-default-export": "error",
+      "import-x/no-duplicates": "error",
+      "import-x/newline-after-import": "error",
+      "import-x/no-useless-path-segments": "error",
+      "import-x/no-self-import": "error",
       "import-x/order": [
         "error",
         {
@@ -105,6 +162,9 @@ export default [
 
       "n/no-missing-import": "off",
       "n/no-unsupported-features/node-builtins": "error",
+
+      "security/detect-object-injection": "off",
+      "security/detect-non-literal-fs-filename": "off",
 
       "jsdoc/require-jsdoc": [
         "error",

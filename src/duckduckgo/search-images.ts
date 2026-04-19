@@ -2,14 +2,13 @@
  * DuckDuckGo image-search entry point.
  */
 
-import { Impit } from "impit"
-
 import { fetchOk } from "../http"
 
 import { buildImageSearchUrl } from "./build-urls"
 
 import type { RequestOptions } from "../http"
 import type { SearchParameters } from "./build-urls"
+import type { Impit } from "impit"
 
 /**
  * Raw image result entry as returned by the DuckDuckGo image endpoint.

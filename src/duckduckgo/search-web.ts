@@ -2,8 +2,6 @@
  * DuckDuckGo web-search entry point.
  */
 
-import { Impit } from "impit"
-
 import { fetchOk } from "../http"
 import { parseSearchResults } from "../parsers"
 
@@ -12,6 +10,7 @@ import { buildWebSearchUrl } from "./build-urls"
 import type { SearchResultsPayload } from "../cache"
 import type { RequestOptions } from "../http"
 import type { SearchParameters } from "./build-urls"
+import type { Impit } from "impit"
 
 /**
  * Perform a DuckDuckGo web search and return the parsed result tuples.

@@ -2,9 +2,9 @@
  * Shared `impit` GET helper that throws on non-2xx responses.
  */
 
-import { Impit } from "impit"
-
 import { FetchError } from "../errors"
+
+import type { Impit } from "impit"
 
 /**
  * Options passed to every outbound request, primarily to support cancellation.

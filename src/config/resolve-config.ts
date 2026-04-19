@@ -2,13 +2,12 @@
  * Configuration resolution utilities.
  */
 
-import { ToolsProviderController } from "@lmstudio/sdk"
-
 import { configSchematics } from "../config-schematics"
 
 import { AUTO_CONFIG_VALUE } from "./auto-sentinel"
 
 import type { SafeSearch } from "../duckduckgo/safe-search"
+import type { ToolsProviderController } from "@lmstudio/sdk"
 
 /**
  * Default page size when no plugin or override value is provided.

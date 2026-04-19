@@ -6,8 +6,6 @@
 import os from "node:os"
 import path from "node:path"
 
-import { Tool, ToolsProviderController } from "@lmstudio/sdk"
-
 import { TTLCache } from "../cache"
 import { createImpit } from "../http"
 import { RateLimiter } from "../timing"
@@ -18,6 +16,7 @@ import { createVisitWebsiteTool } from "./visit-website-tool"
 import { createWebSearchTool } from "./web-search-tool"
 
 import type { SearchResultsPayload } from "../cache"
+import type { Tool, ToolsProviderController } from "@lmstudio/sdk"
 
 /**
  * Root directory name used for the plugin's on-disk `cacache` store.

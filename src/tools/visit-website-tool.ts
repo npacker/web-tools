@@ -2,19 +2,20 @@
  * Visit Website tool factory.
  */
 
-import { tool, Tool, ToolsProviderController } from "@lmstudio/sdk"
-import { Impit } from "impit"
+import { tool, type Tool, type ToolsProviderController } from "@lmstudio/sdk"
 import { JSDOM } from "jsdom"
 import { z } from "zod"
 
-import { TTLCache } from "../cache"
 import { resolveConfig } from "../config/resolve-config"
 import { downloadImages } from "../images"
 import { buildPageExcerpt, extractHeadings, extractLinks, extractPageImages } from "../parsers"
-import { RateLimiter } from "../timing"
 import { fetchWebsite } from "../website"
 
 import { formatToolError } from "./tool-error"
+
+import type { TTLCache } from "../cache"
+import type { RateLimiter } from "../timing"
+import type { Impit } from "impit"
 
 /**
  * Lower bound on the link / image extraction counts.
@@ -171,7 +172,7 @@ async function renderPageImages(
   impit: Impit,
   workingDirectory: string,
   context: PageImageRenderContext
-): Promise<Array<[string, string]>> {
+): Promise<[string, string][]> {
   if (maxImages === 0) {
     return []
   }

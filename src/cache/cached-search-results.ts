@@ -3,7 +3,7 @@
  */
 export interface SearchResultsPayload {
   /** Result tuples of `[label, url]` pairs. */
-  results: Array<[string, string]>
+  results: [string, string][]
   /** Number of results in `results`. */
   count: number
 }

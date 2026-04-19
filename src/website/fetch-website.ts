@@ -2,10 +2,10 @@
  * Fetch HTML from arbitrary websites with on-disk TTL caching keyed by URL.
  */
 
-import { Impit } from "impit"
-
-import { TTLCache } from "../cache"
 import { fetchOk } from "../http"
+
+import type { TTLCache } from "../cache"
+import type { Impit } from "impit"
 
 /**
  * Options controlling an outbound website fetch.

@@ -2,11 +2,11 @@
  * Extract and rank outbound links from a parsed website document.
  */
 
-import { JSDOM } from "jsdom"
-
 import { normalizeText } from "../../text"
 
 import { resolveUrl, termMatchBonus } from "./page-shared"
+
+import type { JSDOM } from "jsdom"
 
 /**
  * Coefficient used in the linear score that penalises link position in the document order.
@@ -45,7 +45,7 @@ export function extractLinks(
   baseUrl: string,
   maxLinks: number,
   searchTerms?: string[]
-): Array<[string, string]> {
+): [string, string][] {
   if (maxLinks === 0) {
     return []
   }
@@ -57,7 +57,7 @@ export function extractLinks(
   }))
   const sorted = scored.toSorted((a, b) => b.score - a.score)
   const seen = new Set<string>()
-  const result: Array<[string, string]> = []
+  const result: [string, string][] = []
 
   for (const { href, label } of sorted) {
     if (seen.has(href)) {
@@ -96,7 +96,7 @@ function collectLinkCandidates(dom: JSDOM, baseUrl: string): LinkCandidate[] {
 
     const resolved = resolveUrl(rawHref, baseUrl)
 
-    if (resolved === undefined || !resolved.startsWith("http")) {
+    if (resolved?.startsWith("http") !== true) {
       continue
     }
 

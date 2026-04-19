@@ -2,12 +2,12 @@
  * Extract and rank images from a parsed website document.
  */
 
-import { JSDOM } from "jsdom"
-
 import { normalizeText } from "../../text"
 import { URL_EXTENSION_PATTERN, isSupportedImageExtension } from "../image-results-parser"
 
 import { resolveUrl, termMatchBonus } from "./page-shared"
+
+import type { JSDOM } from "jsdom"
 
 /**
  * A single image reference extracted from the page.

@@ -129,7 +129,7 @@ function extensionFromUrl(url: string): string | undefined {
   let pathname: string
 
   try {
-    pathname = new URL(url).pathname
+    ;({ pathname } = new URL(url))
   } catch {
     return undefined
   }

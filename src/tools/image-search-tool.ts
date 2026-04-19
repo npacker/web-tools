@@ -2,20 +2,21 @@
  * Image Search tool factory.
  */
 
-import { tool, Tool, ToolsProviderController } from "@lmstudio/sdk"
-import { Impit } from "impit"
+import { tool, type Tool, type ToolsProviderController } from "@lmstudio/sdk"
 import { z } from "zod"
 
-import { TTLCache } from "../cache"
 import { DEFAULT_PAGE_SIZE, DEFAULT_SAFE_SEARCH, resolveConfig } from "../config/resolve-config"
 import { fetchVqdToken, searchImages } from "../duckduckgo"
 import { NoResultsError } from "../errors"
 import { downloadImages } from "../images"
 import { extractImageUrls } from "../parsers"
-import { RateLimiter, sleep } from "../timing"
+import { type RateLimiter, sleep } from "../timing"
 
 import { IMAGE_DOWNLOAD_EMPTY_BATCH_MESSAGE } from "./messages"
 import { formatToolError } from "./tool-error"
+
+import type { TTLCache } from "../cache"
+import type { Impit } from "impit"
 
 /**
  * Lower bound on the configurable page size.

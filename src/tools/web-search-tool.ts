@@ -2,19 +2,18 @@
  * Web Search tool factory.
  */
 
-import { tool, Tool, ToolsProviderController } from "@lmstudio/sdk"
-import { Impit } from "impit"
+import { tool, type Tool, type ToolsProviderController } from "@lmstudio/sdk"
 import { z } from "zod"
 
-import { TTLCache, searchCacheKey } from "../cache"
+import { type TTLCache, searchCacheKey, type SearchResultsPayload } from "../cache"
 import { resolveConfig } from "../config/resolve-config"
 import { searchWeb } from "../duckduckgo"
 import { NoResultsError } from "../errors"
-import { RateLimiter } from "../timing"
 
 import { formatToolError } from "./tool-error"
 
-import type { SearchResultsPayload } from "../cache"
+import type { RateLimiter } from "../timing"
+import type { Impit } from "impit"
 
 /**
  * Lower bound on the configurable page size.

@@ -2,15 +2,14 @@
  * Fetch (or cache-hit) the VQD token required for DuckDuckGo image search.
  */
 
-import { Impit } from "impit"
-
-import { TTLCache } from "../cache"
 import { fetchOk } from "../http"
 import { extractVqdToken } from "../parsers"
 
 import { buildVqdUrl } from "./build-urls"
 
+import type { TTLCache } from "../cache"
 import type { RequestOptions } from "../http"
+import type { Impit } from "impit"
 
 /**
  * Retrieve the VQD token for a query, serving a cached value when available and scraping the

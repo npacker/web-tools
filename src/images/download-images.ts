@@ -2,9 +2,9 @@
  * Concurrent multi-URL image download, preserving input order in the result array.
  */
 
-import { Impit } from "impit"
-
 import { downloadImage } from "./download-image"
+
+import type { Impit } from "impit"
 
 /**
  * Options controlling placement of the downloaded batch.

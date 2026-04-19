@@ -106,16 +106,19 @@ export class TTLCache<T> {
 
     const now = Date.now()
     const live: typeof entries = []
+    const expired: typeof entries = []
 
     for (const entry of entries) {
       const metadata = entry.metadata as CacheMetadata | undefined
 
       if (metadata === undefined || now > metadata.expiry) {
-        await cacache.rm.entry(this.cachePath, entry.key)
+        expired.push(entry)
       } else {
         live.push(entry)
       }
     }
+
+    await Promise.all(expired.map(async entry => cacache.rm.entry(this.cachePath, entry.key)))
 
     if (live.length < this.maxSize) {
       return

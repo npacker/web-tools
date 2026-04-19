@@ -6,11 +6,12 @@ import { writeFile } from "node:fs/promises"
 import path from "node:path"
 
 import { fileTypeFromBuffer } from "file-type"
-import { Impit } from "impit"
 
 import { isAbortError, errorMessage } from "../errors"
 import { toMarkdownPath } from "../fs"
 import { imageExtensionFromHeaders, isSupportedImageExtension, normalizeImageExtension } from "../parsers"
+
+import type { Impit } from "impit"
 
 /**
  * Timeout applied to each image download, in milliseconds.
