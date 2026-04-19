@@ -40,7 +40,6 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
   const pluginConfig = ctl.getPluginConfig(configSchematics)
   const pluginPageSize = pluginConfig.get("pageSize") as number | null
   const pluginSafeSearch = pluginConfig.get("safeSearch") as SafeSearch | typeof AUTO_CONFIG_VALUE
-
   const pageSize = resolvePageSize(pluginPageSize, overrides.pageSize)
   const safeSearch = resolveSafeSearch(pluginSafeSearch, overrides.safeSearch)
 

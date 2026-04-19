@@ -48,15 +48,12 @@ export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[
   const cacheRoot = path.join(ctl.getWorkingDirectory(), CACHE_DIRECTORY_NAME)
   const vqdCache = new TTLCache<string>(path.join(cacheRoot, VQD_CACHE_SUBDIR), VQD_CACHE_TTL_MS, VQD_CACHE_MAX_SIZE)
   const duckDuckGoService = new DuckDuckGoService(impit, vqdCache)
-
   const searchCache = new TTLCache<CachedSearchResults>(
     path.join(cacheRoot, SEARCH_CACHE_SUBDIR),
     SEARCH_CACHE_TTL_MS,
     SEARCH_CACHE_MAX_SIZE
   )
-
   const webSearchTool = createWebSearchTool(ctl, duckDuckGoService, searchCache, rateLimiter)
-
   const imageSearchTool = createImageSearchTool(ctl, duckDuckGoService, rateLimiter, impit)
 
   return [webSearchTool, imageSearchTool]
@@ -119,7 +116,6 @@ function createWebSearchTool(
           pageSize: parameterPageSize,
           safeSearch: parameterSafeSearch,
         })
-
         const cacheKey = searchCacheKey("web", query, safeSearch, page)
         const cached = await cache.get(cacheKey)
 
@@ -209,14 +205,12 @@ function createImageSearchTool(
           pageSize: parameterPageSize,
           safeSearch: parameterSafeSearch,
         })
-
         const vqd = await service.getVqdToken(query, { signal: context.signal })
         await delay(IMAGE_FETCH_DELAY_MS)
         const parameters = { query, pageSize, safeSearch, page }
         const imageResults = await service.searchImages(parameters, vqd, {
           signal: context.signal,
         })
-
         const imageUrls = extractImageUrls(imageResults, pageSize)
 
         if (imageUrls.length === 0) {
@@ -226,7 +220,6 @@ function createImageSearchTool(
         context.status(`Found ${imageUrls.length} images. Fetching...`)
         const workingDirectory = ctl.getWorkingDirectory()
         const timestamp = Date.now()
-
         const downloadPromises = imageUrls.map(async (url, index) =>
           downloadImage(
             url,
@@ -242,7 +235,6 @@ function createImageSearchTool(
             }
           )
         )
-
         const settled = await Promise.all(downloadPromises)
         const downloadedPaths = settled.filter(
           (downloadedPath): downloadedPath is string => downloadedPath !== undefined
