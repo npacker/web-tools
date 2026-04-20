@@ -12,6 +12,7 @@ LM Studio plugin that exposes four web-oriented tools to local LLMs — **Web Se
 - `npm run push` — publish to LM Studio Hub (`lms push`)
 - `npm run lint` / `npm run lint:fix` — ESLint on `src/**/*.ts`
 - `npm run format` / `npm run format:check` — Prettier
+- `npm run knip` — dead-code / unused-export check
 
 No test suite is configured. TypeScript targets ES2023 / CommonJS. Requires Node >= 22 (fetch + AbortSignal.any).
 
@@ -20,24 +21,44 @@ No test suite is configured. TypeScript targets ES2023 / CommonJS. Requires Node
 Entry point [src/index.ts](src/index.ts) registers a config schematic and a tools provider with the LM Studio SDK.
 
 ### Request flow
-1. **Tool invocation** — [src/tools-provider.ts](src/tools-provider.ts) defines two Zod-validated tools (Web Search, Image Search). Each invocation resolves runtime config via [src/config/config-resolver.ts](src/config/config-resolver.ts) (merges plugin UI settings from [src/config.ts](src/config.ts) with per-call overrides).
-2. **Rate limit** — shared [RateLimiter](src/utils/rate-limiter.ts) enforces a 5s gap between outbound requests (see [src/constants.ts](src/constants.ts)).
-3. **HTTP** — [DuckDuckGoService](src/services/duck-duck-go-service.ts) issues requests through a shared `impit` client. **Do not replace `impit` with `fetch`** — it applies browser TLS fingerprints and headers that DuckDuckGo's anti-bot layer requires (see commit 9e97d38).
-4. **Parse** — HTML results go through [src/parsers/html-parser.ts](src/parsers/html-parser.ts) (jsdom, `.result__a` selector); image JSON goes through [src/parsers/image-parser.ts](src/parsers/image-parser.ts).
-5. **Return** — Web returns `[title, url]` pairs. Image search additionally downloads files via [ImageDownloadService](src/services/image-download-service.ts) to the working dir; on download failure it falls back to the remote URL rather than throwing.
+1. **Tool invocation** — [src/tools/tools-provider.ts](src/tools/tools-provider.ts) registers four Zod-validated tools (`createWebSearchTool`, `createImageSearchTool`, `createVisitWebsiteTool`, `createViewImagesTool`). Per-call config resolves via `resolveConfig` in [src/config/resolve-config.ts](src/config/resolve-config.ts), merging plugin UI settings from [src/config-schematics.ts](src/config-schematics.ts) with per-call overrides (runtime override > plugin config > default).
+2. **Rate limit** — shared `RateLimiter` ([src/timing/rate-limiter.ts](src/timing/rate-limiter.ts), backed by `bottleneck`) enforces a `requestIntervalSeconds` gap (default 5s) between outbound requests.
+3. **HTTP + retry** — requests go through a shared `impit` client ([src/http/impit-client.ts](src/http/impit-client.ts)) wrapped by `withRetry` in [src/http/retry.ts](src/http/retry.ts) (`maxRetries`, `retryInitialBackoffSeconds`, `retryMaxBackoffSeconds`). **Do not replace `impit` with `fetch`** — it applies browser TLS fingerprints and headers that DuckDuckGo's anti-bot layer requires (see commit 9e97d38).
+4. **DuckDuckGo calls** — [src/duckduckgo/](src/duckduckgo/) holds `search-web.ts`, `search-images.ts`, `fetch-vqd-token.ts`, and `build-urls.ts`. Safe-search encoding lives in [src/duckduckgo/safe-search.ts](src/duckduckgo/safe-search.ts).
+5. **Parse** — [src/parsers/search-results-parser.ts](src/parsers/search-results-parser.ts) (HTML via jsdom, `.result__a`), [src/parsers/image-results-parser.ts](src/parsers/image-results-parser.ts) (JSON), [src/parsers/vqd-parser.ts](src/parsers/vqd-parser.ts) (homepage `input[name="vqd"]`).
+6. **Return** — Web returns `[title, url]` pairs. Image search downloads files via [src/images/download-images.ts](src/images/download-images.ts) into a per-session directory under `~/.lmstudio/plugin-data/lms-plugin-duckduckgo-images`; on download failure it falls back to the remote URL rather than throwing. Visit Website ([src/website/fetch-website.ts](src/website/fetch-website.ts)) extracts readable content via `@mozilla/readability` plus headings/links/images, with optional pagination and search-term bias. View Images accepts explicit URLs or scrapes from a given page.
+
+### Caches
+Three **disk-backed** TTL caches (via `cacache`) are constructed once in `toolsProvider` and shared across tools. They persist across plugin reloads — clearing requires removing the cacache directory at `~/.lmstudio/plugin-data/lms-plugin-duckduckgo-cache`:
+
+- Search results — up to 100 entries, `searchCacheTtlSeconds` (default 15 min)
+- VQD token — up to 50 entries, `vqdCacheTtlSeconds` (default 10 min)
+- Website HTML — up to 50 entries, `websiteCacheTtlSeconds` (default 10 min)
+
+Cache sizes and subdirs are defined in [src/tools/tools-provider.ts](src/tools/tools-provider.ts); the `TTLCache` implementation is in [src/cache/ttl-cache.ts](src/cache/ttl-cache.ts). TTL defaults live in [src/config/resolve-config.ts](src/config/resolve-config.ts).
 
 ### Image search specifics
-Image endpoints require a **VQD token** scraped from the DuckDuckGo homepage (`input[name="vqd"]`). Tokens are cached 10 min in a [TTLCache](src/cache/ttl-cache.ts); search results are cached 15 min. A 2s delay is inserted between the VQD fetch and the image API call. Token acquisition failures raise `VqdTokenError` ([src/errors.ts](src/errors.ts)).
+Image endpoints require a **VQD token** scraped from the DuckDuckGo homepage. A configurable delay (`vqdImageDelaySeconds`, default 2s) is inserted between the VQD fetch and the image API call. Token acquisition failures raise `VqdTokenError` ([src/duckduckgo/vqd-token-error.ts](src/duckduckgo/vqd-token-error.ts)) with a `VqdTokenFailureReason` of `element_missing`, `value_empty`, or `fetch_failed`.
 
 ### Safe search encoding
-DuckDuckGo uses non-obvious `p` param values: `strict→"1"`, `moderate→""`, `off→"-1"`. Centralized in `DuckDuckGoService`.
+DuckDuckGo uses non-obvious `p` param values: `strict→"1"`, `moderate→""`, `off→"-1"`. Centralized in [src/duckduckgo/safe-search.ts](src/duckduckgo/safe-search.ts).
 
-### Shared state
-`TTLCache` and `RateLimiter` instances are created once in `toolsProvider` and shared across both tools. They are in-memory only and reset on plugin reload.
+### Errors
+Three error hierarchies are load-bearing:
+
+- `FetchError` ([src/http/fetch-error.ts](src/http/fetch-error.ts)) — HTTP/network failures, carries `url` and optional `cause`.
+- `VqdTokenError` ([src/duckduckgo/vqd-token-error.ts](src/duckduckgo/vqd-token-error.ts)) — token acquisition.
+- `NoResultsError` base with `NoWebResultsError` / `NoImageResultsError` ([src/tools/no-results-error.ts](src/tools/no-results-error.ts)).
+
+`formatToolError` in [src/tools/tool-error.ts](src/tools/tool-error.ts) converts these into user-facing strings per tool kind (`web-search`, `image-search`, `website`, `image-download`), including abort-detection via `DOMException.name === "AbortError"`.
 
 ## Key dependencies
 
 - `@lmstudio/sdk` — plugin/tool registration
 - `impit` — HTTP client with TLS + header fingerprinting (required for anti-bot)
 - `jsdom` — HTML parsing
+- `@mozilla/readability` — readable article extraction for Visit Website
 - `zod` — tool parameter schemas
+- `bottleneck` — backs the shared `RateLimiter`
+- `cacache` — disk-backed cache store for all three TTL caches
+- `file-type` — MIME sniffing for downloaded images
