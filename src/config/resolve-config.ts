@@ -2,7 +2,7 @@
  * Configuration resolution utilities.
  */
 
-import { configSchematics } from "../config-schematics"
+import { configSchematics } from "./config-schematics"
 
 import { AUTO_CONFIG_VALUE } from "./auto-sentinel"
 

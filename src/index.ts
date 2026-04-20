@@ -4,7 +4,7 @@
  * Main entry point that registers tools and configuration.
  */
 
-import { configSchematics } from "./config-schematics"
+import { configSchematics } from "./config/config-schematics"
 import { toolsProvider } from "./tools"
 
 import type { PluginContext } from "@lmstudio/sdk"

@@ -1,6 +1,6 @@
 import { createConfigSchematics } from "@lmstudio/sdk"
 
-import { AUTO_CONFIG_VALUE } from "./config/auto-sentinel"
+import { AUTO_CONFIG_VALUE } from "./auto-sentinel"
 
 /**
  * Plugin configuration schematics registered with LM Studio.
