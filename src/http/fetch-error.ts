@@ -1,40 +1,27 @@
 /**
- * HTTP error raised when a request to DuckDuckGo returns a non-success status.
+ * HTTP error raised when an outbound request fails or returns a non-success status.
  */
 
 /**
- * Base error class for all DuckDuckGo-related failures raised by the plugin.
+ * Raised when an HTTP request fails or returns a non-success status.
  */
-class DuckDuckGoError extends Error {
+export class FetchError extends Error {
   /**
-   * Create a new error bound to a machine-readable code.
-   *
-   * @param message Human-readable error description.
-   * @param code Machine-readable code identifying the error category.
-   */
-  public constructor(
-    message: string,
-    public readonly code: string
-  ) {
-    super(message)
-    this.name = "DuckDuckGoError"
-  }
-}
-/**
- * Raised when an HTTP request to DuckDuckGo returns a non-success status.
- */
-export class FetchError extends DuckDuckGoError {
-  /**
-   * Create a fetch error carrying an optional HTTP status code.
+   * Create a fetch error carrying an optional HTTP status code, URL, and underlying cause.
    *
    * @param message Human-readable error description.
    * @param statusCode Optional HTTP status code associated with the failure.
+   * @param url Optional URL that failed to fetch.
+   * @param options Optional error options.
+   * @param options.cause Optional underlying error to chain for diagnostics.
    */
   public constructor(
     message: string,
-    public readonly statusCode?: number
+    public readonly statusCode?: number,
+    public readonly url?: string,
+    options?: ErrorOptions
   ) {
-    super(message, "FETCH_ERROR")
+    super(message, options)
     this.name = "FetchError"
   }
 }

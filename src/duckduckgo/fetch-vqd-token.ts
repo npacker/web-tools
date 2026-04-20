@@ -4,8 +4,10 @@
 
 import { fetchOk } from "../http"
 import { extractVqdToken } from "../parsers"
+import { isAbortError } from "../tools/tool-error"
 
 import { buildVqdUrl } from "./build-urls"
+import { VqdTokenError } from "./vqd-token-error"
 
 import type { TTLCache } from "../cache"
 import type { RequestOptions } from "../http"
@@ -20,7 +22,7 @@ import type { Impit } from "impit"
  * @param query Search query whose VQD token is required.
  * @param options Options controlling the outbound request.
  * @returns The cached or freshly scraped VQD token.
- * @throws {VqdTokenError} When the token cannot be located in the response HTML.
+ * @throws {VqdTokenError} When the homepage cannot be fetched or the token cannot be located.
  */
 export async function fetchVqdToken(
   impit: Impit,
@@ -36,8 +38,19 @@ export async function fetchVqdToken(
   }
 
   const url = buildVqdUrl(query).toString()
-  const response = await fetchOk(impit, url, options)
-  const html = await response.text()
+  let html: string
+
+  try {
+    const response = await fetchOk(impit, url, options)
+    html = await response.text()
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw error
+    }
+
+    throw new VqdTokenError("fetch_failed", { cause: error })
+  }
+
   const vqd = extractVqdToken(html)
   await vqdCache.set(cacheKey, vqd)
 

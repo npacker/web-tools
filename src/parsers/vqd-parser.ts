@@ -23,13 +23,13 @@ export function extractVqdToken(html: string): string {
   const vqdInput = dom.window.document.querySelector(VQD_INPUT_SELECTOR)
 
   if (vqdInput === null) {
-    throw new VqdTokenError()
+    throw new VqdTokenError("element_missing")
   }
 
   const value = vqdInput.getAttribute("value")
 
   if (value === null || value === "") {
-    throw new VqdTokenError()
+    throw new VqdTokenError("value_empty")
   }
 
   return value

@@ -5,7 +5,7 @@
 import { VqdTokenError } from "../duckduckgo/vqd-token-error"
 import { FetchError } from "../http/fetch-error"
 
-import { NoResultsError, SearchAbortedError } from "./search-errors"
+import { NoResultsError } from "./no-results-error"
 
 /**
  * Minimal context surface required by the tool-error formatter for warning output.
@@ -18,7 +18,7 @@ interface ToolErrorContext {
 /**
  * Kinds of tool flows supported by `formatToolError`, used to tailor user-facing messages.
  */
-type ToolErrorKind = "search" | "website" | "image-download"
+type ToolErrorKind = "web-search" | "image-search" | "website" | "image-download"
 
 /**
  * Tool-kind-specific message templates used by `formatToolError`.
@@ -36,10 +36,15 @@ interface ToolErrorTemplates {
  * Static mapping from tool kind to its user-facing message templates.
  */
 const TOOL_ERROR_TEMPLATES: Record<ToolErrorKind, ToolErrorTemplates> = {
-  search: {
-    aborted: "Search aborted by user.",
-    fetchPrefix: "Failed to fetch search results",
-    unexpectedPrefix: "Error during search",
+  "web-search": {
+    aborted: "Web search aborted by user.",
+    fetchPrefix: "Failed to fetch web search results",
+    unexpectedPrefix: "Error during web search",
+  },
+  "image-search": {
+    aborted: "Image search aborted by user.",
+    fetchPrefix: "Failed to fetch image search results",
+    unexpectedPrefix: "Error during image search",
   },
   website: {
     aborted: "Website visit aborted by user.",
@@ -64,7 +69,7 @@ const TOOL_ERROR_TEMPLATES: Record<ToolErrorKind, ToolErrorTemplates> = {
 export function formatToolError(error: unknown, context: ToolErrorContext, kind: ToolErrorKind): string {
   const templates = TOOL_ERROR_TEMPLATES[kind]
 
-  if (isAbortError(error) || error instanceof SearchAbortedError) {
+  if (isAbortError(error)) {
     return templates.aborted
   }
 
@@ -73,19 +78,56 @@ export function formatToolError(error: unknown, context: ToolErrorContext, kind:
   }
 
   if (error instanceof VqdTokenError) {
-    return `Error: ${error.message}`
+    return `Error: ${appendCause(error.message, error.cause)}`
   }
 
   if (error instanceof FetchError) {
-    context.warn(`${templates.fetchPrefix}: ${error.message}`)
+    const line = formatFetchError(error, templates.fetchPrefix)
+    context.warn(line)
 
-    return `Error: ${templates.fetchPrefix}: ${error.message}`
+    return `Error: ${line}`
   }
 
   const message = errorMessage(error)
   context.warn(`${templates.unexpectedPrefix}: ${message}`)
 
   return `Error: ${message}`
+}
+
+/**
+ * Render a `FetchError` into a single user-facing line built from its structured fields.
+ *
+ * @param error The fetch error to render.
+ * @param prefix Tool-kind prefix applied to the line.
+ * @returns The formatted line, including status, URL, and any cause.
+ */
+function formatFetchError(error: FetchError, prefix: string): string {
+  const segments: string[] = [`${prefix}: ${error.message}`]
+
+  if (error.url !== undefined) {
+    segments.push(`— ${error.url}`)
+  }
+
+  return appendCause(segments.join(" "), error.cause)
+}
+
+/**
+ * Append a `(cause: …)` suffix when a distinct underlying cause message is available.
+ *
+ * @param line Base message line.
+ * @param cause Underlying error attached to the outer error, if any.
+ * @returns The line with a cause suffix appended when the cause adds new information.
+ */
+function appendCause(line: string, cause: unknown): string {
+  if (!(cause instanceof Error)) {
+    return line
+  }
+
+  if (cause.message === "" || line.includes(cause.message)) {
+    return line
+  }
+
+  return `${line} (cause: ${cause.message})`
 }
 
 /**
@@ -105,5 +147,14 @@ export function isAbortError(error: unknown): boolean {
  * @returns The error message when the value is an `Error`, otherwise the stringified value.
  */
 export function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  // Avoid exposing [object Object] for plain objects; attempt JSON serialization as a fallback.
+  try {
+    return JSON.stringify(error)
+  } catch {
+    return String(error)
+  }
 }

@@ -1,34 +1,50 @@
 /**
- * VQD token error raised when the token cannot be extracted from DuckDuckGo.
+ * VQD token error raised when the token cannot be obtained from DuckDuckGo.
  */
 
 /**
- * Base error class for all DuckDuckGo-related failures raised by the plugin.
+ * Possible reasons why VQD token acquisition failed.
  */
-class DuckDuckGoError extends Error {
+export type VqdTokenFailureReason = "element_missing" | "value_empty" | "fetch_failed"
+/**
+ * Raised when the VQD token required for image search cannot be obtained.
+ */
+export class VqdTokenError extends Error {
   /**
-   * Create a new error bound to a machine-readable code.
+   * Create a VQD extraction error with a reason-derived message, optionally chaining a cause.
    *
-   * @param message Human-readable error description.
-   * @param code Machine-readable code identifying the error category.
+   * @param reason Optional machine-readable reason for the failure.
+   * @param options Optional error options.
+   * @param options.cause Optional underlying error to chain for diagnostics.
    */
   public constructor(
-    message: string,
-    public readonly code: string
+    public readonly reason?: VqdTokenFailureReason,
+    options?: ErrorOptions
   ) {
-    super(message)
-    this.name = "DuckDuckGoError"
+    const message = reason ? `Unable to obtain VQD token: ${formatVqdReason(reason)}.` : "Unable to obtain VQD token."
+    super(message, options)
+    this.name = "VqdTokenError"
   }
 }
+
 /**
- * Raised when the VQD token required for image search cannot be extracted.
+ * Convert a machine-readable VQD failure reason to a human-friendly phrase.
+ *
+ * @param reason Machine-readable failure reason.
+ * @returns Human-readable explanation of what went wrong.
  */
-export class VqdTokenError extends DuckDuckGoError {
-  /**
-   * Create a VQD extraction error with the standard message and code.
-   */
-  public constructor() {
-    super("Unable to extract vqd token.", "VQD_TOKEN_FAILED")
-    this.name = "VqdTokenError"
+function formatVqdReason(reason: VqdTokenFailureReason): string {
+  switch (reason) {
+    case "element_missing": {
+      return "the search form input element was not found on the DuckDuckGo homepage"
+    }
+
+    case "value_empty": {
+      return "the input element's value attribute was empty or missing"
+    }
+
+    case "fetch_failed": {
+      return "the request to the DuckDuckGo homepage failed"
+    }
   }
 }

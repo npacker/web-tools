@@ -11,7 +11,7 @@ import { downloadImages } from "../images"
 import { extractImageUrls } from "../parsers"
 import { type RateLimiter, sleep } from "../timing"
 
-import { NoResultsError } from "./search-errors"
+import { NoImageResultsError } from "./no-results-error"
 import { formatToolError } from "./tool-error"
 
 import type { TTLCache } from "../cache"
@@ -107,7 +107,7 @@ export function createImageSearchTool(
         const imageUrls = extractImageUrls(imageResults, pageSize)
 
         if (imageUrls.length === 0) {
-          throw new NoResultsError("image")
+          throw new NoImageResultsError(query)
         }
 
         context.status(`Found ${imageUrls.length} images. Fetching...`)
@@ -117,25 +117,20 @@ export function createImageSearchTool(
           { workingDirectory: imageDownloadDirectory, timestamp: Date.now() },
           { warn: context.warn, signal: context.signal }
         )
-        const downloadedPaths: string[] = []
+        const results = batch.map(result => (result.ok ? result.localPath : result.url))
+        const failed = batch.length - batch.filter(result => result.ok).length
 
-        for (const result of batch) {
-          if (result.ok) {
-            downloadedPaths.push(result.localPath)
-          }
+        if (failed === batch.length) {
+          context.warn(`Failed to download any of ${batch.length} images; returning remote URLs instead.`)
+        } else if (failed > 0) {
+          context.warn(`Failed to download ${failed} of ${batch.length} images; returning remote URLs for those slots.`)
+        } else {
+          context.status(`Downloaded ${batch.length} images successfully.`)
         }
 
-        if (downloadedPaths.length === 0) {
-          context.warn("Error fetching images")
-
-          return imageUrls
-        }
-
-        context.status(`Downloaded ${downloadedPaths.length} images successfully.`)
-
-        return downloadedPaths
+        return results
       } catch (error) {
-        return formatToolError(error, context, "search")
+        return formatToolError(error, context, "image-search")
       }
     },
   })

@@ -9,7 +9,7 @@ import { type TTLCache, searchCacheKey, type SearchResultsPayload } from "../cac
 import { resolveConfig } from "../config/resolve-config"
 import { searchWeb } from "../duckduckgo"
 
-import { NoResultsError } from "./search-errors"
+import { NoWebResultsError } from "./no-results-error"
 import { formatToolError } from "./tool-error"
 
 import type { RateLimiter } from "../timing"
@@ -106,7 +106,7 @@ export function createWebSearchTool(
         const result = await searchWeb(impit, parameters, { signal: context.signal })
 
         if (result.results.length === 0) {
-          throw new NoResultsError("web")
+          throw new NoWebResultsError(query)
         }
 
         context.status(`Found ${result.results.length} web pages.`)
@@ -114,7 +114,7 @@ export function createWebSearchTool(
 
         return result.results
       } catch (error) {
-        return formatToolError(error, context, "search")
+        return formatToolError(error, context, "web-search")
       }
     },
   })
