@@ -11,7 +11,6 @@ import { downloadImages } from "../images"
 import { extractPageImages } from "../parsers"
 import { fetchWebsite } from "../website"
 
-import { IMAGE_DOWNLOAD_EMPTY_BATCH_MESSAGE } from "./messages"
 import { formatToolError } from "./tool-error"
 
 import type { TTLCache } from "../cache"
@@ -96,7 +95,7 @@ export function createViewImagesTool(
         }
 
         if (collected.length === 0) {
-          context.warn(IMAGE_DOWNLOAD_EMPTY_BATCH_MESSAGE)
+          context.warn("Error fetching images")
 
           return collected
         }
@@ -113,7 +112,7 @@ export function createViewImagesTool(
         )
 
         if (rendered.length === 0) {
-          context.warn(IMAGE_DOWNLOAD_EMPTY_BATCH_MESSAGE)
+          context.warn("Error fetching images")
 
           return collected
         }
