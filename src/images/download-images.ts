@@ -4,6 +4,7 @@
 
 import { downloadImage } from "./download-image"
 
+import type { RetryHooks, RetryPolicy } from "../http"
 import type { Impit } from "impit"
 
 /**
@@ -24,6 +25,10 @@ interface DownloadImagesContext {
   warn: (message: string) => void
   /** Signal used to abort the in-flight downloads. */
   signal: AbortSignal
+  /** Retry policy applied to transient download failures. */
+  retry?: RetryPolicy
+  /** Hook fired between failed attempts, before the backoff sleep. */
+  onRetry?: RetryHooks["onRetry"]
 }
 
 /**

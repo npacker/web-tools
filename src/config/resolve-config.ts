@@ -7,6 +7,7 @@ import { configSchematics } from "../config-schematics"
 import { AUTO_CONFIG_VALUE } from "./auto-sentinel"
 
 import type { SafeSearch } from "../duckduckgo/safe-search"
+import type { RetryPolicy } from "../http/retry"
 import type { ToolsProviderController } from "@lmstudio/sdk"
 
 /**
@@ -50,6 +51,18 @@ const DEFAULT_REQUEST_INTERVAL_MS = 5000
  */
 const DEFAULT_VQD_IMAGE_DELAY_MS = 2000
 /**
+ * Default number of retry attempts, including the first try, applied to every outbound request.
+ */
+const DEFAULT_MAX_RETRIES = 3
+/**
+ * Default base backoff before the first retry, in milliseconds.
+ */
+const DEFAULT_RETRY_INITIAL_BACKOFF_MS = 1000
+/**
+ * Default cap on a single retry backoff delay after exponential growth, in milliseconds.
+ */
+const DEFAULT_RETRY_MAX_BACKOFF_MS = 30_000
+/**
  * Conversion factor from seconds to milliseconds.
  */
 const MS_PER_SECOND = 1000
@@ -84,6 +97,8 @@ export interface ResolvedTimingConfig {
   websiteCacheTtlMs: number
   /** Minimum interval between outbound requests, in milliseconds. */
   requestIntervalMs: number
+  /** Retry policy applied to every outbound request. */
+  retryPolicy: RetryPolicy
 }
 
 /**
@@ -143,13 +158,34 @@ export function resolveTimingConfig(ctl: ToolsProviderController): ResolvedTimin
   const vqdTtlSeconds = pluginConfig.get("vqdCacheTtlSeconds") as number | null
   const websiteTtlSeconds = pluginConfig.get("websiteCacheTtlSeconds") as number | null
   const intervalSeconds = pluginConfig.get("requestIntervalSeconds") as number | null
+  const maxRetries = pluginConfig.get("maxRetries") as number | null
+  const retryInitialSeconds = pluginConfig.get("retryInitialBackoffSeconds") as number | null
+  const retryMaxSeconds = pluginConfig.get("retryMaxBackoffSeconds") as number | null
 
   return {
     searchCacheTtlMs: resolveSecondsToMs(searchTtlSeconds, DEFAULT_SEARCH_CACHE_TTL_MS),
     vqdCacheTtlMs: resolveSecondsToMs(vqdTtlSeconds, DEFAULT_VQD_CACHE_TTL_MS),
     websiteCacheTtlMs: resolveSecondsToMs(websiteTtlSeconds, DEFAULT_WEBSITE_CACHE_TTL_MS),
     requestIntervalMs: resolveSecondsToMs(intervalSeconds, DEFAULT_REQUEST_INTERVAL_MS),
+    retryPolicy: {
+      maxAttempts: resolveMaxAttempts(maxRetries),
+      initialBackoffMs: resolveSecondsToMs(retryInitialSeconds, DEFAULT_RETRY_INITIAL_BACKOFF_MS),
+      maxBackoffMs: resolveSecondsToMs(retryMaxSeconds, DEFAULT_RETRY_MAX_BACKOFF_MS),
+    },
   }
+}
+
+/**
+ * Convert the plugin's "max retries" field to the `maxAttempts` value consumed by `withRetry`.
+ * A `null` selects the default and `0` explicitly disables retries, leaving a single attempt.
+ *
+ * @param pluginValue Value read from plugin configuration, or `null` when unset.
+ * @returns Total number of attempts including the first try.
+ */
+function resolveMaxAttempts(pluginValue: number | null): number {
+  const retries = pluginValue ?? DEFAULT_MAX_RETRIES
+
+  return Math.max(1, retries + 1)
 }
 
 /**

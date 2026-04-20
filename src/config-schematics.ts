@@ -158,6 +158,57 @@ export const configSchematics = createConfigSchematics()
     0
   )
   .field(
+    "maxRetries",
+    "numeric",
+    {
+      displayName: "Max Retries Per Request",
+      subtitle: "Between 0 and 10, 0 disables retries",
+      min: 0,
+      max: 10,
+      int: true,
+      slider: {
+        step: 1,
+        min: 0,
+        max: 10,
+      },
+    },
+    3
+  )
+  .field(
+    "retryInitialBackoffSeconds",
+    "numeric",
+    {
+      displayName: "Retry Initial Backoff (seconds)",
+      subtitle: "Between 0 and 30, 0 = auto",
+      min: 0,
+      max: 30,
+      int: true,
+      slider: {
+        step: 1,
+        min: 0,
+        max: 30,
+      },
+    },
+    0
+  )
+  .field(
+    "retryMaxBackoffSeconds",
+    "numeric",
+    {
+      displayName: "Retry Max Backoff (seconds)",
+      subtitle: "Between 0 and 300, 0 = auto",
+      min: 0,
+      max: 300,
+      int: true,
+      slider: {
+        step: 5,
+        min: 0,
+        max: 300,
+      },
+    },
+    0
+  )
+  .field(
     "vqdImageDelaySeconds",
     "numeric",
     {

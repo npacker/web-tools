@@ -83,11 +83,12 @@ export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[
     timing.websiteCacheTtlMs,
     WEBSITE_CACHE_MAX_SIZE
   )
+  const retry = timing.retryPolicy
 
   return [
-    createWebSearchTool(ctl, impit, searchCache, rateLimiter),
-    createImageSearchTool(ctl, impit, vqdCache, rateLimiter, imageDownloadDirectory),
-    createVisitWebsiteTool(ctl, impit, websiteCache, rateLimiter, imageDownloadDirectory),
-    createViewImagesTool(ctl, impit, websiteCache, rateLimiter, imageDownloadDirectory),
+    createWebSearchTool(ctl, impit, searchCache, rateLimiter, retry),
+    createImageSearchTool(ctl, impit, vqdCache, rateLimiter, imageDownloadDirectory, retry),
+    createVisitWebsiteTool(ctl, impit, websiteCache, rateLimiter, imageDownloadDirectory, retry),
+    createViewImagesTool(ctl, impit, websiteCache, rateLimiter, imageDownloadDirectory, retry),
   ]
 }

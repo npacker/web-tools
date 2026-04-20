@@ -12,6 +12,7 @@ import { searchWeb } from "../duckduckgo"
 import { NoWebResultsError } from "./no-results-error"
 import { formatToolError } from "./tool-error"
 
+import type { RetryPolicy } from "../http"
 import type { RateLimiter } from "../timing"
 import type { Impit } from "impit"
 
@@ -43,13 +44,15 @@ const DEFAULT_PAGE_NUMBER = 1
  * @param impit Shared HTTP client used for outbound requests.
  * @param cache Cache holding prior web search results.
  * @param rateLimiter Shared limiter enforcing the minimum gap between requests.
+ * @param retry Retry policy applied to every outbound request.
  * @returns The configured web search tool.
  */
 export function createWebSearchTool(
   ctl: ToolsProviderController,
   impit: Impit,
   cache: TTLCache<SearchResultsPayload>,
-  rateLimiter: RateLimiter
+  rateLimiter: RateLimiter,
+  retry: RetryPolicy
 ): Tool {
   return tool({
     name: "Web Search",
@@ -103,7 +106,20 @@ export function createWebSearchTool(
         }
 
         const parameters = { query, pageSize, safeSearch, page }
-        const result = await searchWeb(impit, parameters, { signal: context.signal })
+        const result = await searchWeb(impit, parameters, {
+          signal: context.signal,
+          retry,
+          /**
+           * Report the upcoming retry attempt to the tool status line.
+           *
+           * @param _error Underlying error from the failed attempt.
+           * @param attempt 1-based index of the attempt that just failed.
+           * @param delayMs Upcoming backoff delay in milliseconds.
+           */
+          onRetry: (_error, attempt, delayMs) => {
+            context.status(`Retrying web search (attempt ${attempt + 1}) in ${Math.round(delayMs / 1000)}s...`)
+          },
+        })
 
         if (result.results.length === 0) {
           throw new NoWebResultsError(query)

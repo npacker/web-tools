@@ -15,6 +15,7 @@ import { NoImageResultsError } from "./no-results-error"
 import { formatToolError } from "./tool-error"
 
 import type { TTLCache } from "../cache"
+import type { RetryPolicy } from "../http"
 import type { Impit } from "impit"
 
 /**
@@ -46,6 +47,7 @@ const DEFAULT_PAGE_NUMBER = 1
  * @param vqdCache Cache holding VQD tokens keyed by query.
  * @param rateLimiter Shared limiter enforcing the minimum gap between requests.
  * @param imageDownloadDirectory Directory where downloaded images are written.
+ * @param retry Retry policy applied to every outbound request.
  * @returns The configured image search tool.
  */
 export function createImageSearchTool(
@@ -53,7 +55,8 @@ export function createImageSearchTool(
   impit: Impit,
   vqdCache: TTLCache<string>,
   rateLimiter: RateLimiter,
-  imageDownloadDirectory: string
+  imageDownloadDirectory: string,
+  retry: RetryPolicy
 ): Tool {
   return tool({
     name: "Image Search",
@@ -98,11 +101,30 @@ export function createImageSearchTool(
           pageSize: parameterPageSize,
           safeSearch: parameterSafeSearch,
         })
-        const vqd = await fetchVqdToken(impit, vqdCache, query, { signal: context.signal })
+
+        /**
+         * Build a retry observer that reports attempts against a human-readable phase label.
+         *
+         * @param label Phase name used in the status line.
+         * @returns A retry hook suitable for the HTTP layer.
+         */
+        const onRetry =
+          (label: string) =>
+          (_error: unknown, attempt: number, delayMs: number): void => {
+            context.status(`Retrying ${label} (attempt ${attempt + 1}) in ${Math.round(delayMs / 1000)}s...`)
+          }
+
+        const vqd = await fetchVqdToken(impit, vqdCache, query, {
+          signal: context.signal,
+          retry,
+          onRetry: onRetry("VQD token fetch"),
+        })
         await sleep(vqdImageDelayMs)
         const parameters = { query, pageSize, safeSearch, page }
         const imageResults = await searchImages(impit, parameters, vqd, {
           signal: context.signal,
+          retry,
+          onRetry: onRetry("image search"),
         })
         const imageUrls = extractImageUrls(imageResults, pageSize)
 
@@ -115,7 +137,7 @@ export function createImageSearchTool(
           imageUrls,
           impit,
           { workingDirectory: imageDownloadDirectory, timestamp: Date.now() },
-          { warn: context.warn, signal: context.signal }
+          { warn: context.warn, signal: context.signal, retry, onRetry: onRetry("image download") }
         )
         const results = batch.map(result => (result.ok ? result.localPath : result.url))
         const failed = batch.length - batch.filter(result => result.ok).length

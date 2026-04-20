@@ -5,15 +5,13 @@
 import { fetchOk } from "../http"
 
 import type { TTLCache } from "../cache"
+import type { RequestOptions } from "../http"
 import type { Impit } from "impit"
 
 /**
  * Options controlling an outbound website fetch.
  */
-interface FetchWebsiteOptions {
-  /** Signal used to abort the in-flight request. */
-  signal: AbortSignal
-}
+type FetchWebsiteOptions = RequestOptions
 
 /**
  * Fetch the HTML at `url`, returning a cached payload when one is available.
@@ -37,7 +35,7 @@ export async function fetchWebsite(
     return cached
   }
 
-  const response = await fetchOk(impit, url, { signal: options.signal })
+  const response = await fetchOk(impit, url, options)
   const html = await response.text()
   await cache.set(url, html)
 

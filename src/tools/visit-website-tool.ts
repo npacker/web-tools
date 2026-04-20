@@ -14,6 +14,7 @@ import { fetchWebsite } from "../website"
 import { formatToolError } from "./tool-error"
 
 import type { TTLCache } from "../cache"
+import type { RetryPolicy } from "../http"
 import type { RateLimiter } from "../timing"
 import type { Impit } from "impit"
 
@@ -42,6 +43,7 @@ const MAX_CONTENT_LIMIT = 10_000
  * @param websiteCache Cache holding recent HTML payloads keyed by URL.
  * @param rateLimiter Shared limiter enforcing the minimum gap between outbound requests.
  * @param imageDownloadDirectory Directory where downloaded page images are written.
+ * @param retry Retry policy applied to every outbound request.
  * @returns The configured Visit Website tool.
  */
 export function createVisitWebsiteTool(
@@ -49,7 +51,8 @@ export function createVisitWebsiteTool(
   impit: Impit,
   websiteCache: TTLCache<string>,
   rateLimiter: RateLimiter,
-  imageDownloadDirectory: string
+  imageDownloadDirectory: string,
+  retry: RetryPolicy
 ): Tool {
   return tool({
     name: "Visit Website",
@@ -116,7 +119,24 @@ export function createVisitWebsiteTool(
           maxImages: parameterMaxImages,
           contentLimit: parameterContentLimit,
         })
-        const html = await fetchWebsite(impit, websiteCache, url, { signal: context.signal })
+
+        /**
+         * Build a retry observer that reports attempts against a human-readable phase label.
+         *
+         * @param label Phase name used in the status line.
+         * @returns A retry hook suitable for the HTTP layer.
+         */
+        const onRetry =
+          (label: string) =>
+          (_error: unknown, attempt: number, delayMs: number): void => {
+            context.status(`Retrying ${label} (attempt ${attempt + 1}) in ${Math.round(delayMs / 1000)}s...`)
+          }
+
+        const html = await fetchWebsite(impit, websiteCache, url, {
+          signal: context.signal,
+          retry,
+          onRetry: onRetry("website fetch"),
+        })
         context.status("Website visited successfully.")
         const dom = new JSDOM(html)
         const headings = extractHeadings(dom)
@@ -124,6 +144,8 @@ export function createVisitWebsiteTool(
         const images = await renderPageImages(dom, url, maxImages, findInPage, impit, imageDownloadDirectory, {
           warn: context.warn,
           signal: context.signal,
+          retry,
+          onRetry: onRetry("image download"),
         })
         const content = buildPageExcerpt(html, url, contentLimit, findInPage)
 
@@ -149,6 +171,10 @@ interface PageImageRenderContext {
   warn: (message: string) => void
   /** Signal used to abort any in-flight downloads. */
   signal: AbortSignal
+  /** Retry policy applied to transient download failures. */
+  retry?: RetryPolicy
+  /** Hook fired between failed attempts, before the backoff sleep. */
+  onRetry?: (error: unknown, attempt: number, delayMs: number) => void
 }
 
 /**

@@ -8,9 +8,11 @@ import path from "node:path"
 import { fileTypeFromBuffer } from "file-type"
 
 import { toMarkdownPath } from "../fs"
+import { FetchError, withRetry } from "../http"
 import { imageExtensionFromHeaders, isSupportedImageExtension, normalizeImageExtension } from "../parsers"
 import { isAbortError, errorMessage } from "../tools/tool-error"
 
+import type { RetryHooks, RetryPolicy } from "../http"
 import type { Impit } from "impit"
 
 /**
@@ -26,6 +28,10 @@ interface DownloadImageContext {
   warn: (message: string) => void
   /** Signal used to abort the in-flight download. */
   signal: AbortSignal
+  /** Retry policy applied to transient download failures. */
+  retry?: RetryPolicy
+  /** Hook fired between failed attempts, before the backoff sleep. */
+  onRetry?: RetryHooks["onRetry"]
 }
 
 /**
@@ -56,14 +62,7 @@ export async function downloadImage(
   context: DownloadImageContext
 ): Promise<string | undefined> {
   try {
-    const response = await fetchImage(url, impit, context.signal)
-
-    if (!response.ok) {
-      context.warn(`Failed to fetch image ${options.index}: ${response.statusText}`)
-
-      return undefined
-    }
-
+    const response = await fetchImageWithRetry(url, impit, context)
     const bytes = await response.bytes()
 
     if (bytes.length === 0) {
@@ -90,21 +89,68 @@ export async function downloadImage(
 }
 
 /**
- * Issue the image GET request with a combined external + timeout abort signal.
+ * Issue the image GET request with a combined external + timeout abort signal, retrying
+ * transient failures according to the caller-supplied policy.
+ *
+ * @param url Source URL of the image to download.
+ * @param impit Shared HTTP client used for the request.
+ * @param context Cancellation, retry, and logging hooks supplied by the caller.
+ * @returns The successful response.
+ * @throws {FetchError} When the download fails after all retries are exhausted.
+ */
+async function fetchImageWithRetry(
+  url: string,
+  impit: Impit,
+  context: DownloadImageContext
+): Promise<Awaited<ReturnType<Impit["fetch"]>>> {
+  if (context.retry === undefined) {
+    return attemptImageFetch(url, impit, context.signal)
+  }
+
+  return withRetry(async () => attemptImageFetch(url, impit, context.signal), context.retry, context.signal, {
+    onRetry: context.onRetry,
+  })
+}
+
+/**
+ * Execute a single image GET attempt with a bounded timeout, normalising transport failures
+ * and timeouts into `FetchError` so they can be retried uniformly.
  *
  * @param url Source URL of the image to download.
  * @param impit Shared HTTP client used for the request.
  * @param signal External abort signal combined with the download timeout.
- * @returns The raw response from the HTTP client.
+ * @returns The successful response.
+ * @throws {FetchError} When the transport fails, the timeout fires, or the response carries a non-2xx status.
  */
-async function fetchImage(url: string, impit: Impit, signal: AbortSignal): Promise<ReturnType<Impit["fetch"]>> {
+async function attemptImageFetch(
+  url: string,
+  impit: Impit,
+  signal: AbortSignal
+): Promise<Awaited<ReturnType<Impit["fetch"]>>> {
   const timeoutSignal = AbortSignal.timeout(IMAGE_DOWNLOAD_TIMEOUT_MS)
   const combinedSignal = AbortSignal.any([signal, timeoutSignal])
+  let response: Awaited<ReturnType<Impit["fetch"]>>
 
-  return impit.fetch(url, {
-    method: "GET",
-    signal: combinedSignal,
-  })
+  try {
+    response = await impit.fetch(url, { method: "GET", signal: combinedSignal })
+  } catch (error) {
+    if (isAbortError(error) && !signal.aborted) {
+      throw new FetchError(`Request timed out after ${IMAGE_DOWNLOAD_TIMEOUT_MS}ms`, undefined, url, { cause: error })
+    }
+
+    if (isAbortError(error)) {
+      throw error
+    }
+
+    const message = error instanceof Error ? error.message : String(error)
+    throw new FetchError(`Request failed: ${message}`, undefined, url, { cause: error })
+  }
+
+  if (!response.ok) {
+    throw new FetchError(`HTTP ${response.status} ${response.statusText}`, response.status, url)
+  }
+
+  return response
 }
 
 /**
