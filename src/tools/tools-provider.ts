@@ -3,11 +3,12 @@
  * with the LM Studio SDK.
  */
 
-import os from "node:os"
+import { mkdir } from "node:fs/promises"
 import path from "node:path"
 
 import { TTLCache } from "../cache"
 import { resolveTimingConfig } from "../config/resolve-config"
+import { findLMStudioHome } from "../fs"
 import { createImpit } from "../http"
 import { RateLimiter } from "../timing"
 
@@ -64,9 +65,10 @@ const WEBSITE_CACHE_MAX_SIZE = 50
 export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[]> {
   const timing = resolveTimingConfig(ctl)
   const impit = createImpit()
-  const pluginDataRoot = path.join(os.homedir(), ".lmstudio", "plugin-data")
+  const pluginDataRoot = path.join(findLMStudioHome(), "plugin-data")
   const cacheRoot = path.join(pluginDataRoot, CACHE_DIRECTORY_NAME)
   const imageDownloadDirectory = path.join(pluginDataRoot, IMAGE_DOWNLOAD_DIRECTORY_NAME)
+  await mkdir(imageDownloadDirectory, { recursive: true })
   const rateLimiter = new RateLimiter(timing.requestIntervalMs)
   const vqdCache = new TTLCache<string>(
     path.join(cacheRoot, VQD_CACHE_SUBDIR),
