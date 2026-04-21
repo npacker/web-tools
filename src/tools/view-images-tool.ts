@@ -34,7 +34,6 @@ const MAX_VIEW_IMAGES_COUNT = 200
  * @param impit Shared HTTP client used for HTML fetches and image downloads.
  * @param websiteCache Cache holding recent HTML payloads keyed by URL.
  * @param rateLimiter Shared limiter enforcing the minimum gap between outbound requests.
- * @param imageDownloadDirectory Directory where downloaded images are written.
  * @param retry Retry policy applied to every outbound request.
  * @returns The configured View Images tool.
  */
@@ -43,7 +42,6 @@ export function createViewImagesTool(
   impit: Impit,
   websiteCache: TTLCache<string>,
   rateLimiter: RateLimiter,
-  imageDownloadDirectory: string,
   retry: RetryPolicy
 ): Tool {
   return tool({
@@ -123,7 +121,7 @@ export function createViewImagesTool(
         const batch = await downloadImages(
           collected,
           impit,
-          { workingDirectory: imageDownloadDirectory, timestamp: Date.now() },
+          { workingDirectory: ctl.getWorkingDirectory(), timestamp: Date.now() },
           { warn: context.warn, signal: context.signal, retry, onRetry: onRetry("image download") }
         )
         const rendered = batch.map((result, index) =>

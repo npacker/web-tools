@@ -43,7 +43,6 @@ const MAX_CONTENT_LIMIT = 10_000
  * @param impit Shared HTTP client used for HTML fetches and image downloads.
  * @param websiteCache Cache holding recent HTML payloads keyed by URL.
  * @param rateLimiter Shared limiter enforcing the minimum gap between outbound requests.
- * @param imageDownloadDirectory Directory where downloaded page images are written.
  * @param retry Retry policy applied to every outbound request.
  * @returns The configured Visit Website tool.
  */
@@ -52,7 +51,6 @@ export function createVisitWebsiteTool(
   impit: Impit,
   websiteCache: TTLCache<string>,
   rateLimiter: RateLimiter,
-  imageDownloadDirectory: string,
   retry: RetryPolicy
 ): Tool {
   return tool({
@@ -142,7 +140,7 @@ export function createVisitWebsiteTool(
         const dom = new JSDOM(html)
         const headings = extractHeadings(dom)
         const links = extractLinks(dom, url, maxLinks, findInPage)
-        const images = await renderPageImages(dom, url, maxImages, findInPage, impit, imageDownloadDirectory, {
+        const images = await renderPageImages(dom, url, maxImages, findInPage, impit, ctl.getWorkingDirectory(), {
           warn: context.warn,
           signal: context.signal,
           retry,

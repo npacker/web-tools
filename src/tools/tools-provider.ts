@@ -3,7 +3,6 @@
  * with the LM Studio SDK.
  */
 
-import { mkdir } from "node:fs/promises"
 import path from "node:path"
 
 import { TTLCache } from "../cache"
@@ -24,10 +23,6 @@ import type { Tool, ToolsProviderController } from "@lmstudio/sdk"
  * Root directory name used for the plugin's on-disk `cacache` store.
  */
 const CACHE_DIRECTORY_NAME = "lms-plugin-duckduckgo-cache"
-/**
- * Subdirectory name under the plugin data root where downloaded images are stored.
- */
-const IMAGE_DOWNLOAD_DIRECTORY_NAME = "lms-plugin-duckduckgo-images"
 /**
  * Subdirectory under the cache root dedicated to web/image search results.
  */
@@ -65,10 +60,7 @@ const WEBSITE_CACHE_MAX_SIZE = 50
 export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[]> {
   const timing = resolveTimingConfig(ctl)
   const impit = createImpit()
-  const pluginDataRoot = path.join(findLMStudioHome(), "plugin-data")
-  const cacheRoot = path.join(pluginDataRoot, CACHE_DIRECTORY_NAME)
-  const imageDownloadDirectory = path.join(pluginDataRoot, IMAGE_DOWNLOAD_DIRECTORY_NAME)
-  await mkdir(imageDownloadDirectory, { recursive: true })
+  const cacheRoot = path.join(findLMStudioHome(), "plugin-data", CACHE_DIRECTORY_NAME)
   const rateLimiter = new RateLimiter(timing.requestIntervalMs)
   const vqdCache = new TTLCache<string>(
     path.join(cacheRoot, VQD_CACHE_SUBDIR),
@@ -89,8 +81,8 @@ export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[
 
   return [
     createWebSearchTool(ctl, impit, searchCache, rateLimiter, retry),
-    createImageSearchTool(ctl, impit, vqdCache, rateLimiter, imageDownloadDirectory, retry),
-    createVisitWebsiteTool(ctl, impit, websiteCache, rateLimiter, imageDownloadDirectory, retry),
-    createViewImagesTool(ctl, impit, websiteCache, rateLimiter, imageDownloadDirectory, retry),
+    createImageSearchTool(ctl, impit, vqdCache, rateLimiter, retry),
+    createVisitWebsiteTool(ctl, impit, websiteCache, rateLimiter, retry),
+    createViewImagesTool(ctl, impit, websiteCache, rateLimiter, retry),
   ]
 }

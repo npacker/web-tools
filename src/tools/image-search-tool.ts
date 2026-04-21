@@ -46,7 +46,6 @@ const DEFAULT_PAGE_NUMBER = 1
  * @param impit Shared HTTP client used for outbound requests and image downloads.
  * @param vqdCache Cache holding VQD tokens keyed by query.
  * @param rateLimiter Shared limiter enforcing the minimum gap between requests.
- * @param imageDownloadDirectory Directory where downloaded images are written.
  * @param retry Retry policy applied to every outbound request.
  * @returns The configured image search tool.
  */
@@ -55,7 +54,6 @@ export function createImageSearchTool(
   impit: Impit,
   vqdCache: TTLCache<string>,
   rateLimiter: RateLimiter,
-  imageDownloadDirectory: string,
   retry: RetryPolicy
 ): Tool {
   return tool({
@@ -136,7 +134,7 @@ export function createImageSearchTool(
         const batch = await downloadImages(
           imageUrls,
           impit,
-          { workingDirectory: imageDownloadDirectory, timestamp: Date.now() },
+          { workingDirectory: ctl.getWorkingDirectory(), timestamp: Date.now() },
           { warn: context.warn, signal: context.signal, retry, onRetry: onRetry("image download") }
         )
         const results = batch.map(result => (result.ok ? result.localPath : result.url))
