@@ -87,7 +87,7 @@ function computeBackoffDelay(attempt: number, policy: RetryPolicy): number {
  * @param error Thrown value caught from a request attempt.
  * @returns `true` when the caller should retry.
  */
-export function isRetryableError(error: unknown): boolean {
+function isRetryableError(error: unknown): boolean {
   if (error instanceof FetchError) {
     if (error.statusCode === undefined) {
       return true

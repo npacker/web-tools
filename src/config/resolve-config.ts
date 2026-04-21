@@ -2,9 +2,8 @@
  * Configuration resolution utilities.
  */
 
-import { configSchematics } from "./config-schematics"
-
 import { AUTO_CONFIG_VALUE } from "./auto-sentinel"
+import { configSchematics } from "./config-schematics"
 
 import type { SafeSearch } from "../duckduckgo/safe-search"
 import type { RetryPolicy } from "../http/retry"

@@ -14,6 +14,8 @@ LM Studio plugin that exposes four web-oriented tools to local LLMs — **Web Se
 - `npm run format` / `npm run format:check` — Prettier
 - `npm run knip` — dead-code / unused-export check
 
+A local pre-commit hook at `.git/hooks/pre-commit` runs `lint`, `format:check`, and `knip` sequentially and aborts the commit on any failure. The hook is **not** committed to the repo — fresh clones need to reinstall it. Bypass with `git commit --no-verify` when necessary.
+
 No test suite is configured. TypeScript targets ES2023 / CommonJS. Requires Node >= 22 (fetch + AbortSignal.any).
 
 ## Architecture
