@@ -20,7 +20,7 @@ interface DownloadImagesOptions {
 /**
  * Contextual hooks provided by the caller for logging and cancellation.
  */
-interface DownloadImagesContext {
+export interface DownloadImagesContext {
   /** Logger used to surface non-fatal download failures. */
   warn: (message: string) => void
   /** Signal used to abort the in-flight downloads. */
@@ -30,7 +30,6 @@ interface DownloadImagesContext {
   /** Hook fired between failed attempts, before the backoff sleep. */
   onRetry?: RetryHooks["onRetry"]
 }
-
 /**
  * Per-URL outcome reported by `downloadImages`.
  */

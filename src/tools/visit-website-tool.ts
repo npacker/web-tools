@@ -15,6 +15,7 @@ import { formatToolError } from "./tool-error"
 
 import type { TTLCache } from "../cache"
 import type { RetryPolicy } from "../http"
+import type { DownloadImagesContext } from "../images"
 import type { RateLimiter } from "../timing"
 import type { Impit } from "impit"
 
@@ -164,20 +165,6 @@ export function createVisitWebsiteTool(
 }
 
 /**
- * Contextual hooks provided by the visit-website implementation for logging and cancellation.
- */
-interface PageImageRenderContext {
-  /** Logger used to surface non-fatal download failures. */
-  warn: (message: string) => void
-  /** Signal used to abort any in-flight downloads. */
-  signal: AbortSignal
-  /** Retry policy applied to transient download failures. */
-  retry?: RetryPolicy
-  /** Hook fired between failed attempts, before the backoff sleep. */
-  onRetry?: (error: unknown, attempt: number, delayMs: number) => void
-}
-
-/**
  * Extract up to `maxImages` images from the parsed page, download them, and return
  * `[alt, markdownOrError]` tuples in document order.
  *
@@ -197,7 +184,7 @@ async function renderPageImages(
   searchTerms: string[] | undefined,
   impit: Impit,
   workingDirectory: string,
-  context: PageImageRenderContext
+  context: DownloadImagesContext
 ): Promise<[string, string][]> {
   if (maxImages === 0) {
     return []

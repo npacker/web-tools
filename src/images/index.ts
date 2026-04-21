@@ -1,1 +1,1 @@
-export { downloadImages } from "./download-images"
+export { downloadImages, type DownloadImagesContext } from "./download-images"
