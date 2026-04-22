@@ -5,7 +5,7 @@
  */
 
 import { configSchematics } from "./config/config-schematics"
-import { toolsProvider } from "./tools"
+import { toolsProvider } from "./tools-provider"
 
 import type { PluginContext } from "@lmstudio/sdk"
 

@@ -2,9 +2,9 @@
  * Fetch (or cache-hit) the VQD token required for DuckDuckGo image search.
  */
 
+import { isAbortError } from "../errors"
 import { fetchOk } from "../http"
 import { extractVqdToken } from "../parsers"
-import { isAbortError } from "../tools/tool-error"
 
 import { buildVqdUrl } from "./build-urls"
 import { VqdTokenError } from "./vqd-token-error"

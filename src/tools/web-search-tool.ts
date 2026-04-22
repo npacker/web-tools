@@ -8,10 +8,8 @@ import { z } from "zod"
 import { type TTLCache, searchCacheKey, type SearchResultsPayload } from "../cache"
 import { resolveConfig } from "../config/resolve-config"
 import { searchWeb } from "../duckduckgo"
+import { formatToolError, NoWebResultsError } from "../errors"
 import { createRetryNotifier } from "../http"
-
-import { NoWebResultsError } from "./no-results-error"
-import { formatToolError } from "./tool-error"
 
 import type { RetryOptions } from "../http"
 import type { RateLimiter } from "../timing"

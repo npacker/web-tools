@@ -7,13 +7,11 @@ import { z } from "zod"
 
 import { DEFAULT_PAGE_SIZE, DEFAULT_SAFE_SEARCH, resolveConfig } from "../config/resolve-config"
 import { fetchVqdToken, searchImages } from "../duckduckgo"
+import { formatToolError, NoImageResultsError } from "../errors"
 import { createRetryNotifier } from "../http"
 import { downloadImages } from "../images"
 import { extractImageUrls } from "../parsers"
 import { type RateLimiter, sleep } from "../timing"
-
-import { NoImageResultsError } from "./no-results-error"
-import { formatToolError } from "./tool-error"
 
 import type { TTLCache } from "../cache"
 import type { RetryOptions } from "../http"

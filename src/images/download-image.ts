@@ -8,10 +8,10 @@ import path from "node:path"
 import { fileTypeFromBuffer } from "file-type"
 import pRetry from "p-retry"
 
+import { errorMessage, isAbortError } from "../errors"
 import { toMarkdownPath } from "../fs"
 import { FetchError, isRetryableFetchError } from "../http"
 import { imageExtensionFromHeaders, isSupportedImageExtension, normalizeImageExtension } from "../parsers"
-import { isAbortError, errorMessage } from "../tools/tool-error"
 
 import type { RetryOptions } from "../http"
 import type { Impit } from "impit"

@@ -7,16 +7,14 @@ import { JSDOM } from "jsdom"
 import { z } from "zod"
 
 import { resolveConfig } from "../config/resolve-config"
+import { formatToolError } from "../errors"
 import { createRetryNotifier } from "../http"
-import { downloadImages } from "../images"
-import { buildPageExcerpt, extractHeadings, extractLinks, extractPageImages } from "../parsers"
+import { renderPageImages } from "../images"
+import { buildPageExcerpt, extractHeadings, extractLinks } from "../parsers"
 import { fetchWebsite } from "../website"
-
-import { formatToolError } from "./tool-error"
 
 import type { TTLCache } from "../cache"
 import type { RetryOptions } from "../http"
-import type { DownloadImagesContext } from "../images"
 import type { RateLimiter } from "../timing"
 import type { Impit } from "impit"
 
@@ -147,54 +145,5 @@ export function createVisitWebsiteTool(
         return formatToolError(error, context, "website")
       }
     },
-  })
-}
-
-/**
- * Extract up to `maxImages` images from the parsed page, download them, and return
- * `[alt, markdownOrError]` tuples in document order.
- *
- * @param dom Parsed website DOM.
- * @param url Absolute URL of the page, used as the resolution base for relative sources.
- * @param maxImages Upper bound on the number of images to extract and download.
- * @param searchTerms Optional terms biasing extraction ranking.
- * @param impit Shared HTTP client used for the downloads.
- * @param workingDirectory Directory into which downloaded files are written.
- * @param context Runtime hooks used for cancellation and warning output.
- * @returns Tuples of alt text paired with a Markdown image reference or a per-image error string.
- */
-async function renderPageImages(
-  dom: JSDOM,
-  url: string,
-  maxImages: number,
-  searchTerms: string[] | undefined,
-  impit: Impit,
-  workingDirectory: string,
-  context: DownloadImagesContext
-): Promise<[string, string][]> {
-  if (maxImages === 0) {
-    return []
-  }
-
-  const images = extractPageImages(dom, url, maxImages, searchTerms)
-
-  if (images.length === 0) {
-    return []
-  }
-
-  const batch = await downloadImages(
-    images.map(image => image.src),
-    impit,
-    { workingDirectory, timestamp: Date.now() },
-    context
-  )
-
-  return images.map((image, index) => {
-    const result = batch[index]
-    const markdown = result.ok
-      ? `![Image ${index + 1}](${result.localPath})`
-      : `Error fetching image from URL: ${image.src}`
-
-    return [image.alt, markdown] as [string, string]
   })
 }

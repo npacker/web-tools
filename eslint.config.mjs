@@ -235,6 +235,38 @@ export default [
     },
   },
   {
+    files: ["src/tools/**/*.ts"],
+    ignores: ["src/tools/*-tool.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "Program",
+          message:
+            "Files in `src/tools/` must be named `*-tool.ts` and contain a single `create*Tool` factory. Move non-tool code (helpers, errors, shared types, the tools provider) to a sibling module under `src/`.",
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/tools/*-tool.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "FunctionDeclaration[id.name!=/^create[A-Z].*Tool$/]",
+          message:
+            "Functions declared in `src/tools/*-tool.ts` must be named `create<Name>Tool` (e.g. `createWebSearchTool`). Move helpers to a sibling module.",
+        },
+        {
+          selector: "FunctionDeclaration:not([returnType.typeAnnotation.typeName.name='Tool'])",
+          message:
+            "Functions declared in `src/tools/*-tool.ts` must have an explicit `Tool` return type. Move helpers to a sibling module.",
+        },
+      ],
+    },
+  },
+  {
     ignores: ["node_modules/", "dist/", "*.js"],
   },
 ];

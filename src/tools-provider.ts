@@ -5,18 +5,17 @@
 
 import path from "node:path"
 
-import { TTLCache } from "../cache"
-import { resolveTimingConfig } from "../config/resolve-config"
-import { findLMStudioHome } from "../fs"
-import { createImpit } from "../http"
-import { RateLimiter } from "../timing"
+import { TTLCache } from "./cache"
+import { resolveTimingConfig } from "./config/resolve-config"
+import { findLMStudioHome } from "./fs"
+import { createImpit } from "./http"
+import { RateLimiter } from "./timing"
+import { createImageSearchTool } from "./tools/image-search-tool"
+import { createViewImagesTool } from "./tools/view-images-tool"
+import { createVisitWebsiteTool } from "./tools/visit-website-tool"
+import { createWebSearchTool } from "./tools/web-search-tool"
 
-import { createImageSearchTool } from "./image-search-tool"
-import { createViewImagesTool } from "./view-images-tool"
-import { createVisitWebsiteTool } from "./visit-website-tool"
-import { createWebSearchTool } from "./web-search-tool"
-
-import type { SearchResultsPayload } from "../cache"
+import type { SearchResultsPayload } from "./cache"
 import type { Tool, ToolsProviderController } from "@lmstudio/sdk"
 
 /**

@@ -7,12 +7,11 @@ import { JSDOM } from "jsdom"
 import { z } from "zod"
 
 import { resolveConfig } from "../config/resolve-config"
+import { formatToolError } from "../errors"
 import { createRetryNotifier } from "../http"
 import { downloadImages } from "../images"
 import { extractPageImages } from "../parsers"
 import { fetchWebsite } from "../website"
-
-import { formatToolError } from "./tool-error"
 
 import type { TTLCache } from "../cache"
 import type { RetryOptions } from "../http"
