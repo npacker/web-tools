@@ -3,11 +3,30 @@
  */
 
 import { Readability } from "@mozilla/readability"
+import Fuse from "fuse.js"
 import { JSDOM } from "jsdom"
 
 import { htmlToMarkdown, htmlToText, normalizeText } from "../../text"
 
 import type { ContentFormat } from "../../config/resolve-config"
+
+/**
+ * Maximum Fuse.js relevance score (0 = exact match, 1 = match anything) at which a paragraph
+ * is considered a fuzzy hit for a search term. Tightened from the library default (0.6) to
+ * avoid returning chunks whose match is essentially noise.
+ *
+ * @const {number}
+ * @default 0.3
+ */
+const FUSE_SCORE_THRESHOLD = 0.3
+
+/**
+ * Paragraph separator used when joining the selected chunks back together for emission.
+ *
+ * @const {string}
+ * @default "\n\n"
+ */
+const CHUNK_JOIN_SEPARATOR = "\n\n"
 
 /**
  * Structured extraction of the core heading fields on a page.
@@ -21,16 +40,6 @@ interface PageHeadings {
   h2: string
   /** Text of the first `<h3>` element, or an empty string when absent. */
   h3: string
-}
-
-/**
- * Internal term-match record produced while building the content window list.
- */
-interface TermMatch {
-  /** Start offset of the match window within the source text. */
-  index: number
-  /** Matched substring including surrounding padding. */
-  text: string
 }
 
 /**
@@ -108,9 +117,10 @@ function formatHtml(htmlFragment: string, format: ContentFormat): string {
 
 /**
  * Build the visible-text payload for the Visit Website tool: when search terms are supplied
- * and the full text exceeds the budget, concatenate dedup-merged windows around each term;
- * otherwise return a head slice of the full text. Also reports the pre-truncation length
- * so callers can detect truncation and refine with search terms or raise the plugin setting.
+ * and the full text exceeds the budget, concatenate the highest-scoring paragraphs selected
+ * via fuzzy matching; otherwise return a head slice of the full text. Also reports the
+ * pre-truncation length so callers can detect truncation and refine with search terms or
+ * raise the plugin setting.
  *
  * @param html Raw HTML payload used by Readability to extract the main article text.
  * @param url Absolute URL of the page, passed to Readability for relative-link resolution.
@@ -145,66 +155,99 @@ export function buildPageExcerpt(
 }
 
 /**
- * Slice a body of text around occurrences of each search term, concatenating dedup-merged
- * windows until the overall `limit` character budget is reached.
+ * Select the paragraphs that best match the supplied search terms via Fuse.js fuzzy matching
+ * and concatenate them in document order up to the character budget. Fuzzy matching tolerates
+ * typos, inflections, and partial word overlaps that a case-insensitive `indexOf` scan would
+ * miss, while still favouring exact matches (which score near zero).
  *
- * @param text Full text from which to extract matching windows.
+ * @param text Full text from which to extract matching paragraphs.
  * @param terms Terms to locate inside `text`.
  * @param limit Total character budget for the concatenated output.
- * @returns The concatenated windows, with overlapping ranges merged into single spans.
+ * @returns The concatenated paragraphs, emitted in source order, truncated to `limit`.
  */
 function sliceAroundTerms(text: string, terms: string[], limit: number): string {
   if (terms.length === 0 || limit <= 0) {
     return ""
   }
 
-  const windowSize = Math.max(1, Math.floor(limit / (terms.length * 2)))
-  const matches = collectTermMatches(text, terms, windowSize).toSorted((a, b) => a.index - b.index)
-  let output = ""
-  let nextMinIndex = 0
+  const chunks = splitIntoChunks(text)
 
-  for (const match of matches) {
-    output += match.index >= nextMinIndex ? match.text : match.text.slice(nextMinIndex - match.index)
-    nextMinIndex = match.index + match.text.length
-
-    if (output.length >= limit) {
-      break
-    }
+  if (chunks.length === 0) {
+    return ""
   }
 
-  return output.slice(0, limit)
+  const scoredIndices = rankChunksByTerms(chunks, terms)
+
+  if (scoredIndices.length === 0) {
+    return ""
+  }
+
+  const selected = new Set<number>()
+  let total = 0
+
+  for (const index of scoredIndices) {
+    if (total >= limit) {
+      break
+    }
+
+    selected.add(index)
+    total += chunks[index].length
+  }
+
+  return [...selected]
+    .toSorted((a, b) => a - b)
+    .map(index => chunks[index])
+    .join(CHUNK_JOIN_SEPARATOR)
+    .slice(0, limit)
 }
 
 /**
- * Find every occurrence of each term in the source text and return a padded window around each
- * match, using case-insensitive `indexOf` scanning rather than dynamically constructed regexes.
+ * Rank chunk indices by the best (lowest) Fuse.js score achieved across any of the supplied
+ * terms, discarding chunks that fail the score threshold for every term.
  *
- * @param text Text to scan.
- * @param terms Terms to search for.
- * @param windowSize Number of characters of padding to include on either side of each match.
- * @returns Flattened list of term matches with their source offsets.
+ * @param chunks Paragraph-level chunks of the page text, in source order.
+ * @param terms Search terms to match against each chunk.
+ * @returns Chunk indices ordered from best to worst match.
  */
-function collectTermMatches(text: string, terms: string[], windowSize: number): TermMatch[] {
-  const matches: TermMatch[] = []
-  const haystack = text.toLowerCase()
+function rankChunksByTerms(chunks: string[], terms: string[]): number[] {
+  const fuse = new Fuse(chunks, {
+    includeScore: true,
+    ignoreLocation: true,
+    threshold: FUSE_SCORE_THRESHOLD,
+  })
+  const bestScore = new Map<number, number>()
 
   for (const term of terms) {
     if (term === "") {
       continue
     }
 
-    const needle = term.toLowerCase()
-    let from = 0
-    let hit = haystack.indexOf(needle, from)
+    for (const { refIndex, score } of fuse.search(term)) {
+      if (score === undefined) {
+        continue
+      }
 
-    while (hit !== -1) {
-      const start = Math.max(0, hit - windowSize)
-      const end = Math.min(text.length, hit + needle.length + windowSize)
-      matches.push({ index: start, text: text.slice(start, end) })
-      from = hit + needle.length
-      hit = haystack.indexOf(needle, from)
+      const current = bestScore.get(refIndex)
+
+      if (current === undefined || score < current) {
+        bestScore.set(refIndex, score)
+      }
     }
   }
 
-  return matches
+  return [...bestScore.entries()].toSorted(([, a], [, b]) => a - b).map(([index]) => index)
+}
+
+/**
+ * Split normalized page text into paragraph-level chunks on blank-line boundaries, discarding
+ * any empty segments produced by the split.
+ *
+ * @param text Full page text already normalized to collapse runs of blank lines.
+ * @returns Trimmed paragraph chunks in source order.
+ */
+function splitIntoChunks(text: string): string[] {
+  return text
+    .split(/\n{2,}/)
+    .map(paragraph => paragraph.trim())
+    .filter(paragraph => paragraph.length > 0)
 }
