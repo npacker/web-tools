@@ -7,6 +7,7 @@ import { z } from "zod"
 
 import { DEFAULT_PAGE_SIZE, DEFAULT_SAFE_SEARCH, resolveConfig } from "../config/resolve-config"
 import { fetchVqdToken, searchImages } from "../duckduckgo"
+import { createRetryNotifier } from "../http"
 import { downloadImages } from "../images"
 import { extractImageUrls } from "../parsers"
 import { type RateLimiter, sleep } from "../timing"
@@ -15,7 +16,7 @@ import { NoImageResultsError } from "./no-results-error"
 import { formatToolError } from "./tool-error"
 
 import type { TTLCache } from "../cache"
-import type { RetryPolicy } from "../http"
+import type { RetryOptions } from "../http"
 import type { Impit } from "impit"
 
 /**
@@ -54,7 +55,7 @@ export function createImageSearchTool(
   impit: Impit,
   vqdCache: TTLCache<string>,
   rateLimiter: RateLimiter,
-  retry: RetryPolicy
+  retry: RetryOptions
 ): Tool {
   return tool({
     name: "Image Search",
@@ -99,30 +100,17 @@ export function createImageSearchTool(
           pageSize: parameterPageSize,
           safeSearch: parameterSafeSearch,
         })
-
-        /**
-         * Build a retry observer that reports attempts against a human-readable phase label.
-         *
-         * @param label Phase name used in the status line.
-         * @returns A retry hook suitable for the HTTP layer.
-         */
-        const onRetry =
-          (label: string) =>
-          (_error: unknown, attempt: number, delayMs: number): void => {
-            context.status(`Retrying ${label} (attempt ${attempt + 1}) in ${Math.round(delayMs / 1000)}s...`)
-          }
-
         const vqd = await fetchVqdToken(impit, vqdCache, query, {
           signal: context.signal,
           retry,
-          onRetry: onRetry("VQD token fetch"),
+          onFailedAttempt: createRetryNotifier(context.status, "VQD token fetch"),
         })
         await sleep(vqdImageDelayMs)
         const parameters = { query, pageSize, safeSearch, page }
         const imageResults = await searchImages(impit, parameters, vqd, {
           signal: context.signal,
           retry,
-          onRetry: onRetry("image search"),
+          onFailedAttempt: createRetryNotifier(context.status, "image search"),
         })
         const imageUrls = extractImageUrls(imageResults, pageSize)
 
@@ -135,7 +123,12 @@ export function createImageSearchTool(
           imageUrls,
           impit,
           { workingDirectory: ctl.getWorkingDirectory(), timestamp: Date.now() },
-          { warn: context.warn, signal: context.signal, retry, onRetry: onRetry("image download") }
+          {
+            warn: context.warn,
+            signal: context.signal,
+            retry,
+            onFailedAttempt: createRetryNotifier(context.status, "image download"),
+          }
         )
         const results = batch.map(result => (result.ok ? result.localPath : result.url))
         const failed = batch.length - batch.filter(result => result.ok).length

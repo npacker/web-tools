@@ -4,8 +4,9 @@
 
 import { downloadImage } from "./download-image"
 
-import type { RetryHooks, RetryPolicy } from "../http"
+import type { RetryOptions } from "../http"
 import type { Impit } from "impit"
+import type { Options as PRetryOptions } from "p-retry"
 
 /**
  * Options controlling placement of the downloaded batch.
@@ -26,9 +27,9 @@ export interface DownloadImagesContext {
   /** Signal used to abort the in-flight downloads. */
   signal: AbortSignal
   /** Retry policy applied to transient download failures. */
-  retry?: RetryPolicy
-  /** Hook fired between failed attempts, before the backoff sleep. */
-  onRetry?: RetryHooks["onRetry"]
+  retry?: RetryOptions
+  /** Observer invoked after each failed attempt, before the backoff sleep. */
+  onFailedAttempt?: PRetryOptions["onFailedAttempt"]
 }
 /**
  * Per-URL outcome reported by `downloadImages`.

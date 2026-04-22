@@ -7,6 +7,7 @@ import { JSDOM } from "jsdom"
 import { z } from "zod"
 
 import { resolveConfig } from "../config/resolve-config"
+import { createRetryNotifier } from "../http"
 import { downloadImages } from "../images"
 import { extractPageImages } from "../parsers"
 import { fetchWebsite } from "../website"
@@ -14,7 +15,7 @@ import { fetchWebsite } from "../website"
 import { formatToolError } from "./tool-error"
 
 import type { TTLCache } from "../cache"
-import type { RetryPolicy } from "../http"
+import type { RetryOptions } from "../http"
 import type { RateLimiter } from "../timing"
 import type { Impit } from "impit"
 
@@ -42,7 +43,7 @@ export function createViewImagesTool(
   impit: Impit,
   websiteCache: TTLCache<string>,
   rateLimiter: RateLimiter,
-  retry: RetryPolicy
+  retry: RetryOptions
 ): Tool {
   return tool({
     name: "View Images",
@@ -83,25 +84,13 @@ export function createViewImagesTool(
         const { maxImages } = resolveConfig(ctl, { maxImages: parameterMaxImages })
         const collected: string[] = [...explicitUrls]
 
-        /**
-         * Build a retry observer that reports attempts against a human-readable phase label.
-         *
-         * @param label Phase name used in the status line.
-         * @returns A retry hook suitable for the HTTP layer.
-         */
-        const onRetry =
-          (label: string) =>
-          (_error: unknown, attempt: number, delayMs: number): void => {
-            context.status(`Retrying ${label} (attempt ${attempt + 1}) in ${Math.round(delayMs / 1000)}s...`)
-          }
-
         if (hasWebsite) {
           context.status("Fetching image URLs from website...")
           await rateLimiter.wait()
           const html = await fetchWebsite(impit, websiteCache, websiteURL, {
             signal: context.signal,
             retry,
-            onRetry: onRetry("website fetch"),
+            onFailedAttempt: createRetryNotifier(context.status, "website fetch"),
           })
           const dom = new JSDOM(html)
           const scraped = extractPageImages(dom, websiteURL, maxImages)
@@ -122,7 +111,12 @@ export function createViewImagesTool(
           collected,
           impit,
           { workingDirectory: ctl.getWorkingDirectory(), timestamp: Date.now() },
-          { warn: context.warn, signal: context.signal, retry, onRetry: onRetry("image download") }
+          {
+            warn: context.warn,
+            signal: context.signal,
+            retry,
+            onFailedAttempt: createRetryNotifier(context.status, "image download"),
+          }
         )
         const rendered = batch.map((result, index) =>
           result.ok ? `![Image ${index + 1}](${result.localPath})` : `Error fetching image from URL: ${result.url}`

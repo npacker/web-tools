@@ -1,12 +1,15 @@
 /**
- * Shared `impit` GET helper that throws on non-2xx responses and honours a retry policy.
+ * Shared `impit` GET helper that throws on non-2xx responses and retries transient failures via `p-retry`.
  */
 
-import { FetchError } from "./fetch-error"
-import { withRetry } from "./retry"
+import pRetry from "p-retry"
 
-import type { RetryHooks, RetryPolicy } from "./retry"
+import { FetchError } from "./fetch-error"
+import { isRetryableFetchError } from "./retry"
+
+import type { RetryOptions } from "./retry"
 import type { Impit } from "impit"
+import type { Options as PRetryOptions } from "p-retry"
 
 /**
  * Options passed to every outbound request, primarily to support cancellation and retries.
@@ -15,15 +18,13 @@ export interface RequestOptions {
   /** Signal used to abort the in-flight request. */
   signal: AbortSignal
   /** Retry policy applied to the request; when omitted, the call is attempted exactly once. */
-  retry?: RetryPolicy
-  /** Hook fired between failed attempts, before the backoff sleep. */
-  onRetry?: RetryHooks["onRetry"]
+  retry?: RetryOptions
+  /** Observer invoked after each failed attempt, before the backoff sleep. */
+  onFailedAttempt?: PRetryOptions["onFailedAttempt"]
 }
 
 /**
  * Issue a GET request through the shared `impit` client, throwing `FetchError` on failure or non-2xx.
- *
- * When `options.retry` is provided, transient failures are retried with progressive backoff.
  *
  * @param impit Shared HTTP client used for the request.
  * @param url Target URL to fetch.
@@ -32,12 +33,19 @@ export interface RequestOptions {
  * @throws {FetchError} When the transport fails or the response carries a non-2xx status.
  */
 export async function fetchOk(impit: Impit, url: string, options: RequestOptions): Promise<ReturnType<Impit["fetch"]>> {
-  if (options.retry === undefined) {
-    return attemptFetch(impit, url, options.signal)
-  }
-
-  return withRetry(async () => attemptFetch(impit, url, options.signal), options.retry, options.signal, {
-    onRetry: options.onRetry,
+  return pRetry(async () => attemptFetch(impit, url, options.signal), {
+    retries: 0,
+    ...options.retry,
+    signal: options.signal,
+    /**
+     * Gate retries on the `FetchError.statusCode` allowlist so non-transient failures fail fast.
+     *
+     * @param context Retry context supplied by `p-retry`; only `error` is consulted.
+     * @param context.error Error thrown by the most recent attempt.
+     * @returns `true` when the error is a transient fetch failure that warrants another attempt.
+     */
+    shouldRetry: ({ error }) => isRetryableFetchError(error),
+    onFailedAttempt: options.onFailedAttempt,
   })
 }
 

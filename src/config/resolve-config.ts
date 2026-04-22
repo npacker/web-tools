@@ -6,7 +6,7 @@ import { AUTO_CONFIG_VALUE } from "./auto-sentinel"
 import { configSchematics } from "./config-schematics"
 
 import type { SafeSearch } from "../duckduckgo/safe-search"
-import type { RetryPolicy } from "../http/retry"
+import type { RetryOptions } from "../http/retry"
 import type { ToolsProviderController } from "@lmstudio/sdk"
 
 /**
@@ -97,7 +97,7 @@ export interface ResolvedTimingConfig {
   /** Minimum interval between outbound requests, in milliseconds. */
   requestIntervalMs: number
   /** Retry policy applied to every outbound request. */
-  retryPolicy: RetryPolicy
+  retryPolicy: RetryOptions
 }
 
 /**
@@ -167,24 +167,26 @@ export function resolveTimingConfig(ctl: ToolsProviderController): ResolvedTimin
     websiteCacheTtlMs: resolveSecondsToMs(websiteTtlSeconds, DEFAULT_WEBSITE_CACHE_TTL_MS),
     requestIntervalMs: resolveSecondsToMs(intervalSeconds, DEFAULT_REQUEST_INTERVAL_MS),
     retryPolicy: {
-      maxAttempts: resolveMaxAttempts(maxRetries),
-      initialBackoffMs: resolveSecondsToMs(retryInitialSeconds, DEFAULT_RETRY_INITIAL_BACKOFF_MS),
-      maxBackoffMs: resolveSecondsToMs(retryMaxSeconds, DEFAULT_RETRY_MAX_BACKOFF_MS),
+      retries: resolveRetries(maxRetries),
+      factor: 2,
+      minTimeout: resolveSecondsToMs(retryInitialSeconds, DEFAULT_RETRY_INITIAL_BACKOFF_MS),
+      maxTimeout: resolveSecondsToMs(retryMaxSeconds, DEFAULT_RETRY_MAX_BACKOFF_MS),
+      randomize: true,
     },
   }
 }
 
 /**
- * Convert the plugin's "max retries" field to the `maxAttempts` value consumed by `withRetry`.
+ * Convert the plugin's "max retries" field to the `retries` value consumed by `p-retry`.
  * A `null` or `-1` selects the default, and `0` explicitly disables retries, leaving a single attempt.
  *
  * @param pluginValue Value read from plugin configuration, or `null` when unset.
- * @returns Total number of attempts including the first try.
+ * @returns Number of retries after the first attempt.
  */
-function resolveMaxAttempts(pluginValue: number | null): number {
+function resolveRetries(pluginValue: number | null): number {
   const retries = pluginValue === null || pluginValue === -1 ? DEFAULT_MAX_RETRIES : pluginValue
 
-  return Math.max(1, retries + 1)
+  return Math.max(0, retries)
 }
 
 /**

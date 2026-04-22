@@ -6,14 +6,16 @@ import { writeFile } from "node:fs/promises"
 import path from "node:path"
 
 import { fileTypeFromBuffer } from "file-type"
+import pRetry from "p-retry"
 
 import { toMarkdownPath } from "../fs"
-import { FetchError, withRetry } from "../http"
+import { FetchError, isRetryableFetchError } from "../http"
 import { imageExtensionFromHeaders, isSupportedImageExtension, normalizeImageExtension } from "../parsers"
 import { isAbortError, errorMessage } from "../tools/tool-error"
 
-import type { RetryHooks, RetryPolicy } from "../http"
+import type { RetryOptions } from "../http"
 import type { Impit } from "impit"
+import type { Options as PRetryOptions } from "p-retry"
 
 /**
  * Timeout applied to each image download, in milliseconds.
@@ -29,9 +31,9 @@ interface DownloadImageContext {
   /** Signal used to abort the in-flight download. */
   signal: AbortSignal
   /** Retry policy applied to transient download failures. */
-  retry?: RetryPolicy
-  /** Hook fired between failed attempts, before the backoff sleep. */
-  onRetry?: RetryHooks["onRetry"]
+  retry?: RetryOptions
+  /** Observer invoked after each failed attempt, before the backoff sleep. */
+  onFailedAttempt?: PRetryOptions["onFailedAttempt"]
 }
 
 /**
@@ -62,7 +64,20 @@ export async function downloadImage(
   context: DownloadImageContext
 ): Promise<string | undefined> {
   try {
-    const response = await fetchImageWithRetry(url, impit, context)
+    const response = await pRetry(async () => attemptImageFetch(url, impit, context.signal), {
+      retries: 0,
+      ...context.retry,
+      signal: context.signal,
+      /**
+       * Gate retries on the `FetchError.statusCode` allowlist so non-transient failures fail fast.
+       *
+       * @param retryContext Retry context supplied by `p-retry`; only `error` is consulted.
+       * @param retryContext.error Error thrown by the most recent attempt.
+       * @returns `true` when the error is a transient fetch failure that warrants another attempt.
+       */
+      shouldRetry: ({ error }) => isRetryableFetchError(error),
+      onFailedAttempt: context.onFailedAttempt,
+    })
     const bytes = await response.bytes()
 
     if (bytes.length === 0) {
@@ -86,30 +101,6 @@ export async function downloadImage(
 
     return undefined
   }
-}
-
-/**
- * Issue the image GET request with a combined external + timeout abort signal, retrying
- * transient failures according to the caller-supplied policy.
- *
- * @param url Source URL of the image to download.
- * @param impit Shared HTTP client used for the request.
- * @param context Cancellation, retry, and logging hooks supplied by the caller.
- * @returns The successful response.
- * @throws {FetchError} When the download fails after all retries are exhausted.
- */
-async function fetchImageWithRetry(
-  url: string,
-  impit: Impit,
-  context: DownloadImageContext
-): Promise<Awaited<ReturnType<Impit["fetch"]>>> {
-  if (context.retry === undefined) {
-    return attemptImageFetch(url, impit, context.signal)
-  }
-
-  return withRetry(async () => attemptImageFetch(url, impit, context.signal), context.retry, context.signal, {
-    onRetry: context.onRetry,
-  })
 }
 
 /**

@@ -7,6 +7,7 @@ import { JSDOM } from "jsdom"
 import { z } from "zod"
 
 import { resolveConfig } from "../config/resolve-config"
+import { createRetryNotifier } from "../http"
 import { downloadImages } from "../images"
 import { buildPageExcerpt, extractHeadings, extractLinks, extractPageImages } from "../parsers"
 import { fetchWebsite } from "../website"
@@ -14,7 +15,7 @@ import { fetchWebsite } from "../website"
 import { formatToolError } from "./tool-error"
 
 import type { TTLCache } from "../cache"
-import type { RetryPolicy } from "../http"
+import type { RetryOptions } from "../http"
 import type { DownloadImagesContext } from "../images"
 import type { RateLimiter } from "../timing"
 import type { Impit } from "impit"
@@ -51,7 +52,7 @@ export function createVisitWebsiteTool(
   impit: Impit,
   websiteCache: TTLCache<string>,
   rateLimiter: RateLimiter,
-  retry: RetryPolicy
+  retry: RetryOptions
 ): Tool {
   return tool({
     name: "Visit Website",
@@ -118,23 +119,10 @@ export function createVisitWebsiteTool(
           maxImages: parameterMaxImages,
           contentLimit: parameterContentLimit,
         })
-
-        /**
-         * Build a retry observer that reports attempts against a human-readable phase label.
-         *
-         * @param label Phase name used in the status line.
-         * @returns A retry hook suitable for the HTTP layer.
-         */
-        const onRetry =
-          (label: string) =>
-          (_error: unknown, attempt: number, delayMs: number): void => {
-            context.status(`Retrying ${label} (attempt ${attempt + 1}) in ${Math.round(delayMs / 1000)}s...`)
-          }
-
         const html = await fetchWebsite(impit, websiteCache, url, {
           signal: context.signal,
           retry,
-          onRetry: onRetry("website fetch"),
+          onFailedAttempt: createRetryNotifier(context.status, "website fetch"),
         })
         context.status("Website visited successfully.")
         const dom = new JSDOM(html)
@@ -144,7 +132,7 @@ export function createVisitWebsiteTool(
           warn: context.warn,
           signal: context.signal,
           retry,
-          onRetry: onRetry("image download"),
+          onFailedAttempt: createRetryNotifier(context.status, "image download"),
         })
         const content = buildPageExcerpt(html, url, contentLimit, findInPage)
 

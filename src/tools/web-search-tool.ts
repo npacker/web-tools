@@ -8,11 +8,12 @@ import { z } from "zod"
 import { type TTLCache, searchCacheKey, type SearchResultsPayload } from "../cache"
 import { resolveConfig } from "../config/resolve-config"
 import { searchWeb } from "../duckduckgo"
+import { createRetryNotifier } from "../http"
 
 import { NoWebResultsError } from "./no-results-error"
 import { formatToolError } from "./tool-error"
 
-import type { RetryPolicy } from "../http"
+import type { RetryOptions } from "../http"
 import type { RateLimiter } from "../timing"
 import type { Impit } from "impit"
 
@@ -52,7 +53,7 @@ export function createWebSearchTool(
   impit: Impit,
   cache: TTLCache<SearchResultsPayload>,
   rateLimiter: RateLimiter,
-  retry: RetryPolicy
+  retry: RetryOptions
 ): Tool {
   return tool({
     name: "Web Search",
@@ -109,16 +110,7 @@ export function createWebSearchTool(
         const result = await searchWeb(impit, parameters, {
           signal: context.signal,
           retry,
-          /**
-           * Report the upcoming retry attempt to the tool status line.
-           *
-           * @param _error Underlying error from the failed attempt.
-           * @param attempt 1-based index of the attempt that just failed.
-           * @param delayMs Upcoming backoff delay in milliseconds.
-           */
-          onRetry: (_error, attempt, delayMs) => {
-            context.status(`Retrying web search (attempt ${attempt + 1}) in ${Math.round(delayMs / 1000)}s...`)
-          },
+          onFailedAttempt: createRetryNotifier(context.status, "web search"),
         })
 
         if (result.results.length === 0) {
