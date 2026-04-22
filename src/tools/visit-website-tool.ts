@@ -34,7 +34,7 @@ const MIN_CONTENT_LIMIT = 0
 /**
  * Upper bound on the visible-text character budget.
  */
-const MAX_CONTENT_LIMIT = 10_000
+const MAX_CONTENT_LIMIT = 100_000
 
 /**
  * Create the Visit Website tool.

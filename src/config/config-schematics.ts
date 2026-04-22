@@ -77,14 +77,14 @@ export const configSchematics = createConfigSchematics()
     "numeric",
     {
       displayName: "Visit Website: Content Character Limit",
-      subtitle: "1 to 10000, 0 = default (2000)",
+      subtitle: "1 to 100000, 0 = default (10000)",
       min: 0,
-      max: 10_000,
+      max: 100_000,
       int: true,
       slider: {
-        step: 100,
-        min: 100,
-        max: 10_000,
+        step: 1000,
+        min: 0,
+        max: 100_000,
       },
     },
     0

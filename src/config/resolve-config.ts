@@ -28,7 +28,7 @@ const DEFAULT_MAX_IMAGES = 10
 /**
  * Default visible-text character budget for the Visit Website tool when no value is provided.
  */
-const DEFAULT_CONTENT_LIMIT = 2000
+const DEFAULT_CONTENT_LIMIT = 10_000
 /**
  * Default TTL for the web/image search result cache, in milliseconds.
  */
