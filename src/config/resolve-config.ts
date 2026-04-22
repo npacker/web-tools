@@ -170,8 +170,6 @@ interface ConfigOverrides {
   safeSearch?: SafeSearch
   /** Max-images override provided by the caller. */
   maxImages?: number
-  /** Content-limit override provided by the caller. */
-  contentLimit?: number
   /** Content-format override provided by the caller. */
   contentFormat?: ContentFormat
 }
@@ -197,7 +195,7 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
     pageSize: resolvePageSize(pluginPageSize, overrides.pageSize),
     safeSearch: resolveSafeSearch(pluginSafeSearch, overrides.safeSearch),
     maxImages: resolveAutoNumeric(pluginMaxImages, overrides.maxImages, DEFAULT_MAX_IMAGES),
-    contentLimit: resolveZeroSentinelNumeric(pluginContentLimit, overrides.contentLimit, DEFAULT_CONTENT_LIMIT),
+    contentLimit: pluginContentLimit !== null && pluginContentLimit !== 0 ? pluginContentLimit : DEFAULT_CONTENT_LIMIT,
     contentFormat: overrides.contentFormat ?? pluginContentFormat ?? DEFAULT_CONTENT_FORMAT,
     vqdImageDelayMs: resolveSecondsToMs(pluginVqdImageDelaySeconds, DEFAULT_VQD_IMAGE_DELAY_MS),
   }
@@ -305,25 +303,6 @@ function resolveSafeSearch(
  */
 function resolveAutoNumeric(pluginValue: number | null, override: number | undefined, defaultValue: number): number {
   const fromPlugin = pluginValue !== null && pluginValue !== -1 ? pluginValue : undefined
-
-  return fromPlugin ?? override ?? defaultValue
-}
-
-/**
- * Resolves a numeric plugin value that treats `0` as a "use default" sentinel.
- * Used by fields where `0` would be nonsensical as a real configuration.
- *
- * @param pluginValue Value read from plugin configuration, or `null` when unset.
- * @param override Runtime override from the tool invocation.
- * @param defaultValue Fallback value when neither plugin nor override supplies a concrete number.
- * @returns The effective numeric value.
- */
-function resolveZeroSentinelNumeric(
-  pluginValue: number | null,
-  override: number | undefined,
-  defaultValue: number
-): number {
-  const fromPlugin = pluginValue !== null && pluginValue !== 0 ? pluginValue : undefined
 
   return fromPlugin ?? override ?? defaultValue
 }

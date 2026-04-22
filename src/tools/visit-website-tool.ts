@@ -19,22 +19,6 @@ import type { RateLimiter } from "../timing"
 import type { Impit } from "impit"
 
 /**
- * Lower bound on the visible-text character budget.
- *
- * @const {number}
- * @default 0
- */
-const MIN_CONTENT_LIMIT = 0
-
-/**
- * Upper bound on the visible-text character budget.
- *
- * @const {number}
- * @default 100_000
- */
-const MAX_CONTENT_LIMIT = 100_000
-
-/**
  * Output format choices accepted by the `contentFormat` parameter.
  *
  * @const {readonly ContentFormat[]}
@@ -62,20 +46,13 @@ export function createVisitWebsiteTool(
   return tool({
     name: "Visit Website",
     description:
-      "Visit a website and return its title, top-level headings, and content. When contentLength exceeds contentLimit, raise contentLimit or refine with findInPage.",
+      "Visit a website and return its title, top-level headings, and content. When contentLength exceeds the returned content length the page was truncated — refine with findInPage.",
     parameters: {
       url: z.string().url().describe("The URL of the website to visit"),
       findInPage: z
         .array(z.string())
         .optional()
         .describe("Strongly recommended: optional search terms to prioritize which content slices are returned."),
-      contentLimit: z
-        .number()
-        .int()
-        .min(MIN_CONTENT_LIMIT)
-        .max(MAX_CONTENT_LIMIT)
-        .optional()
-        .describe("Maximum text content length to extract from the page."),
       contentFormat: z.enum(CONTENT_FORMAT_OPTIONS).optional().describe("Output format of the content field."),
     },
 
@@ -85,21 +62,16 @@ export function createVisitWebsiteTool(
      * @param args Validated tool parameters.
      * @param args.url URL of the website to visit.
      * @param args.findInPage Optional search terms that bias content slicing.
-     * @param args.contentLimit Optional per-call override for the visible-text character budget.
      * @param args.contentFormat Optional per-call override for the content field's output format.
      * @param context Runtime tool context supplied by the SDK.
      * @returns The structured page summary or a user-facing error string.
      */
-    implementation: async (
-      { url, findInPage, contentLimit: parameterContentLimit, contentFormat: parameterContentFormat },
-      context
-    ) => {
+    implementation: async ({ url, findInPage, contentFormat: parameterContentFormat }, context) => {
       context.status("Visiting website...")
       await rateLimiter.wait()
 
       try {
         const { contentLimit, contentFormat } = resolveConfig(ctl, {
-          contentLimit: parameterContentLimit,
           contentFormat: parameterContentFormat,
         })
         const html = await fetchWebsite(impit, websiteCache, url, {

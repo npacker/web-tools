@@ -37,11 +37,10 @@ Fetches a URL and returns its title, first-level headings (`h1`/`h2`/`h3`), and 
 | Parameter | Type | Notes |
 | --- | --- | --- |
 | `url` | URL | Required. |
-| `findInPage` | string[] | Optional search terms that bias which content slices are returned when the page exceeds `contentLimit`. Strongly recommended. |
-| `contentLimit` | int 0–100 000 | Optional visible-text character budget; overrides plugin setting. |
+| `findInPage` | string[] | Optional search terms that bias which content slices are returned when the page exceeds the character budget. Strongly recommended. |
 | `contentFormat` | `"markdown" \| "text"` | Optional output format; overrides plugin setting. |
 
-The response also includes `contentLength`, the character count of the full extracted content prior to truncation. When `contentLength > content.length` the content was truncated — raise `contentLimit` or refine `findInPage` and re-call to retrieve more.
+The visible-text character budget (`contentLimit`) is a plugin-only setting — it is not exposed as a tool parameter so the model cannot override the user-set or default budget. The response includes `contentLength`, the character count of the full extracted content prior to truncation. When `contentLength > content.length` the content was truncated — refine `findInPage` and re-call, or raise `contentLimit` in the plugin settings.
 
 ### View Images
 

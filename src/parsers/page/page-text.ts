@@ -110,7 +110,7 @@ function formatHtml(htmlFragment: string, format: ContentFormat): string {
  * Build the visible-text payload for the Visit Website tool: when search terms are supplied
  * and the full text exceeds the budget, concatenate dedup-merged windows around each term;
  * otherwise return a head slice of the full text. Also reports the pre-truncation length
- * so callers can detect truncation and raise `contentLimit` if needed.
+ * so callers can detect truncation and refine with search terms or raise the plugin setting.
  *
  * @param html Raw HTML payload used by Readability to extract the main article text.
  * @param url Absolute URL of the page, passed to Readability for relative-link resolution.
