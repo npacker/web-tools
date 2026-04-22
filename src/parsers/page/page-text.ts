@@ -155,10 +155,13 @@ export function buildPageExcerpt(
 }
 
 /**
- * Select the paragraphs that best match the supplied search terms via Fuse.js fuzzy matching
- * and concatenate them in document order up to the character budget. Fuzzy matching tolerates
- * typos, inflections, and partial word overlaps that a case-insensitive `indexOf` scan would
- * miss, while still favouring exact matches (which score near zero).
+ * Select the paragraphs that best match the supplied search terms via Fuse.js fuzzy matching,
+ * grow outward through their neighbouring paragraphs until the character budget is exhausted,
+ * and concatenate the result in document order. Fuzzy matching tolerates typos, inflections,
+ * and partial word overlaps that a case-insensitive `indexOf` scan would miss, while still
+ * favouring exact matches (which score near zero). The symmetric expansion ensures a large
+ * `contentLimit` is actually filled with surrounding context instead of leaving budget unused
+ * when only a handful of paragraphs match.
  *
  * @param text Full text from which to extract matching paragraphs.
  * @param terms Terms to locate inside `text`.
@@ -176,22 +179,16 @@ function sliceAroundTerms(text: string, terms: string[], limit: number): string 
     return ""
   }
 
-  const scoredIndices = rankChunksByTerms(chunks, terms)
+  const rankedIndices = rankChunksByTerms(chunks, terms)
 
-  if (scoredIndices.length === 0) {
+  if (rankedIndices.length === 0) {
     return ""
   }
 
-  const selected = new Set<number>()
-  let total = 0
+  const selected = selectAroundMatches(rankedIndices, chunks, limit)
 
-  for (const index of scoredIndices) {
-    if (total >= limit) {
-      break
-    }
-
-    selected.add(index)
-    total += chunks[index].length
+  if (selected.size === 0) {
+    return ""
   }
 
   return [...selected]
@@ -199,6 +196,81 @@ function sliceAroundTerms(text: string, terms: string[], limit: number): string 
     .map(index => chunks[index])
     .join(CHUNK_JOIN_SEPARATOR)
     .slice(0, limit)
+}
+
+/**
+ * Grow a selection outward from each ranked match, adding paragraphs in priority order (matches
+ * first, then the ±1 neighbours of every match, then ±2, and so on) until the character budget
+ * is filled. Higher-scoring matches and their inner neighbourhoods are always admitted before
+ * lower-scoring matches reach their outer neighbourhoods, preserving the Fuse.js ranking while
+ * ensuring the budget is consumed when enough source material is available. Candidates whose
+ * inclusion would overshoot the budget are skipped in favour of lower-priority ones that still
+ * fit, so no chunk is silently truncated in document order by the final slice. The highest-
+ * priority chunk is admitted unconditionally so an oversized top match never yields an empty
+ * excerpt (the final slice will trim it to the budget).
+ *
+ * @param rankedIndices Chunk indices ordered from best to worst fuzzy match.
+ * @param chunks Paragraph-level chunks of the page text, indexed in source order.
+ * @param limit Character budget to fill, accounting for paragraph separators between chunks.
+ * @returns Set of chunk indices chosen for inclusion, unordered.
+ */
+function selectAroundMatches(rankedIndices: number[], chunks: string[], limit: number): Set<number> {
+  const selected = new Set<number>()
+  let total = 0
+
+  for (const candidate of prioritizedCandidates(rankedIndices, chunks.length)) {
+    if (total >= limit) {
+      break
+    }
+
+    if (selected.has(candidate)) {
+      continue
+    }
+
+    const separatorCost = selected.size > 0 ? CHUNK_JOIN_SEPARATOR.length : 0
+    const projected = total + separatorCost + chunks[candidate].length
+
+    if (selected.size > 0 && projected > limit) {
+      continue
+    }
+
+    selected.add(candidate)
+    total = projected
+  }
+
+  return selected
+}
+
+/**
+ * Enumerate chunk indices in priority order for symmetric neighbourhood expansion: the matches
+ * themselves first, then their ±1 neighbours (iterated across all matches), then ±2, and so on
+ * out to the document edges. Duplicate indices are emitted when multiple matches share a
+ * neighbour; the caller is expected to deduplicate.
+ *
+ * @param rankedIndices Chunk indices ordered from best to worst fuzzy match.
+ * @param chunkCount Total number of chunks in the source document.
+ * @returns Flat list of candidate chunk indices in emission order.
+ */
+function prioritizedCandidates(rankedIndices: number[], chunkCount: number): number[] {
+  const candidates: number[] = [...rankedIndices]
+  const lastIndex = chunkCount - 1
+
+  for (let radius = 1; radius <= lastIndex; radius++) {
+    for (const matchIndex of rankedIndices) {
+      const left = matchIndex - radius
+      const right = matchIndex + radius
+
+      if (left >= 0) {
+        candidates.push(left)
+      }
+
+      if (right <= lastIndex) {
+        candidates.push(right)
+      }
+    }
+  }
+
+  return candidates
 }
 
 /**
