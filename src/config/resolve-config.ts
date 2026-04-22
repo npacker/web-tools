@@ -26,15 +26,7 @@ export const DEFAULT_PAGE_SIZE = 5
 export const DEFAULT_SAFE_SEARCH = "moderate" as const
 
 /**
- * Default number of links extracted by the Visit Website tool when no value is provided.
- *
- * @const {number}
- * @default 40
- */
-const DEFAULT_MAX_LINKS = 40
-
-/**
- * Default number of images extracted by the Visit Website and View Images tools when no value is provided.
+ * Default number of images scraped by the View Images tool when no value is provided.
  *
  * @const {number}
  * @default 10
@@ -48,6 +40,14 @@ const DEFAULT_MAX_IMAGES = 10
  * @default 10_000
  */
 const DEFAULT_CONTENT_LIMIT = 10_000
+
+/**
+ * Default output format for the Visit Website tool's `content` field when no value is provided.
+ *
+ * @const {ContentFormat}
+ * @default "markdown"
+ */
+const DEFAULT_CONTENT_FORMAT = "markdown" as const
 
 /**
  * Default TTL for the web/image search result cache, in milliseconds.
@@ -122,6 +122,11 @@ const DEFAULT_RETRY_MAX_BACKOFF_MS = 30_000
 const MS_PER_SECOND = 1000
 
 /**
+ * Output format for the Visit Website tool's `content` field.
+ */
+export type ContentFormat = "markdown" | "text"
+
+/**
  * Fully resolved configuration used by a tool invocation.
  */
 interface ResolvedConfig {
@@ -129,12 +134,12 @@ interface ResolvedConfig {
   pageSize: number
   /** Safe-search mode to apply to the request. */
   safeSearch: SafeSearch
-  /** Maximum number of links returned by the Visit Website tool. */
-  maxLinks: number
-  /** Maximum number of images returned by the Visit Website and View Images tools. */
+  /** Maximum number of images scraped by the View Images tool. */
   maxImages: number
   /** Visible-text character budget for the Visit Website tool. */
   contentLimit: number
+  /** Output format for the Visit Website tool's `content` field. */
+  contentFormat: ContentFormat
   /** Delay before the image-search API call, in milliseconds. */
   vqdImageDelayMs: number
 }
@@ -163,12 +168,12 @@ interface ConfigOverrides {
   pageSize?: number
   /** Safe-search override provided by the caller. */
   safeSearch?: SafeSearch
-  /** Max-links override provided by the caller. */
-  maxLinks?: number
   /** Max-images override provided by the caller. */
   maxImages?: number
   /** Content-limit override provided by the caller. */
   contentLimit?: number
+  /** Content-format override provided by the caller. */
+  contentFormat?: ContentFormat
 }
 
 /**
@@ -183,17 +188,17 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
   const pluginConfig = ctl.getPluginConfig(configSchematics)
   const pluginPageSize = pluginConfig.get("pageSize") as number | null
   const pluginSafeSearch = pluginConfig.get("safeSearch") as SafeSearch | typeof AUTO_CONFIG_VALUE
-  const pluginMaxLinks = pluginConfig.get("maxLinks") as number | null
   const pluginMaxImages = pluginConfig.get("maxImages") as number | null
   const pluginContentLimit = pluginConfig.get("contentLimit") as number | null
+  const pluginContentFormat = pluginConfig.get("contentFormat") as ContentFormat | null
   const pluginVqdImageDelaySeconds = pluginConfig.get("vqdImageDelaySeconds") as number | null
 
   return {
     pageSize: resolvePageSize(pluginPageSize, overrides.pageSize),
     safeSearch: resolveSafeSearch(pluginSafeSearch, overrides.safeSearch),
-    maxLinks: resolveAutoNumeric(pluginMaxLinks, overrides.maxLinks, DEFAULT_MAX_LINKS),
     maxImages: resolveAutoNumeric(pluginMaxImages, overrides.maxImages, DEFAULT_MAX_IMAGES),
     contentLimit: resolveZeroSentinelNumeric(pluginContentLimit, overrides.contentLimit, DEFAULT_CONTENT_LIMIT),
+    contentFormat: overrides.contentFormat ?? pluginContentFormat ?? DEFAULT_CONTENT_FORMAT,
     vqdImageDelayMs: resolveSecondsToMs(pluginVqdImageDelaySeconds, DEFAULT_VQD_IMAGE_DELAY_MS),
   }
 }
@@ -291,7 +296,7 @@ function resolveSafeSearch(
 
 /**
  * Resolves a numeric plugin value that treats `-1` as a "use default" sentinel.
- * A stored `0` is taken literally and represents a valid configuration (e.g. "no links" / "no images").
+ * A stored `0` is taken literally and represents a valid configuration (e.g. "no images").
  *
  * @param pluginValue Value read from plugin configuration, or `null` when unset.
  * @param override Runtime override from the tool invocation.

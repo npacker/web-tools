@@ -8,6 +8,7 @@ import { z } from "zod"
 
 import { resolveConfig } from "../config/resolve-config"
 import { formatToolError } from "../errors"
+import { filenameFromUrl } from "../fs"
 import { createRetryNotifier } from "../http"
 import { downloadImages } from "../images"
 import { extractPageImages } from "../parsers"
@@ -33,6 +34,36 @@ const MIN_VIEW_IMAGES_COUNT = 1
  * @default 200
  */
 const MAX_VIEW_IMAGES_COUNT = 200
+
+/**
+ * Per-image record accumulated before downloading: the source URL plus any alt/title metadata
+ * scraped from the containing page. Explicit URL arguments arrive with empty alt/title.
+ */
+interface ImageSubject {
+  /** Absolute source URL of the image. */
+  src: string
+  /** Alternative text from the `<img>` `alt` attribute, or an empty string when unavailable. */
+  alt: string
+  /** Advisory text from the `<img>` `title` attribute, or an empty string when unavailable. */
+  title: string
+}
+
+/**
+ * Shape returned per image to the caller. Successful downloads include a markdown reference
+ * pointing at the saved file; failures include an `error` message instead.
+ */
+interface ViewedImage {
+  /** Filename segment of the source URL, percent-decoded when possible. */
+  filename: string
+  /** Alternative text from the source page's `<img>` `alt` attribute, or an empty string. */
+  alt: string
+  /** Advisory text from the source page's `<img>` `title` attribute, or an empty string. */
+  title: string
+  /** Markdown image reference pointing at the downloaded local file, present on success. */
+  image?: string
+  /** Human-readable error message, present when the download failed. */
+  error?: string
+}
 
 /**
  * Create the View Images tool.
@@ -77,7 +108,7 @@ export function createViewImagesTool(
      * @param args.websiteURL Optional page to scrape for additional image URLs.
      * @param args.maxImages Optional per-call override for the number of page-scraped images.
      * @param context Runtime tool context supplied by the SDK.
-     * @returns Markdown image strings interleaved with per-URL error messages, or a user-facing error string.
+     * @returns Per-image records with filename, alt, title, and either a markdown reference or an error, or a user-facing error string.
      */
     implementation: async ({ imageURLs, websiteURL, maxImages: parameterMaxImages }, context) => {
       const explicitUrls = imageURLs ?? []
@@ -89,7 +120,7 @@ export function createViewImagesTool(
 
       try {
         const { maxImages } = resolveConfig(ctl, { maxImages: parameterMaxImages })
-        const collected: string[] = [...explicitUrls]
+        const subjects: ImageSubject[] = explicitUrls.map(source => ({ src: source, alt: "", title: "" }))
 
         if (hasWebsite) {
           context.status("Fetching image URLs from website...")
@@ -99,23 +130,22 @@ export function createViewImagesTool(
             retry,
             onFailedAttempt: createRetryNotifier(context.status, "website fetch"),
           })
-          const dom = new JSDOM(html)
-          const scraped = extractPageImages(dom, websiteURL, maxImages)
+          const scraped = extractPageImages(new JSDOM(html), websiteURL, maxImages)
 
           for (const image of scraped) {
-            collected.push(image.src)
+            subjects.push({ src: image.src, alt: image.alt, title: image.title })
           }
         }
 
-        if (collected.length === 0) {
+        if (subjects.length === 0) {
           context.warn("Error fetching images")
 
-          return collected
+          return []
         }
 
         context.status("Downloading images...")
         const batch = await downloadImages(
-          collected,
+          subjects.map(subject => subject.src),
           impit,
           { workingDirectory: ctl.getWorkingDirectory(), timestamp: Date.now() },
           {
@@ -125,17 +155,24 @@ export function createViewImagesTool(
             onFailedAttempt: createRetryNotifier(context.status, "image download"),
           }
         )
-        const rendered = batch.map((result, index) =>
-          result.ok ? `![Image ${index + 1}](${result.localPath})` : `Error fetching image from URL: ${result.url}`
-        )
+        const rendered: ViewedImage[] = subjects.map((subject, index) => {
+          const base = {
+            filename: filenameFromUrl(subject.src),
+            alt: subject.alt,
+            title: subject.title,
+          }
+          const result = batch[index]
 
-        if (rendered.length === 0) {
-          context.warn("Error fetching images")
+          if (result.ok) {
+            const altForMarkdown = subject.alt === "" ? `Image ${index + 1}` : subject.alt
 
-          return collected
-        }
+            return { ...base, image: `![${altForMarkdown}](${result.localPath})` }
+          }
 
-        context.status(`Downloaded ${rendered.length} images successfully.`)
+          return { ...base, error: `Failed to fetch image from ${result.url}` }
+        })
+
+        context.status(`Processed ${rendered.length} images.`)
 
         return rendered
       } catch (error) {

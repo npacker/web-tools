@@ -5,7 +5,9 @@
 import { Readability } from "@mozilla/readability"
 import { JSDOM } from "jsdom"
 
-import { normalizeText } from "../../text"
+import { htmlToMarkdown, htmlToText, normalizeText } from "../../text"
+
+import type { ContentFormat } from "../../config/resolve-config"
 
 /**
  * Structured extraction of the core heading fields on a page.
@@ -32,6 +34,17 @@ interface TermMatch {
 }
 
 /**
+ * Result of building a page excerpt: the (possibly truncated) content and the total length
+ * of the full extracted content before truncation or term windowing was applied.
+ */
+export interface PageExcerpt {
+  /** The excerpt actually returned to the caller, already truncated to the requested budget. */
+  content: string
+  /** Character count of the full extracted content prior to any truncation or windowing. */
+  totalLength: number
+}
+
+/**
  * Extract the document title and the first heading of each of the first three heading levels.
  *
  * @param dom Parsed website DOM.
@@ -49,63 +62,86 @@ export function extractHeadings(dom: JSDOM): PageHeadings {
 }
 
 /**
- * Extract the main readable content of the document via Mozilla Readability, falling back to a
- * script/style-stripped `textContent` of the body when Readability cannot identify an article.
+ * Extract the main readable content of the document via Mozilla Readability, falling back to the
+ * body's inner HTML when Readability cannot identify an article, then format the HTML into the
+ * requested output shape (markdown or plain text).
  *
  * @param html Raw HTML payload.
  * @param url Absolute URL of the page, used by Readability to resolve relative references.
- * @returns The cleaned article text, or an empty string when neither extraction strategy yields content.
+ * @param format Output format applied to the extracted content.
+ * @returns The cleaned article content, or an empty string when neither extraction strategy yields content.
  */
-function extractVisibleText(html: string, url: string): string {
+function extractVisibleText(html: string, url: string, format: ContentFormat): string {
   const readabilityDom = new JSDOM(html, { url })
   const article = new Readability(readabilityDom.window.document).parse()
 
-  if (article !== null && article.textContent !== "") {
-    return normalizeText(article.textContent)
+  const articleContent = article?.content
+
+  if (articleContent !== null && articleContent !== undefined && articleContent !== "") {
+    return formatHtml(articleContent, format)
   }
 
   const fallbackDom = new JSDOM(html)
   const { body } = fallbackDom.window.document
 
-  for (const node of body.querySelectorAll("script, style, noscript")) {
-    node.remove()
-  }
+  return formatHtml(body.innerHTML, format)
+}
 
-  return normalizeText(body.textContent)
+/**
+ * Convert an HTML fragment to the requested output format.
+ *
+ * @param htmlFragment HTML to convert.
+ * @param format Target output format.
+ * @returns The formatted content string.
+ */
+function formatHtml(htmlFragment: string, format: ContentFormat): string {
+  switch (format) {
+    case "markdown": {
+      return htmlToMarkdown(htmlFragment)
+    }
+
+    case "text": {
+      return htmlToText(htmlFragment)
+    }
+  }
 }
 
 /**
  * Build the visible-text payload for the Visit Website tool: when search terms are supplied
  * and the full text exceeds the budget, concatenate dedup-merged windows around each term;
- * otherwise return a head slice of the full text.
+ * otherwise return a head slice of the full text. Also reports the pre-truncation length
+ * so callers can detect truncation and raise `contentLimit` if needed.
  *
  * @param html Raw HTML payload used by Readability to extract the main article text.
  * @param url Absolute URL of the page, passed to Readability for relative-link resolution.
  * @param contentLimit Character budget for the returned text.
  * @param searchTerms Optional search terms biasing content selection.
- * @returns The formatted content string, or an empty string when `contentLimit` is zero.
+ * @param format Output format applied to the extracted content.
+ * @returns The excerpt and the total length of the full extracted content before truncation.
  */
 export function buildPageExcerpt(
   html: string,
   url: string,
   contentLimit: number,
-  searchTerms: string[] | undefined
-): string {
+  searchTerms: string[] | undefined,
+  format: ContentFormat
+): PageExcerpt {
   if (contentLimit <= 0) {
-    return ""
+    return { content: "", totalLength: 0 }
   }
 
-  const allContent = extractVisibleText(html, url)
+  const allContent = extractVisibleText(html, url, format)
+  const totalLength = allContent.length
 
-  if (searchTerms !== undefined && searchTerms.length > 0 && contentLimit < allContent.length) {
+  if (searchTerms !== undefined && searchTerms.length > 0 && contentLimit < totalLength) {
     const sliced = sliceAroundTerms(allContent, searchTerms, contentLimit)
 
     if (sliced.length > 0) {
-      return sliced
+      return { content: sliced, totalLength }
     }
   }
 
-  return allContent.slice(0, contentLimit)
+  return { content: allContent.slice(0, contentLimit), totalLength }
 }
 
 /**

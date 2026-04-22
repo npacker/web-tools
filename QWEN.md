@@ -6,8 +6,8 @@
 
 - **Web Search** — DuckDuckGo web search returning ranked `[title, url]` pairs.
 - **Image Search** — DuckDuckGo image search; matching images are downloaded to the working directory so the assistant can display them.
-- **Visit Website** — fetches a URL and returns its title, headings, links, downloaded images, and a search-term-aware slice of its visible text.
-- **View Images** — downloads images from a list of URLs and/or scraped from a page so the assistant can display them.
+- **Visit Website** — fetches a URL and returns its title, first-level headings, and a search-term-aware slice of its readable content as Markdown (default) or plain text.
+- **View Images** — downloads images from a list of URLs and/or scraped from a page so the assistant can display them; each record carries filename, alt, and title metadata.
 
 Built on `@lmstudio/sdk`, it requires **Node.js >= 22** and targets **ES2023 / CommonJS**. The project is licensed under MIT. It descends from Daniel Sig's original `lms-plugin-duckduckgo` and `lms-plugin-visit-website` plugins, merged and extended by Nigel Packer.
 
@@ -149,9 +149,9 @@ All config fields default to `0` or `"Auto"`, meaning the LLM assistant decides 
 |---|---|---|---|---|
 | `pageSize` | numeric | 0 (auto) | 0–10 | Max web/image search results per page |
 | `safeSearch` | select | Auto | strict/moderate/off/ | DuckDuckGo safe search level |
-| `maxLinks` | numeric | 0 (auto) | 0–200 | Visit Website: max links to return |
-| `maxImages` | numeric | 0 (auto) | 0–200 | Visit Website: max images to download |
-| `contentLimit` | numeric | 0 (auto) | 0–10000 | Visit Website: max characters of text |
+| `maxImages` | numeric | -1 (auto) | -1–200 | View Images: max images scraped when a `websiteURL` is provided |
+| `contentLimit` | numeric | 0 (auto) | 0–100000 | Visit Website: max characters of text |
+| `contentFormat` | select | markdown | markdown / text | Visit Website: output format of the content field |
 | `searchCacheTtlSeconds` | numeric | 0 (auto) | 0–3600 | Search result cache duration |
 | `vqdCacheTtlSeconds` | numeric | 0 (auto) | 0–3600 | VQD token cache duration |
 | `websiteCacheTtlSeconds` | numeric | 0 (auto) | 0–3600 | Website content cache duration |

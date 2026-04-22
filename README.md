@@ -1,6 +1,6 @@
 # Web Tools Plugin for LM Studio
 
-An LM Studio plugin that gives local LLMs four web-oriented tools built on `@lmstudio/sdk`. Web and image search are backed by DuckDuckGo (via the browser-fingerprinting [`impit`](https://www.npmjs.com/package/impit) HTTP client), website visits use [`@mozilla/readability`](https://www.npmjs.com/package/@mozilla/readability) for article extraction, and every image referenced by a tool is downloaded into the chat's working directory so the assistant can display it inline.
+An LM Studio plugin that gives local LLMs four web-oriented tools built on `@lmstudio/sdk`. Web and image search are backed by DuckDuckGo (via the browser-fingerprinting [`impit`](https://www.npmjs.com/package/impit) HTTP client), website visits use [`@mozilla/readability`](https://www.npmjs.com/package/@mozilla/readability) for article extraction plus [`turndown`](https://www.npmjs.com/package/turndown) for clean Markdown output, and images referenced by the image-oriented tools are downloaded into the chat's working directory so the assistant can display them inline.
 
 ## Tools
 
@@ -32,15 +32,16 @@ Matching images are downloaded into the chat's working directory and returned as
 
 ### Visit Website
 
-Fetches a URL and returns its title, `h1`/`h2`/`h3` headings, extracted links, downloaded images, and a visible-text excerpt produced by `@mozilla/readability`.
+Fetches a URL and returns its title, first-level headings (`h1`/`h2`/`h3`), and a readable content excerpt produced by `@mozilla/readability`. The content is returned as Markdown by default — headings, lists, inline links, and inline images are preserved — or as plain text when `contentFormat` is set to `"text"`. Use the View Images tool to download any images of interest.
 
 | Parameter | Type | Notes |
 | --- | --- | --- |
 | `url` | URL | Required. |
-| `findInPage` | string[] | Optional search terms that bias which links, images, and content slices are returned. Strongly recommended. |
-| `maxLinks` | int 0–200 | Optional; overrides plugin setting. `0` returns no links. |
-| `maxImages` | int 0–200 | Optional; overrides plugin setting. `0` returns no images. |
+| `findInPage` | string[] | Optional search terms that bias which content slices are returned when the page exceeds `contentLimit`. Strongly recommended. |
 | `contentLimit` | int 0–100 000 | Optional visible-text character budget; overrides plugin setting. |
+| `contentFormat` | `"markdown" \| "text"` | Optional output format; overrides plugin setting. |
+
+The response also includes `contentLength`, the character count of the full extracted content prior to truncation. When `contentLength > content.length` the content was truncated — raise `contentLimit` or refine `findInPage` and re-call to retrieve more.
 
 ### View Images
 
@@ -52,7 +53,18 @@ Downloads images from an explicit URL list, from images scraped off a page, or b
 | `websiteURL` | URL | Optional page to scrape for images. |
 | `maxImages` | int 1–200 | Optional; caps how many scraped images are downloaded when `websiteURL` is supplied. |
 
-Returns markdown image tags (`![Image N](path)`) pointing at the downloaded files, with per-URL error strings for any that failed.
+Returns an array of per-image records:
+
+```json
+{
+  "filename": "typescript.svg",
+  "alt": "TypeScript logo",
+  "title": "Click to enlarge",
+  "image": "![TypeScript logo](path/to/download)"
+}
+```
+
+When a download fails, the record carries an `error` field in place of `image`. `alt` and `title` are populated from the source page's `<img>` attributes when images are scraped via `websiteURL`; explicit `imageURLs` arrive without that metadata and surface both fields as empty strings.
 
 ## Installation
 
@@ -81,9 +93,9 @@ All fields are exposed in the LM Studio plugin UI. Two sentinel conventions appl
 | --- | --- | --- | --- |
 | Search Results Per Page | 0–10 | `0` → 5 | Page size for web and image search. `0` lets the assistant decide. |
 | Safe Search | strict / moderate / off / Auto | Auto → `moderate` | DuckDuckGo safe-search mode. Auto lets the assistant decide. |
-| Visit Website: Max Links | -1–200 | `-1` → 40 | Maximum links extracted per page. `0` returns no links. |
-| Visit Website: Max Images | -1–200 | `-1` → 10 | Maximum images extracted per page (also used by View Images). `0` returns no images. |
+| View Images: Max Images | -1–200 | `-1` → 10 | Maximum images scraped when View Images receives a `websiteURL`. |
 | Visit Website: Content Character Limit | 0–100 000 | `0` → 10 000 | Visible-text character budget for the page excerpt. |
+| Visit Website: Content Format | Markdown / Plain text | Markdown | Output format of the `content` field. Markdown retains headings, lists, and inline links; Plain text strips syntax and preserves only line breaks. |
 | Search Cache TTL | -1–3600 s | `-1` → 900 s (15 min) | How long web/image search results stay cached. `0` disables. |
 | VQD Token Cache TTL | -1–3600 s | `-1` → 600 s (10 min) | How long DuckDuckGo VQD tokens stay cached. `0` disables. |
 | Website Cache TTL | -1–3600 s | `-1` → 600 s (10 min) | How long fetched HTML stays cached. `0` disables. |
@@ -128,9 +140,9 @@ No test suite is configured.
 Built on top of Daniel Sig's original
 [lms-plugin-duckduckgo](https://github.com/danielsig/lms-plugin-duckduckgo) and
 [lms-plugin-visit-website](https://github.com/danielsig/lms-plugin-visit-website) plugins, now
-merged into a single tool suite and extended with the View Images tool, `findInPage`-biased
-website extraction, configurable rate limiting and retry, and a persistent `cacache`-backed
-store for VQD tokens, search results, and fetched HTML.
+merged into a single tool suite and extended with the View Images tool, Markdown-formatted
+website content, `findInPage`-biased content slicing, configurable rate limiting and retry,
+and a persistent `cacache`-backed store for VQD tokens, search results, and fetched HTML.
 
 ## License
 

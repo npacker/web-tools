@@ -9,30 +9,14 @@ import { z } from "zod"
 import { resolveConfig } from "../config/resolve-config"
 import { formatToolError } from "../errors"
 import { createRetryNotifier } from "../http"
-import { renderPageImages } from "../images"
-import { buildPageExcerpt, extractHeadings, extractLinks } from "../parsers"
+import { buildPageExcerpt, extractHeadings } from "../parsers"
 import { fetchWebsite } from "../website"
 
 import type { TTLCache } from "../cache"
+import type { ContentFormat } from "../config/resolve-config"
 import type { RetryOptions } from "../http"
 import type { RateLimiter } from "../timing"
 import type { Impit } from "impit"
-
-/**
- * Lower bound on the link / image extraction counts.
- *
- * @const {number}
- * @default 0
- */
-const MIN_EXTRACTION_COUNT = 0
-
-/**
- * Upper bound on the link / image extraction counts.
- *
- * @const {number}
- * @default 200
- */
-const MAX_EXTRACTION_COUNT = 200
 
 /**
  * Lower bound on the visible-text character budget.
@@ -51,10 +35,18 @@ const MIN_CONTENT_LIMIT = 0
 const MAX_CONTENT_LIMIT = 100_000
 
 /**
+ * Output format choices accepted by the `contentFormat` parameter.
+ *
+ * @const {readonly ContentFormat[]}
+ * @default ["markdown", "text"]
+ */
+const CONTENT_FORMAT_OPTIONS = ["markdown", "text"] as const satisfies readonly ContentFormat[]
+
+/**
  * Create the Visit Website tool.
  *
  * @param ctl Tools provider controller supplied by the LM Studio SDK.
- * @param impit Shared HTTP client used for HTML fetches and image downloads.
+ * @param impit Shared HTTP client used for HTML fetches.
  * @param websiteCache Cache holding recent HTML payloads keyed by URL.
  * @param rateLimiter Shared limiter enforcing the minimum gap between outbound requests.
  * @param retry Retry policy applied to every outbound request.
@@ -70,29 +62,13 @@ export function createVisitWebsiteTool(
   return tool({
     name: "Visit Website",
     description:
-      "Visit a website and return its title, headings, links, images, and text content. Images are automatically downloaded and viewable.",
+      "Visit a website and return its title, top-level headings, and content. When contentLength exceeds contentLimit, raise contentLimit or refine with findInPage.",
     parameters: {
       url: z.string().url().describe("The URL of the website to visit"),
       findInPage: z
         .array(z.string())
         .optional()
-        .describe(
-          "Strongly recommended: optional search terms to prioritize which links, images, and content to return."
-        ),
-      maxLinks: z
-        .number()
-        .int()
-        .min(MIN_EXTRACTION_COUNT)
-        .max(MAX_EXTRACTION_COUNT)
-        .optional()
-        .describe("Maximum number of links to extract from the page."),
-      maxImages: z
-        .number()
-        .int()
-        .min(MIN_EXTRACTION_COUNT)
-        .max(MAX_EXTRACTION_COUNT)
-        .optional()
-        .describe("Maximum number of images to extract from the page."),
+        .describe("Strongly recommended: optional search terms to prioritize which content slices are returned."),
       contentLimit: z
         .number()
         .int()
@@ -100,38 +76,31 @@ export function createVisitWebsiteTool(
         .max(MAX_CONTENT_LIMIT)
         .optional()
         .describe("Maximum text content length to extract from the page."),
+      contentFormat: z.enum(CONTENT_FORMAT_OPTIONS).optional().describe("Output format of the content field."),
     },
 
     /**
-     * Executes a website visit, parsing the HTML and downloading any referenced images.
+     * Executes a website visit and parses the HTML.
      *
      * @param args Validated tool parameters.
      * @param args.url URL of the website to visit.
-     * @param args.findInPage Optional search terms that bias ranking and content slicing.
-     * @param args.maxLinks Optional per-call override for the number of extracted links.
-     * @param args.maxImages Optional per-call override for the number of extracted images.
+     * @param args.findInPage Optional search terms that bias content slicing.
      * @param args.contentLimit Optional per-call override for the visible-text character budget.
+     * @param args.contentFormat Optional per-call override for the content field's output format.
      * @param context Runtime tool context supplied by the SDK.
      * @returns The structured page summary or a user-facing error string.
      */
     implementation: async (
-      {
-        url,
-        findInPage,
-        maxLinks: parameterMaxLinks,
-        maxImages: parameterMaxImages,
-        contentLimit: parameterContentLimit,
-      },
+      { url, findInPage, contentLimit: parameterContentLimit, contentFormat: parameterContentFormat },
       context
     ) => {
       context.status("Visiting website...")
       await rateLimiter.wait()
 
       try {
-        const { maxLinks, maxImages, contentLimit } = resolveConfig(ctl, {
-          maxLinks: parameterMaxLinks,
-          maxImages: parameterMaxImages,
+        const { contentLimit, contentFormat } = resolveConfig(ctl, {
           contentLimit: parameterContentLimit,
+          contentFormat: parameterContentFormat,
         })
         const html = await fetchWebsite(impit, websiteCache, url, {
           signal: context.signal,
@@ -139,23 +108,20 @@ export function createVisitWebsiteTool(
           onFailedAttempt: createRetryNotifier(context.status, "website fetch"),
         })
         context.status("Website visited successfully.")
-        const dom = new JSDOM(html)
-        const headings = extractHeadings(dom)
-        const links = extractLinks(dom, url, maxLinks, findInPage)
-        const images = await renderPageImages(dom, url, maxImages, findInPage, impit, ctl.getWorkingDirectory(), {
-          warn: context.warn,
-          signal: context.signal,
-          retry,
-          onFailedAttempt: createRetryNotifier(context.status, "image download"),
-        })
-        const content = buildPageExcerpt(html, url, contentLimit, findInPage)
+        const headings = extractHeadings(new JSDOM(html))
+        const { content, totalLength: contentLength } = buildPageExcerpt(
+          html,
+          url,
+          contentLimit,
+          findInPage,
+          contentFormat
+        )
 
         return {
           url,
           ...headings,
-          ...(links.length > 0 ? { links } : {}),
-          ...(images.length > 0 ? { images } : {}),
           ...(content.length > 0 ? { content } : {}),
+          ...(contentLength > 0 ? { contentLength } : {}),
         }
       } catch (error) {
         return formatToolError(error, context, "website")

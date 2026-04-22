@@ -41,28 +41,11 @@ export const configSchematics = createConfigSchematics()
     AUTO_CONFIG_VALUE
   )
   .field(
-    "maxLinks",
-    "numeric",
-    {
-      displayName: "Visit Website: Max Links",
-      subtitle: "-1 to 200, -1 = default (40), 0 = no links",
-      min: -1,
-      max: 200,
-      int: true,
-      slider: {
-        step: 1,
-        min: -1,
-        max: 200,
-      },
-    },
-    -1
-  )
-  .field(
     "maxImages",
     "numeric",
     {
-      displayName: "Visit Website: Max Images",
-      subtitle: "-1 to 200, -1 = default (10), 0 = no images",
+      displayName: "View Images: Max Images",
+      subtitle: "-1 to 200, -1 = default (10). Maximum images scraped when View Images receives a websiteURL.",
       min: -1,
       max: 200,
       int: true,
@@ -90,6 +73,20 @@ export const configSchematics = createConfigSchematics()
       },
     },
     0
+  )
+  .field(
+    "contentFormat",
+    "select",
+    {
+      options: [
+        { value: "markdown", displayName: "Markdown" },
+        { value: "text", displayName: "Plain text" },
+      ],
+      displayName: "Visit Website: Content Format",
+      subtitle:
+        "Markdown retains headings, lists, and inline links; plain text strips syntax and preserves only line breaks.",
+    },
+    "markdown"
   )
   .field(
     "searchCacheTtlSeconds",

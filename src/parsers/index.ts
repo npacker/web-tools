@@ -6,6 +6,5 @@ export {
   isSupportedImageExtension,
   normalizeImageExtension,
 } from "./image-results-parser"
-export { extractLinks } from "./page/page-links"
-export { extractPageImages } from "./page/page-images"
+export { extractPageImages, type PageImage } from "./page/page-images"
 export { extractHeadings, buildPageExcerpt } from "./page/page-text"
