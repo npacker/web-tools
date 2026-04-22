@@ -10,12 +10,19 @@ import type { Options as PRetryOptions, RetryContext } from "p-retry"
  * Subset of `p-retry` options populated from plugin configuration.
  */
 export type RetryOptions = Pick<PRetryOptions, "retries" | "factor" | "minTimeout" | "maxTimeout" | "randomize">
+
 /**
  * HTTP status codes that should trigger a retry when returned by the server.
+ *
+ * @const {Set<number>}
  */
 const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504])
+
 /**
  * Conversion factor from milliseconds to seconds, used when rendering retry delays.
+ *
+ * @const {number}
+ * @default 1000
  */
 const MS_PER_SECOND = 1000
 

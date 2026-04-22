@@ -20,10 +20,17 @@ import type { Impit } from "impit"
 
 /**
  * Lower bound on the image count when a website URL is provided.
+ *
+ * @const {number}
+ * @default 1
  */
 const MIN_VIEW_IMAGES_COUNT = 1
+
 /**
  * Upper bound on the image count when a website URL is provided.
+ *
+ * @const {number}
+ * @default 200
  */
 const MAX_VIEW_IMAGES_COUNT = 200
 
@@ -61,6 +68,7 @@ export function createViewImagesTool(
         .optional()
         .describe("Maximum number of images to view when websiteURL is provided."),
     },
+
     /**
      * Executes an image download batch, optionally preceded by scraping image URLs from a page.
      *

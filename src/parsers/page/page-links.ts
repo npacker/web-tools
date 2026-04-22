@@ -10,10 +10,17 @@ import type { JSDOM } from "jsdom"
 
 /**
  * Coefficient used in the linear score that penalises link position in the document order.
+ *
+ * @const {number}
+ * @default 20
  */
 const LINK_POSITION_PENALTY_COEFFICIENT = 20
+
 /**
  * Baseline subtracted from length/position measurements when ranking navigation-style links.
+ *
+ * @const {number}
+ * @default 100
  */
 const LINK_NAVIGATION_BASELINE = 100
 

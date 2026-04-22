@@ -19,6 +19,9 @@ import type { Options as PRetryOptions } from "p-retry"
 
 /**
  * Timeout applied to each image download, in milliseconds.
+ *
+ * @const {number}
+ * @default 10_000
  */
 const IMAGE_DOWNLOAD_TIMEOUT_MS = 10_000
 
@@ -68,6 +71,7 @@ export async function downloadImage(
       retries: 0,
       ...context.retry,
       signal: context.signal,
+
       /**
        * Gate retries on the `FetchError.statusCode` allowlist so non-transient failures fail fast.
        *

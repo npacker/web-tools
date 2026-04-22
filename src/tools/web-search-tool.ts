@@ -17,22 +17,41 @@ import type { Impit } from "impit"
 
 /**
  * Lower bound on the configurable page size.
+ *
+ * @const {number}
+ * @default 1
  */
 const MIN_PAGE_SIZE = 1
+
 /**
  * Upper bound on the configurable page size.
+ *
+ * @const {number}
+ * @default 10
  */
 const MAX_PAGE_SIZE = 10
+
 /**
  * Lower bound on the requested page number.
+ *
+ * @const {number}
+ * @default 1
  */
 const MIN_PAGE_NUMBER = 1
+
 /**
  * Upper bound on the requested page number.
+ *
+ * @const {number}
+ * @default 100
  */
 const MAX_PAGE_NUMBER = 100
+
 /**
  * Default page number when no value is provided.
+ *
+ * @const {number}
+ * @default 1
  */
 const DEFAULT_PAGE_NUMBER = 1
 
@@ -75,6 +94,7 @@ export function createWebSearchTool(
         .default(DEFAULT_PAGE_NUMBER)
         .describe("Page number for pagination"),
     },
+
     /**
      * Executes a web search, honouring cached results when available.
      *

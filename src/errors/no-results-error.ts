@@ -20,6 +20,7 @@ export abstract class NoResultsError extends Error {
     this.name = "NoResultsError"
   }
 }
+
 /**
  * Raised when a web search yields no usable results.
  */
@@ -34,6 +35,7 @@ export class NoWebResultsError extends NoResultsError {
     this.name = "NoWebResultsError"
   }
 }
+
 /**
  * Raised when an image search yields no usable results.
  */

@@ -6,6 +6,7 @@
  * Possible reasons why VQD token acquisition failed.
  */
 export type VqdTokenFailureReason = "element_missing" | "value_empty" | "fetch_failed"
+
 /**
  * Raised when the VQD token required for image search cannot be obtained.
  */

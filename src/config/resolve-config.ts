@@ -11,58 +11,113 @@ import type { ToolsProviderController } from "@lmstudio/sdk"
 
 /**
  * Default page size when no plugin or override value is provided.
+ *
+ * @const {number}
+ * @default 5
  */
 export const DEFAULT_PAGE_SIZE = 5
+
 /**
  * Default safe-search mode when neither plugin nor override supplies a value.
+ *
+ * @const {"moderate"}
+ * @default "moderate"
  */
 export const DEFAULT_SAFE_SEARCH = "moderate" as const
+
 /**
  * Default number of links extracted by the Visit Website tool when no value is provided.
+ *
+ * @const {number}
+ * @default 40
  */
 const DEFAULT_MAX_LINKS = 40
+
 /**
  * Default number of images extracted by the Visit Website and View Images tools when no value is provided.
+ *
+ * @const {number}
+ * @default 10
  */
 const DEFAULT_MAX_IMAGES = 10
+
 /**
  * Default visible-text character budget for the Visit Website tool when no value is provided.
+ *
+ * @const {number}
+ * @default 10_000
  */
 const DEFAULT_CONTENT_LIMIT = 10_000
+
 /**
  * Default TTL for the web/image search result cache, in milliseconds.
+ *
+ * @const {number}
+ * @default 900_000
  */
 const DEFAULT_SEARCH_CACHE_TTL_MS = 15 * 60_000
+
 /**
  * Default TTL for the VQD token cache, in milliseconds.
+ *
+ * @const {number}
+ * @default 600_000
  */
 const DEFAULT_VQD_CACHE_TTL_MS = 10 * 60_000
+
 /**
  * Default TTL for the website HTML cache, in milliseconds.
+ *
+ * @const {number}
+ * @default 600_000
  */
 const DEFAULT_WEBSITE_CACHE_TTL_MS = 10 * 60_000
+
 /**
  * Default minimum interval enforced between outbound DuckDuckGo requests, in milliseconds.
+ *
+ * @const {number}
+ * @default 5000
  */
 const DEFAULT_REQUEST_INTERVAL_MS = 5000
+
 /**
  * Default delay inserted between the VQD-token scrape and the image-search API call, in milliseconds.
+ *
+ * @const {number}
+ * @default 2000
  */
 const DEFAULT_VQD_IMAGE_DELAY_MS = 2000
+
 /**
  * Default number of retry attempts, including the first try, applied to every outbound request.
+ *
+ * @const {number}
+ * @default 3
  */
 const DEFAULT_MAX_RETRIES = 3
+
 /**
  * Default base backoff before the first retry, in milliseconds.
+ *
+ * @const {number}
+ * @default 1000
  */
 const DEFAULT_RETRY_INITIAL_BACKOFF_MS = 1000
+
 /**
  * Default cap on a single retry backoff delay after exponential growth, in milliseconds.
+ *
+ * @const {number}
+ * @default 30_000
  */
 const DEFAULT_RETRY_MAX_BACKOFF_MS = 30_000
+
 /**
  * Conversion factor from seconds to milliseconds.
+ *
+ * @const {number}
+ * @default 1000
  */
 const MS_PER_SECOND = 1000
 

@@ -49,6 +49,11 @@ export default [
         },
         node: true,
       },
+      jsdoc: {
+        tagNamePreference: {
+          constant: "const",
+        },
+      },
     },
     rules: {
       "no-inline-comments": "error",
@@ -186,11 +191,29 @@ export default [
             "PropertyDefinition",
             'ExportNamedDeclaration[declaration.type="VariableDeclaration"]',
             "ExportDefaultDeclaration",
+            "Program > VariableDeclaration[kind='const']",
           ],
           checkConstructors: true,
           checkGetters: true,
           checkSetters: true,
           enableFixer: false,
+        },
+      ],
+      "jsdoc/no-restricted-syntax": [
+        "error",
+        {
+          contexts: [
+            {
+              context: "VariableDeclaration[kind='const']",
+              comment: 'JsdocBlock:not(:has(JsdocTag[tag="const"][rawType!=""]))',
+              message: "Constants must include a @const tag with a type, e.g. /** @const {number} */.",
+            },
+            {
+              context: "VariableDeclaration[kind='const']:has(VariableDeclarator[init.type='Literal'])",
+              comment: 'JsdocBlock:not(:has(JsdocTag[tag="default"]))',
+              message: "Constants with a literal value must include a @default tag.",
+            },
+          ],
         },
       ],
       "jsdoc/require-description": ["error", { checkConstructors: false }],
@@ -209,7 +232,7 @@ export default [
 
       "@stylistic/padding-line-between-statements": [
         "error",
-        { blankLine: "never", prev: "*", next: "*" },
+        { blankLine: "any", prev: "*", next: "*" },
         { blankLine: "always", prev: "import", next: "*" },
         { blankLine: "any", prev: "import", next: "import" },
         { blankLine: "always", prev: "*", next: "return" },
@@ -221,6 +244,22 @@ export default [
     },
   },
   prettierConfig,
+  {
+    files: ["src/**/*.ts"],
+    rules: {
+      "@stylistic/lines-around-comment": [
+        "error",
+        {
+          beforeBlockComment: true,
+          allowBlockStart: true,
+          allowClassStart: true,
+          allowObjectStart: true,
+          allowArrayStart: true,
+          ignorePattern: "^[^\\n]*$",
+        },
+      ],
+    },
+  },
   {
     files: ["**/constants.ts", "**/types.ts"],
     rules: {

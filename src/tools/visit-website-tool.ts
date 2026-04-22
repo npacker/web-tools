@@ -20,18 +20,33 @@ import type { Impit } from "impit"
 
 /**
  * Lower bound on the link / image extraction counts.
+ *
+ * @const {number}
+ * @default 0
  */
 const MIN_EXTRACTION_COUNT = 0
+
 /**
  * Upper bound on the link / image extraction counts.
+ *
+ * @const {number}
+ * @default 200
  */
 const MAX_EXTRACTION_COUNT = 200
+
 /**
  * Lower bound on the visible-text character budget.
+ *
+ * @const {number}
+ * @default 0
  */
 const MIN_CONTENT_LIMIT = 0
+
 /**
  * Upper bound on the visible-text character budget.
+ *
+ * @const {number}
+ * @default 100_000
  */
 const MAX_CONTENT_LIMIT = 100_000
 
@@ -86,6 +101,7 @@ export function createVisitWebsiteTool(
         .optional()
         .describe("Maximum text content length to extract from the page."),
     },
+
     /**
      * Executes a website visit, parsing the HTML and downloading any referenced images.
      *

@@ -8,6 +8,9 @@ import { normalizeText } from "../text"
 
 /**
  * CSS selector matching web search result links on the DuckDuckGo HTML endpoint.
+ *
+ * @const {string}
+ * @default ".result__a"
  */
 const SEARCH_RESULT_LINK_SELECTOR = ".result__a"
 

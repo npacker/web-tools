@@ -17,20 +17,36 @@ export interface SearchParameters {
   /** One-based page number of the request. */
   page: number
 }
+
 /**
  * Base URL used for all DuckDuckGo requests.
+ *
+ * @const {string}
+ * @default "https://duckduckgo.com"
  */
 const DUCKDUCKGO_BASE_URL = "https://duckduckgo.com"
+
 /**
  * Path of the DuckDuckGo HTML web search endpoint.
+ *
+ * @const {string}
+ * @default "/html/"
  */
 const WEB_SEARCH_PATH = "/html/"
+
 /**
  * Path of the DuckDuckGo JSON image search endpoint.
+ *
+ * @const {string}
+ * @default "/i.js"
  */
 const IMAGE_SEARCH_PATH = "/i.js"
+
 /**
  * Path of the DuckDuckGo homepage used to scrape VQD tokens.
+ *
+ * @const {string}
+ * @default "/"
  */
 const VQD_FETCH_PATH = "/"
 

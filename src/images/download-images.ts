@@ -31,6 +31,7 @@ export interface DownloadImagesContext {
   /** Observer invoked after each failed attempt, before the backoff sleep. */
   onFailedAttempt?: PRetryOptions["onFailedAttempt"]
 }
+
 /**
  * Per-URL outcome reported by `downloadImages`.
  */
@@ -38,12 +39,14 @@ type DownloadedImage =
   | {
       /** Discriminant marking a successful download or passthrough. */
       ok: true
+
       /** Local filesystem path of the saved (or already-local) image. */
       localPath: string
     }
   | {
       /** Discriminant marking a failed download. */
       ok: false
+
       /** Original remote URL that could not be fetched. */
       url: string
     }

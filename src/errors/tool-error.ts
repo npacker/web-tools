@@ -34,6 +34,8 @@ interface ToolErrorTemplates {
 
 /**
  * Static mapping from tool kind to its user-facing message templates.
+ *
+ * @const {Record<ToolErrorKind, ToolErrorTemplates>}
  */
 const TOOL_ERROR_TEMPLATES: Record<ToolErrorKind, ToolErrorTemplates> = {
   "web-search": {

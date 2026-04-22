@@ -13,8 +13,12 @@ import path from "node:path"
 /**
  * Name of the pointer file written into the user's home directory that records the resolved
  * LM Studio home path for subsequent lookups.
+ *
+ * @const {string}
+ * @default ".lmstudio-home-pointer"
  */
 const POINTER_FILE_NAME = ".lmstudio-home-pointer"
+
 /**
  * Memoised result of `findLMStudioHome`, so repeated calls avoid re-reading the pointer file.
  */

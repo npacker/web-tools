@@ -37,6 +37,7 @@ export async function fetchOk(impit: Impit, url: string, options: RequestOptions
     retries: 0,
     ...options.retry,
     signal: options.signal,
+
     /**
      * Gate retries on the `FetchError.statusCode` allowlist so non-transient failures fail fast.
      *

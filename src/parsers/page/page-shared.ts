@@ -4,6 +4,9 @@
 
 /**
  * Score bonus applied when a link label or image alt text contains a user-supplied search term.
+ *
+ * @const {number}
+ * @default 1000
  */
 const SEARCH_TERM_BONUS = 1000
 
