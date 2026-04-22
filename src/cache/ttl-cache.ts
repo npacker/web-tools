@@ -38,11 +38,16 @@ export class TTLCache<T> {
 
   /**
    * Retrieve a value by key, evicting and returning `undefined` when expired.
+   * Always returns `undefined` when the cache is disabled (`ttlMs <= 0`).
    *
    * @param key Lookup key.
-   * @returns The stored value, or `undefined` when absent or expired.
+   * @returns The stored value, or `undefined` when absent, expired, or disabled.
    */
   public async get(key: string): Promise<T | undefined> {
+    if (this.ttlMs <= 0) {
+      return undefined
+    }
+
     const info = await cacache.get.info(this.cachePath, key)
 
     if (info === null) {
@@ -64,11 +69,16 @@ export class TTLCache<T> {
 
   /**
    * Store a value under the given key with the configured TTL.
+   * Becomes a no-op when the cache is disabled (`ttlMs <= 0`).
    *
    * @param key Key to store the value under.
    * @param value Value to associate with the key.
    */
   public async set(key: string, value: T): Promise<void> {
+    if (this.ttlMs <= 0) {
+      return
+    }
+
     await this.evictIfNeeded()
     const metadata: CacheMetadata = { expiry: Date.now() + this.ttlMs }
     await cacache.put(this.cachePath, key, JSON.stringify(value), { metadata })

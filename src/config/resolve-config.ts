@@ -138,7 +138,7 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
     safeSearch: resolveSafeSearch(pluginSafeSearch, overrides.safeSearch),
     maxLinks: resolveAutoNumeric(pluginMaxLinks, overrides.maxLinks, DEFAULT_MAX_LINKS),
     maxImages: resolveAutoNumeric(pluginMaxImages, overrides.maxImages, DEFAULT_MAX_IMAGES),
-    contentLimit: resolveAutoNumeric(pluginContentLimit, overrides.contentLimit, DEFAULT_CONTENT_LIMIT),
+    contentLimit: resolveZeroSentinelNumeric(pluginContentLimit, overrides.contentLimit, DEFAULT_CONTENT_LIMIT),
     vqdImageDelayMs: resolveSecondsToMs(pluginVqdImageDelaySeconds, DEFAULT_VQD_IMAGE_DELAY_MS),
   }
 }
@@ -176,26 +176,27 @@ export function resolveTimingConfig(ctl: ToolsProviderController): ResolvedTimin
 
 /**
  * Convert the plugin's "max retries" field to the `maxAttempts` value consumed by `withRetry`.
- * A `null` selects the default and `0` explicitly disables retries, leaving a single attempt.
+ * A `null` or `-1` selects the default, and `0` explicitly disables retries, leaving a single attempt.
  *
  * @param pluginValue Value read from plugin configuration, or `null` when unset.
  * @returns Total number of attempts including the first try.
  */
 function resolveMaxAttempts(pluginValue: number | null): number {
-  const retries = pluginValue ?? DEFAULT_MAX_RETRIES
+  const retries = pluginValue === null || pluginValue === -1 ? DEFAULT_MAX_RETRIES : pluginValue
 
   return Math.max(1, retries + 1)
 }
 
 /**
- * Converts a seconds-valued plugin field (with `0` treated as "auto") to milliseconds.
+ * Converts a seconds-valued plugin field (with `-1` treated as "use default") to milliseconds.
+ * A stored `0` is taken literally, representing "disabled" or "no delay" depending on the field.
  *
  * @param pluginSeconds Value read from plugin configuration, or `null` when unset.
- * @param defaultMs Fallback milliseconds value when the field is unset or `0`.
+ * @param defaultMs Fallback milliseconds value when the field is unset or `-1`.
  * @returns The effective value in milliseconds.
  */
 function resolveSecondsToMs(pluginSeconds: number | null, defaultMs: number): number {
-  if (pluginSeconds !== null && pluginSeconds !== 0) {
+  if (pluginSeconds !== null && pluginSeconds !== -1) {
     return pluginSeconds * MS_PER_SECOND
   }
 
@@ -232,7 +233,8 @@ function resolveSafeSearch(
 }
 
 /**
- * Resolves a numeric plugin value that treats `0` as an "auto" sentinel.
+ * Resolves a numeric plugin value that treats `-1` as a "use default" sentinel.
+ * A stored `0` is taken literally and represents a valid configuration (e.g. "no links" / "no images").
  *
  * @param pluginValue Value read from plugin configuration, or `null` when unset.
  * @param override Runtime override from the tool invocation.
@@ -240,6 +242,25 @@ function resolveSafeSearch(
  * @returns The effective numeric value.
  */
 function resolveAutoNumeric(pluginValue: number | null, override: number | undefined, defaultValue: number): number {
+  const fromPlugin = pluginValue !== null && pluginValue !== -1 ? pluginValue : undefined
+
+  return fromPlugin ?? override ?? defaultValue
+}
+
+/**
+ * Resolves a numeric plugin value that treats `0` as a "use default" sentinel.
+ * Used by fields where `0` would be nonsensical as a real configuration.
+ *
+ * @param pluginValue Value read from plugin configuration, or `null` when unset.
+ * @param override Runtime override from the tool invocation.
+ * @param defaultValue Fallback value when neither plugin nor override supplies a concrete number.
+ * @returns The effective numeric value.
+ */
+function resolveZeroSentinelNumeric(
+  pluginValue: number | null,
+  override: number | undefined,
+  defaultValue: number
+): number {
   const fromPlugin = pluginValue !== null && pluginValue !== 0 ? pluginValue : undefined
 
   return fromPlugin ?? override ?? defaultValue
