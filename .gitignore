@@ -1,4 +1,5 @@
 .lmstudio
+.qwen
 node_modules
 dist
 *.js
