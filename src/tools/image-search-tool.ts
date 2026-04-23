@@ -11,6 +11,7 @@ import { formatToolError, NoImageResultsError } from "../errors"
 import { createRetryNotifier, FetchError } from "../http"
 import { downloadImages } from "../images"
 import { extractImageUrls } from "../parsers"
+import { rejectUnknownParameters } from "../strict-parameters"
 import { type RateLimiter, sleep } from "../timing"
 
 import type { TTLCache } from "../cache"
@@ -111,15 +112,22 @@ export function createImageSearchTool(
     /**
      * Executes an image search, downloading any matching images to the working directory.
      *
-     * @param args Validated tool parameters.
-     * @param args.query Search query string.
-     * @param args.pageSize Optional per-call page size override.
-     * @param args.safeSearch Optional per-call safe-search override.
-     * @param args.page Page number being requested.
+     * @param arguments_ Validated tool parameters.
+     * @param arguments_.query Search query string.
+     * @param arguments_.pageSize Optional per-call page size override.
+     * @param arguments_.safeSearch Optional per-call safe-search override.
+     * @param arguments_.page Page number being requested.
      * @param context Runtime tool context supplied by the SDK.
      * @returns Either the downloaded file paths, the remote URLs on download failure, or a user-facing error string.
      */
-    implementation: async ({ query, pageSize: parameterPageSize, safeSearch: parameterSafeSearch, page }, context) => {
+    implementation: async (arguments_, context) => {
+      const guarded = rejectUnknownParameters(arguments_, ["query", "pageSize", "safeSearch", "page"] as const)
+
+      if (typeof guarded === "string") {
+        return guarded
+      }
+
+      const { query, pageSize: parameterPageSize, safeSearch: parameterSafeSearch, page } = guarded
       context.status("Initiating DuckDuckGo image search...")
       await rateLimiter.wait()
 

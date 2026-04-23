@@ -12,6 +12,7 @@ import { filenameFromUrl } from "../fs"
 import { createRetryNotifier, httpUrlSchema } from "../http"
 import { downloadImages } from "../images"
 import { extractPageImages } from "../parsers"
+import { rejectUnknownParameters } from "../strict-parameters"
 import { escapeMarkdownText, escapeMarkdownUrl } from "../text"
 import { fetchWebsite } from "../website"
 
@@ -106,14 +107,21 @@ export function createViewImagesTool(
     /**
      * Executes an image download batch, optionally preceded by scraping image URLs from a page.
      *
-     * @param args Validated tool parameters.
-     * @param args.imageURLs Explicit URLs to download.
-     * @param args.websiteURL Optional page to scrape for additional image URLs.
-     * @param args.maxImages Optional per-call override for the number of page-scraped images.
+     * @param arguments_ Validated tool parameters.
+     * @param arguments_.imageURLs Explicit URLs to download.
+     * @param arguments_.websiteURL Optional page to scrape for additional image URLs.
+     * @param arguments_.maxImages Optional per-call override for the number of page-scraped images.
      * @param context Runtime tool context supplied by the SDK.
      * @returns Per-image records with filename, alt, title, and either a markdown reference or an error, or a user-facing error string.
      */
-    implementation: async ({ imageURLs, websiteURL, maxImages: parameterMaxImages }, context) => {
+    implementation: async (arguments_, context) => {
+      const guarded = rejectUnknownParameters(arguments_, ["imageURLs", "websiteURL", "maxImages"] as const)
+
+      if (typeof guarded === "string") {
+        return guarded
+      }
+
+      const { imageURLs, websiteURL, maxImages: parameterMaxImages } = guarded
       const explicitUrls = imageURLs ?? []
       const hasWebsite = websiteURL !== undefined && websiteURL !== ""
 

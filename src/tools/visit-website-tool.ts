@@ -10,6 +10,7 @@ import { resolveConfig } from "../config/resolve-config"
 import { formatToolError } from "../errors"
 import { createRetryNotifier, httpUrlSchema } from "../http"
 import { buildPageExcerpt, extractHeadings } from "../parsers"
+import { rejectUnknownParameters } from "../strict-parameters"
 import { fetchWebsite } from "../website"
 
 import type { TTLCache } from "../cache"
@@ -59,14 +60,21 @@ export function createVisitWebsiteTool(
     /**
      * Executes a website visit and parses the HTML.
      *
-     * @param args Validated tool parameters.
-     * @param args.url URL of the website to visit.
-     * @param args.findInPage Optional search terms that bias content slicing.
-     * @param args.contentFormat Optional per-call override for the content field's output format.
+     * @param arguments_ Validated tool parameters.
+     * @param arguments_.url URL of the website to visit.
+     * @param arguments_.findInPage Optional search terms that bias content slicing.
+     * @param arguments_.contentFormat Optional per-call override for the content field's output format.
      * @param context Runtime tool context supplied by the SDK.
      * @returns The structured page summary or a user-facing error string.
      */
-    implementation: async ({ url, findInPage, contentFormat: parameterContentFormat }, context) => {
+    implementation: async (arguments_, context) => {
+      const guarded = rejectUnknownParameters(arguments_, ["url", "findInPage", "contentFormat"] as const)
+
+      if (typeof guarded === "string") {
+        return guarded
+      }
+
+      const { url, findInPage, contentFormat: parameterContentFormat } = guarded
       context.status("Visiting website...")
       await rateLimiter.wait()
 
