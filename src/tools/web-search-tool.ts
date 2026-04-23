@@ -77,15 +77,15 @@ export function createWebSearchTool(
     description:
       "Search for web pages on DuckDuckGo using a query string, returning a list of URLs with titles and snippet previews.",
     parameters: {
-      query: z.string().describe("The search query for finding web pages"),
+      query: z.string().describe("The search query for finding web pages."),
       pageSize: z
         .number()
         .int()
         .min(MIN_PAGE_SIZE)
         .max(MAX_PAGE_SIZE)
         .optional()
-        .describe("Number of web results per page"),
-      safeSearch: z.enum(["strict", "moderate", "off"]).optional().describe("Safe Search"),
+        .describe("The number of web results per page."),
+      safeSearch: z.enum(["strict", "moderate", "off"]).optional().describe("Safe Search."),
       page: z
         .number()
         .int()
@@ -93,7 +93,7 @@ export function createWebSearchTool(
         .max(MAX_PAGE_NUMBER)
         .optional()
         .default(DEFAULT_PAGE_NUMBER)
-        .describe("Page number for pagination"),
+        .describe("The current page number for pagination."),
     },
 
     /**

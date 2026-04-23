@@ -88,7 +88,7 @@ export function createImageSearchTool(
     name: "Image Search",
     description: "Search for images on DuckDuckGo using a query string and return a list of image URLs.",
     parameters: {
-      query: z.string().describe("The search query for finding images"),
+      query: z.string().describe("The search query for finding images."),
       pageSize: z
         .number()
         .int()
@@ -96,7 +96,7 @@ export function createImageSearchTool(
         .max(MAX_PAGE_SIZE)
         .optional()
         .default(DEFAULT_PAGE_SIZE)
-        .describe("Number of image results per page"),
+        .describe("The number of image results per page."),
       safeSearch: z.enum(["strict", "moderate", "off"]).optional().default(DEFAULT_SAFE_SEARCH).describe("Safe Search"),
       page: z
         .number()
@@ -105,7 +105,7 @@ export function createImageSearchTool(
         .max(MAX_PAGE_NUMBER)
         .optional()
         .default(DEFAULT_PAGE_NUMBER)
-        .describe("Page number for pagination"),
+        .describe("The current page number for pagination."),
     },
 
     /**

@@ -48,11 +48,11 @@ export function createVisitWebsiteTool(
     description:
       "Visit a website and return its title, top-level headings, and content. When contentLength exceeds the returned content length the page was truncated — refine with findInPage.",
     parameters: {
-      url: httpUrlSchema.describe("The URL of the website to visit"),
+      url: httpUrlSchema.describe("The URL of the website to visit."),
       findInPage: z
-        .union([z.array(z.string()), z.string().transform(term => [term])])
+        .array(z.string())
         .optional()
-        .describe("Strongly recommended: optional search terms to prioritize which content slices are returned."),
+        .describe("Strongly recommended: An array of optional search terms to narrow the returned page content."),
       contentFormat: z.enum(CONTENT_FORMAT_OPTIONS).optional().describe("Output format of the content field."),
     },
 

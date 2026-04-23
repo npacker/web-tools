@@ -87,20 +87,17 @@ export function createViewImagesTool(
 ): Tool {
   return tool({
     name: "View Images",
-    description: "Download images from a website or a list of image URLs to make them viewable.",
+    description: "Download images from a web page or view a list of individual image URLs.",
     parameters: {
-      imageURLs: z
-        .union([z.array(httpUrlSchema), httpUrlSchema.transform(url => [url])])
-        .optional()
-        .describe("List of image URLs to view that were not obtained via the Visit Website tool."),
-      websiteURL: httpUrlSchema.optional().describe("The URL of the website, whose images to view."),
+      imageURLs: z.array(httpUrlSchema).optional().describe("A list of image URLs to view."),
+      websiteURL: httpUrlSchema.optional().describe("A URL of a page page to extract images from."),
       maxImages: z
         .number()
         .int()
         .min(MIN_VIEW_IMAGES_COUNT)
         .max(MAX_VIEW_IMAGES_COUNT)
         .optional()
-        .describe("Maximum number of images to view when websiteURL is provided."),
+        .describe("The maximum number of images to extract when websiteURL is provided."),
     },
 
     /**
