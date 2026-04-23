@@ -10,12 +10,32 @@ import type { RetryOptions } from "../http/retry"
 import type { ToolsProviderController } from "@lmstudio/sdk"
 
 /**
- * Default page size when no plugin or override value is provided.
+ * Web-search page stride used when the results cap is disabled. Matches the ~30 results
+ * DuckDuckGo's HTML endpoint returns per page, so the `s=` offset advances one DDG page
+ * at a time rather than re-fetching overlapping windows.
  *
  * @const {number}
  * @default
  */
-const DEFAULT_PAGE_SIZE = 5
+const WEB_NATIVE_PAGE_SIZE = 30
+
+/**
+ * Image-search page stride used when the results cap is disabled. Matches the ~100 results
+ * DuckDuckGo's image JSON endpoint returns per page.
+ *
+ * @const {number}
+ * @default
+ */
+const IMAGE_NATIVE_PAGE_SIZE = 100
+
+/**
+ * Fallback cap used when a results-per-page field reads `null` before the UI has committed the
+ * schematic default.
+ *
+ * @const {number}
+ * @default
+ */
+const DEFAULT_MAX_RESULTS = 10
 
 /**
  * Default safe-search mode when neither plugin nor override supplies a value.
@@ -162,8 +182,14 @@ export type ContentFormat = "markdown" | "text"
  * Fully resolved configuration used by a tool invocation.
  */
 interface ResolvedConfig {
-  /** Number of results to request per page. */
-  pageSize: number
+  /** Upper bound on web-search results returned per page; `Infinity` when the cap is disabled. */
+  webMaxResults: number
+  /** Stride used to compute the `s=` offset for web-search pagination. */
+  webPageStride: number
+  /** Upper bound on image-search results returned per page; `Infinity` when the cap is disabled. */
+  imageMaxResults: number
+  /** Stride used to compute the `s=` offset for image-search pagination. */
+  imagePageStride: number
   /** Safe-search mode to apply to the request. */
   safeSearch: SafeSearch
   /** Whether web search results should include preview snippets. */
@@ -218,7 +244,10 @@ interface ConfigOverrides {
  */
 export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOverrides): ResolvedConfig {
   const pluginConfig = ctl.getPluginConfig(configSchematics)
-  const pluginPageSize = pluginConfig.get("pageSize") as number | null
+  const pluginLimitWeb = pluginConfig.get("limitWebResults") as boolean | null
+  const pluginWebMax = pluginConfig.get("webMaxResults") as number | null
+  const pluginLimitImage = pluginConfig.get("limitImageResults") as boolean | null
+  const pluginImageMax = pluginConfig.get("imageMaxResults") as number | null
   const pluginSafeSearch = pluginConfig.get("safeSearch") as SafeSearch | typeof AUTO_CONFIG_VALUE
   const pluginIncludeSnippets = pluginConfig.get("includeSnippets") as boolean | null
   const pluginMaxImages = pluginConfig.get("maxImages") as number | null
@@ -227,9 +256,14 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
   const pluginVqdImageDelaySeconds = pluginConfig.get("vqdImageDelaySeconds") as number | null
   const pluginMaxResponseMb = pluginConfig.get("maxResponseMb") as number | null
   const pluginMaxImageMb = pluginConfig.get("maxImageMb") as number | null
+  const webLimited = pluginLimitWeb ?? true
+  const imageLimited = pluginLimitImage ?? true
 
   return {
-    pageSize: resolvePageSize(pluginPageSize),
+    webMaxResults: webLimited ? (pluginWebMax ?? DEFAULT_MAX_RESULTS) : Number.POSITIVE_INFINITY,
+    webPageStride: webLimited ? (pluginWebMax ?? DEFAULT_MAX_RESULTS) : WEB_NATIVE_PAGE_SIZE,
+    imageMaxResults: imageLimited ? (pluginImageMax ?? DEFAULT_MAX_RESULTS) : Number.POSITIVE_INFINITY,
+    imagePageStride: imageLimited ? (pluginImageMax ?? DEFAULT_MAX_RESULTS) : IMAGE_NATIVE_PAGE_SIZE,
     safeSearch: resolveSafeSearch(pluginSafeSearch, overrides.safeSearch),
     includeSnippets: pluginIncludeSnippets ?? DEFAULT_INCLUDE_SNIPPETS,
     maxImages: resolveAutoNumeric(pluginMaxImages, overrides.maxImages, DEFAULT_MAX_IMAGES),
@@ -314,16 +348,6 @@ function resolveMbToBytes(pluginMb: number | null, defaultMb: number): number {
   const mb = pluginMb !== null && pluginMb !== -1 ? pluginMb : defaultMb
 
   return mb * BYTES_PER_MB
-}
-
-/**
- * Resolves page size from plugin configuration.
- *
- * @param pluginValue Value read from plugin configuration, or `null` when unset.
- * @returns The effective page size.
- */
-function resolvePageSize(pluginValue: number | null): number {
-  return pluginValue !== null && pluginValue !== 0 ? pluginValue : DEFAULT_PAGE_SIZE
 }
 
 /**

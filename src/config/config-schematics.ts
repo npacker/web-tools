@@ -10,21 +10,58 @@ import { AUTO_CONFIG_VALUE } from "./auto-sentinel"
  */
 export const configSchematics = createConfigSchematics()
   .field(
-    "pageSize",
+    "limitWebResults",
+    "boolean",
+    {
+      displayName: "Limit Web Search Results",
+      subtitle: "When disabled, every result DuckDuckGo returns on the requested page is included.",
+    },
+    true
+  )
+  .field(
+    "webMaxResults",
     "numeric",
     {
-      displayName: "Search Results Per Page",
-      subtitle: "1 to 10, 0 = default (5)",
-      min: 0,
-      max: 10,
+      displayName: "Web Search: Max Results",
+      subtitle: "1 to 30. Caps results per page; DuckDuckGo returns up to ~30.",
+      min: 1,
+      max: 30,
       int: true,
       slider: {
         step: 1,
         min: 1,
-        max: 10,
+        max: 30,
       },
+      dependencies: [{ key: "limitWebResults", condition: { type: "equals", value: true } }],
     },
-    0
+    10
+  )
+  .field(
+    "limitImageResults",
+    "boolean",
+    {
+      displayName: "Limit Image Search Results",
+      subtitle: "When disabled, every image DuckDuckGo returns on the requested page is included.",
+    },
+    true
+  )
+  .field(
+    "imageMaxResults",
+    "numeric",
+    {
+      displayName: "Image Search: Max Results",
+      subtitle: "1 to 100. Caps results per page; DuckDuckGo returns up to ~100.",
+      min: 1,
+      max: 100,
+      int: true,
+      slider: {
+        step: 1,
+        min: 1,
+        max: 100,
+      },
+      dependencies: [{ key: "limitImageResults", condition: { type: "equals", value: true } }],
+    },
+    10
   )
   .field(
     "safeSearch",

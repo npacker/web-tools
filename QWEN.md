@@ -188,7 +188,10 @@ All config fields default to `0` or `"Auto"`, meaning the LLM assistant decides 
 
 | Field | Type | Default | Range | Purpose |
 |---|---|---|---|---|
-| `pageSize` | numeric | 0 (auto) | 0–10 | Max web/image search results per page (plugin-only, not exposed as tool parameter) |
+| `limitWebResults` | boolean | true | true/false | When enabled, caps web-search results at `webMaxResults`; when disabled, returns the full DDG page (~30). |
+| `webMaxResults` | numeric | 10 | 1–30 | Max web-search results per page; hidden when `limitWebResults` is off (plugin-only, not exposed as tool parameter). |
+| `limitImageResults` | boolean | true | true/false | When enabled, caps image-search results at `imageMaxResults`; when disabled, returns the full DDG page (~100). |
+| `imageMaxResults` | numeric | 10 | 1–100 | Max image-search results per page; hidden when `limitImageResults` is off (plugin-only, not exposed as tool parameter). |
 | `safeSearch` | select | Auto | strict/moderate/off | DuckDuckGo safe search level |
 | `maxImages` | numeric | -1 (auto) | -1–200 | View Images: max images scraped when a `websiteURL` is provided |
 | `contentLimit` | numeric | 0 (auto) | 0–100000 | Visit Website: max characters of text (plugin-only, not exposed as tool parameter) |

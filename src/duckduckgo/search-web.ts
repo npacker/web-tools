@@ -17,18 +17,20 @@ import type { Impit } from "impit"
  *
  * @param impit Shared HTTP client used for the request.
  * @param parameters Query and pagination parameters for the search.
+ * @param maxResults Upper bound on the number of parsed results returned; `Infinity` for no cap.
  * @param options Options controlling the outbound request.
  * @returns The parsed search results along with their count.
  */
 export async function searchWeb(
   impit: Impit,
   parameters: SearchParameters,
+  maxResults: number,
   options: RequestOptions
 ): Promise<SearchResultsPayload> {
   const url = buildWebSearchUrl(parameters).toString()
   const response = await fetchOk(impit, url, options)
   const html = await response.text()
-  const parsed = parseSearchResults(html, parameters.pageSize)
+  const parsed = parseSearchResults(html, maxResults)
   const results = parsed.map(
     ({ label, url: resultUrl, snippet }) => [label, resultUrl, snippet] as [string, string, string]
   )

@@ -14,7 +14,7 @@ DuckDuckGo web search.
 | `safeSearch` | `"strict" \| "moderate" \| "off"` | Optional; overrides plugin setting when supplied. |
 | `page` | int 1–100 | Optional, defaults to 1. Enables pagination. |
 
-Returns an array of `[title, url]` pairs. Results are cached by `(query, safeSearch, page)`. The results-per-page count (`pageSize`) is a plugin-only setting — it is not exposed as a tool parameter so the model cannot override the user-set or default value.
+Returns an array of `[title, url]` pairs. Results are cached by `(query, safeSearch, page)`. The results-per-page cap is controlled by the plugin's `limitWebResults` toggle and `webMaxResults` slider (default 10, max 30) — these are plugin-only settings and are not exposed as tool parameters. Disabling `limitWebResults` returns every result DuckDuckGo includes on the page.
 
 ### Image Search
 
@@ -26,7 +26,7 @@ DuckDuckGo image search. Requires a VQD token scraped from the DuckDuckGo homepa
 | `safeSearch` | `"strict" \| "moderate" \| "off"` | Optional; overrides plugin setting. |
 | `page` | int 1–100 | Optional, defaults to 1. |
 
-Matching images are downloaded into the chat's working directory and returned as local file paths. If a download fails, the remote URL is returned for that slot instead so the assistant always gets something displayable. The results-per-page count (`pageSize`) is a plugin-only setting — it is not exposed as a tool parameter so the model cannot override the user-set or default value.
+Matching images are downloaded into the chat's working directory and returned as local file paths. If a download fails, the remote URL is returned for that slot instead so the assistant always gets something displayable. The results-per-page cap is controlled by the plugin's `limitImageResults` toggle and `imageMaxResults` slider (default 10, max 100) — these are plugin-only settings and are not exposed as tool parameters. Disabling `limitImageResults` returns every image DuckDuckGo includes on the page.
 
 ### Visit Website
 

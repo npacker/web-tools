@@ -10,8 +10,8 @@ import type { SafeSearch } from "./safe-search"
 export interface SearchParameters {
   /** Raw search query string. */
   query: string
-  /** Number of results requested per page. */
-  pageSize: number
+  /** Offset stride used to advance DuckDuckGo's `s=` parameter between pages. */
+  pageStride: number
   /** Safe-search mode applied to the request. */
   safeSearch: SafeSearch
   /** One-based page number of the request. */
@@ -62,7 +62,7 @@ export function buildWebSearchUrl(parameters: SearchParameters): URL {
   url.searchParams.append("p", encodeSafeSearchParameter(parameters.safeSearch))
 
   if (parameters.page > 1) {
-    url.searchParams.append("s", pageOffset(parameters.pageSize, parameters.page).toString())
+    url.searchParams.append("s", pageOffset(parameters.pageStride, parameters.page).toString())
   }
 
   return url
@@ -100,7 +100,7 @@ export function buildImageSearchUrl(parameters: SearchParameters, vqd: string): 
   url.searchParams.append("p", encodeSafeSearchParameter(parameters.safeSearch))
 
   if (parameters.page > 1) {
-    url.searchParams.append("s", pageOffset(parameters.pageSize, parameters.page).toString())
+    url.searchParams.append("s", pageOffset(parameters.pageStride, parameters.page).toString())
   }
 
   return url
@@ -121,12 +121,12 @@ function encodeSafeSearchParameter(safeSearch: SafeSearch): string {
 }
 
 /**
- * Zero-based offset corresponding to a one-based page number at the given page size.
+ * Zero-based offset corresponding to a one-based page number at the given stride.
  *
- * @param pageSize Number of results per page.
+ * @param pageStride Offset stride between pages.
  * @param page One-based page number.
  * @returns Zero-based offset for the requested page.
  */
-function pageOffset(pageSize: number, page: number): number {
-  return pageSize * (page - 1)
+function pageOffset(pageStride: number, page: number): number {
+  return pageStride * (page - 1)
 }

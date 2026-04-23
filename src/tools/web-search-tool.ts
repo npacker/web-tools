@@ -89,7 +89,7 @@ export function createWebSearchTool(
       await rateLimiter.wait()
 
       try {
-        const { pageSize, safeSearch, includeSnippets } = resolveConfig(ctl, {
+        const { webMaxResults, webPageStride, safeSearch, includeSnippets } = resolveConfig(ctl, {
           safeSearch: parameterSafeSearch,
         })
         const cacheKey = searchCacheKey("web", query, safeSearch, page)
@@ -108,8 +108,8 @@ export function createWebSearchTool(
           }
         }
 
-        const parameters = { query, pageSize, safeSearch, page }
-        const result = await searchWeb(impit, parameters, {
+        const parameters = { query, pageStride: webPageStride, safeSearch, page }
+        const result = await searchWeb(impit, parameters, webMaxResults, {
           signal: context.signal,
           retry,
           onFailedAttempt: createRetryNotifier(context.status, "web search"),
