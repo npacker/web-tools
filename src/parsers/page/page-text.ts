@@ -82,9 +82,7 @@ export function extractHeadings(dom: JSDOM): PageHeadings {
  */
 function extractVisibleText(html: string, url: string, format: ContentFormat): string {
   const readabilityDom = new JSDOM(html, { url })
-  const article = new Readability(readabilityDom.window.document).parse()
-
-  const articleContent = article?.content
+  const articleContent = parseReadability(readabilityDom)
 
   if (articleContent !== null && articleContent !== undefined && articleContent !== "") {
     return formatHtml(articleContent, format)
@@ -94,6 +92,25 @@ function extractVisibleText(html: string, url: string, format: ContentFormat): s
   const { body } = fallbackDom.window.document
 
   return formatHtml(body.innerHTML, format)
+}
+
+/**
+ * Run Mozilla Readability against the supplied document, returning its extracted content HTML or
+ * a nullish value when extraction fails. Readability can throw synchronously when jsdom's CSSOM
+ * parser chokes on inline styles — notably CSS custom properties inside shorthand values such as
+ * `border: var(--border-width, 1px) solid #fff`, which trip a CSSOM bug that surfaces as
+ * `Cannot create property 'border-width' on string '…'`. Swallow those throws so the caller's
+ * raw-body fallback can still produce text for the page.
+ *
+ * @param dom Parsed website DOM Readability should read.
+ * @returns The article HTML, or `null`/`undefined` when Readability cannot identify or parse one.
+ */
+function parseReadability(dom: JSDOM): string | null | undefined {
+  try {
+    return new Readability(dom.window.document).parse()?.content
+  } catch {
+    return undefined
+  }
 }
 
 /**
