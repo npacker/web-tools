@@ -32,15 +32,14 @@ Matching images are downloaded into the chat's working directory and returned as
 
 ### Visit Website
 
-Fetches a URL and returns its title, first-level headings (`h1`/`h2`/`h3`), and a readable content excerpt produced by `@mozilla/readability`. The content is returned as Markdown by default — headings, lists, inline links, and inline images are preserved — or as plain text when `contentFormat` is set to `"text"`. Use the View Images tool to download any images of interest.
+Fetches a URL and returns its title, first-level headings (`h1`/`h2`/`h3`), and a readable content excerpt produced by `@mozilla/readability`. The content is returned as Markdown by default — headings, lists, inline links, and inline images are preserved — or as plain text when the plugin's `contentFormat` setting is switched to `"text"`. Use the View Images tool to download any images of interest.
 
 | Parameter | Type | Notes |
 | --- | --- | --- |
 | `url` | URL | Required. |
 | `findInPage` | string[] | Optional search terms that bias which content slices are returned when the page exceeds the character budget. Strongly recommended. |
-| `contentFormat` | `"markdown" \| "text"` | Optional output format; overrides plugin setting. |
 
-The visible-text character budget (`contentLimit`) is a plugin-only setting — it is not exposed as a tool parameter so the model cannot override the user-set or default budget. The response includes `contentLength`, the character count of the full extracted content prior to truncation. When `contentLength > content.length` the content was truncated — refine `findInPage` and re-call, or raise `contentLimit` in the plugin settings.
+Both the visible-text character budget (`contentLimit`) and the output format (`contentFormat`) are plugin-only settings — they are not exposed as tool parameters so the model cannot override the user-set or default values. The response includes `contentLength`, the character count of the full extracted content prior to truncation. When `contentLength > content.length` the content was truncated — refine `findInPage` and re-call, or raise `contentLimit` in the plugin settings.
 
 ### View Images
 

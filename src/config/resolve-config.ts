@@ -208,8 +208,6 @@ interface ConfigOverrides {
   safeSearch?: SafeSearch
   /** Max-images override provided by the caller. */
   maxImages?: number
-  /** Content-format override provided by the caller. */
-  contentFormat?: ContentFormat
 }
 
 /**
@@ -238,7 +236,7 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
     includeSnippets: pluginIncludeSnippets ?? DEFAULT_INCLUDE_SNIPPETS,
     maxImages: resolveAutoNumeric(pluginMaxImages, overrides.maxImages, DEFAULT_MAX_IMAGES),
     contentLimit: pluginContentLimit !== null && pluginContentLimit !== 0 ? pluginContentLimit : DEFAULT_CONTENT_LIMIT,
-    contentFormat: overrides.contentFormat ?? pluginContentFormat ?? DEFAULT_CONTENT_FORMAT,
+    contentFormat: pluginContentFormat ?? DEFAULT_CONTENT_FORMAT,
     vqdImageDelayMs: resolveSecondsToMs(pluginVqdImageDelaySeconds, DEFAULT_VQD_IMAGE_DELAY_MS),
     maxResponseBytes: resolveMbToBytes(pluginMaxResponseMb, DEFAULT_MAX_RESPONSE_MB),
     maxImageBytes: resolveMbToBytes(pluginMaxImageMb, DEFAULT_MAX_IMAGE_MB),

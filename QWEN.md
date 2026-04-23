@@ -192,7 +192,7 @@ All config fields default to `0` or `"Auto"`, meaning the LLM assistant decides 
 | `safeSearch` | select | Auto | strict/moderate/off | DuckDuckGo safe search level |
 | `maxImages` | numeric | -1 (auto) | -1–200 | View Images: max images scraped when a `websiteURL` is provided |
 | `contentLimit` | numeric | 0 (auto) | 0–100000 | Visit Website: max characters of text (plugin-only, not exposed as tool parameter) |
-| `contentFormat` | select | markdown | markdown / text | Visit Website: output format of the content field |
+| `contentFormat` | select | markdown | markdown / text | Visit Website: output format of the content field (plugin-only, not exposed as tool parameter) |
 | `searchCacheTtlSeconds` | numeric | 0 (auto) | 0–3600 | Search result cache duration (default 15 min) |
 | `vqdCacheTtlSeconds` | numeric | 0 (auto) | 0–3600 | VQD token cache duration (default 10 min) |
 | `websiteCacheTtlSeconds` | numeric | 0 (auto) | 0–3600 | Website content cache duration (default 10 min) |
@@ -208,7 +208,7 @@ All config fields default to `0` or `"Auto"`, meaning the LLM assistant decides 
 - **Markdown** (default) — `src/text/html-to-markdown.ts` via a shared `turndown` service (ATX headings, `-` bullets, fenced code, inline links, inline images). `script`/`style`/`noscript`/`template` are stripped before conversion.
 - **Plain text** — `src/text/html-to-text.ts` walks the DOM and inserts newlines at block boundaries so paragraphs and lists remain separated without markdown syntax.
 
-Both paths share `src/text/normalize-blank-lines.ts` for trailing-whitespace and blank-line collapsing. `contentFormat` is selectable per-call (Zod `enum`) and plugin-wide (`select` field, default `"markdown"`). `contentLimit` is plugin-only — not exposed as a tool parameter so the model cannot override the user-set or default budget. The tool still returns `contentLength`, the pre-truncation character count, so the model can detect truncation and refine with `findInPage`.
+Both paths share `src/text/normalize-blank-lines.ts` for trailing-whitespace and blank-line collapsing. Both `contentFormat` (plugin `select` field, default `"markdown"`) and `contentLimit` are plugin-only — neither is exposed as a tool parameter so the model cannot override the user-set or default values. The tool still returns `contentLength`, the pre-truncation character count, so the model can detect truncation and refine with `findInPage`.
 
 ---
 
