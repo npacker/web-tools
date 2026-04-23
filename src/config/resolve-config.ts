@@ -122,12 +122,36 @@ const DEFAULT_RETRY_INITIAL_BACKOFF_MS = 1000
 const DEFAULT_RETRY_MAX_BACKOFF_MS = 30_000
 
 /**
+ * Default upper bound on the HTML payload fetched by Visit Website, in megabytes.
+ *
+ * @const {number}
+ * @default
+ */
+const DEFAULT_MAX_RESPONSE_MB = 5
+
+/**
+ * Default upper bound on the per-image payload downloaded by Image Search and View Images, in megabytes.
+ *
+ * @const {number}
+ * @default
+ */
+const DEFAULT_MAX_IMAGE_MB = 10
+
+/**
  * Conversion factor from seconds to milliseconds.
  *
  * @const {number}
  * @default
  */
 const MS_PER_SECOND = 1000
+
+/**
+ * Conversion factor from megabytes to bytes.
+ *
+ * @const {number}
+ * @default
+ */
+const BYTES_PER_MB = 1024 * 1024
 
 /**
  * Output format for the Visit Website tool's `content` field.
@@ -152,6 +176,10 @@ interface ResolvedConfig {
   contentFormat: ContentFormat
   /** Delay before the image-search API call, in milliseconds. */
   vqdImageDelayMs: number
+  /** Hard upper bound on the HTML payload fetched by Visit Website, in bytes. */
+  maxResponseBytes: number
+  /** Hard upper bound on the per-image payload downloaded by Image Search and View Images, in bytes. */
+  maxImageBytes: number
 }
 
 /**
@@ -201,6 +229,8 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
   const pluginContentLimit = pluginConfig.get("contentLimit") as number | null
   const pluginContentFormat = pluginConfig.get("contentFormat") as ContentFormat | null
   const pluginVqdImageDelaySeconds = pluginConfig.get("vqdImageDelaySeconds") as number | null
+  const pluginMaxResponseMb = pluginConfig.get("maxResponseMb") as number | null
+  const pluginMaxImageMb = pluginConfig.get("maxImageMb") as number | null
 
   return {
     pageSize: resolvePageSize(pluginPageSize, overrides.pageSize),
@@ -210,6 +240,8 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
     contentLimit: pluginContentLimit !== null && pluginContentLimit !== 0 ? pluginContentLimit : DEFAULT_CONTENT_LIMIT,
     contentFormat: overrides.contentFormat ?? pluginContentFormat ?? DEFAULT_CONTENT_FORMAT,
     vqdImageDelayMs: resolveSecondsToMs(pluginVqdImageDelaySeconds, DEFAULT_VQD_IMAGE_DELAY_MS),
+    maxResponseBytes: resolveMbToBytes(pluginMaxResponseMb, DEFAULT_MAX_RESPONSE_MB),
+    maxImageBytes: resolveMbToBytes(pluginMaxImageMb, DEFAULT_MAX_IMAGE_MB),
   }
 }
 
@@ -273,6 +305,19 @@ function resolveSecondsToMs(pluginSeconds: number | null, defaultMs: number): nu
   }
 
   return defaultMs
+}
+
+/**
+ * Converts a megabyte-valued plugin field (with `-1` or `null` treated as "use default") to bytes.
+ *
+ * @param pluginMb Value read from plugin configuration, or `null` when unset.
+ * @param defaultMb Fallback value in megabytes when the field is unset or `-1`.
+ * @returns The effective value in bytes.
+ */
+function resolveMbToBytes(pluginMb: number | null, defaultMb: number): number {
+  const mb = pluginMb !== null && pluginMb !== -1 ? pluginMb : defaultMb
+
+  return mb * BYTES_PER_MB
 }
 
 /**

@@ -217,6 +217,40 @@ export const configSchematics = createConfigSchematics()
     -1
   )
   .field(
+    "maxResponseMb",
+    "numeric",
+    {
+      displayName: "Visit Website: Max Response Size (MB)",
+      subtitle: "1 to 100, -1 = default (5). Caps the HTML payload fetched by Visit Website.",
+      min: -1,
+      max: 100,
+      int: true,
+      slider: {
+        step: 1,
+        min: -1,
+        max: 100,
+      },
+    },
+    -1
+  )
+  .field(
+    "maxImageMb",
+    "numeric",
+    {
+      displayName: "Max Image Size (MB)",
+      subtitle: "1 to 100, -1 = default (10). Caps per-image payload for Image Search and View Images.",
+      min: -1,
+      max: 100,
+      int: true,
+      slider: {
+        step: 1,
+        min: -1,
+        max: 100,
+      },
+    },
+    -1
+  )
+  .field(
     "vqdImageDelaySeconds",
     "numeric",
     {

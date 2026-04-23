@@ -10,7 +10,7 @@ import pRetry from "p-retry"
 
 import { errorMessage, isAbortError } from "../errors"
 import { toMarkdownPath } from "../fs"
-import { assertPublicUrl, FetchError, isRetryableFetchError } from "../http"
+import { assertPublicUrl, FetchError, isRetryableFetchError, readLimitedBytes } from "../http"
 import { imageExtensionFromHeaders, isSupportedImageExtension, normalizeImageExtension } from "../parsers"
 
 import type { RetryOptions } from "../http"
@@ -75,7 +75,7 @@ interface DownloadImageContext {
 }
 
 /**
- * Per-download options controlling file placement and naming.
+ * Per-download options controlling file placement, naming, and the per-image size cap.
  */
 interface DownloadImageOptions {
   /** Directory into which the downloaded file is written. */
@@ -84,6 +84,8 @@ interface DownloadImageOptions {
   timestamp: number
   /** Zero-based index of the image within the current batch. */
   index: number
+  /** Hard upper bound on the image payload, in bytes. */
+  maxBytes: number
 }
 
 /**
@@ -117,7 +119,7 @@ export async function downloadImage(
       shouldRetry: ({ error }) => isRetryableFetchError(error),
       onFailedAttempt: context.onFailedAttempt,
     })
-    const bytes = await response.bytes()
+    const bytes = await readLimitedBytes(response, options.maxBytes, url)
 
     if (bytes.length === 0) {
       context.warn(`Image ${options.index} is empty: ${url}`)

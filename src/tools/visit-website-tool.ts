@@ -71,13 +71,14 @@ export function createVisitWebsiteTool(
       await rateLimiter.wait()
 
       try {
-        const { contentLimit, contentFormat } = resolveConfig(ctl, {
+        const { contentLimit, contentFormat, maxResponseBytes } = resolveConfig(ctl, {
           contentFormat: parameterContentFormat,
         })
         const html = await fetchWebsite(impit, websiteCache, url, {
           signal: context.signal,
           retry,
           onFailedAttempt: createRetryNotifier(context.status, "website fetch"),
+          maxBytes: maxResponseBytes,
         })
         context.status("Website visited successfully.")
         const headings = extractHeadings(new JSDOM(html))

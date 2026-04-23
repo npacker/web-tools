@@ -119,7 +119,7 @@ export function createViewImagesTool(
       }
 
       try {
-        const { maxImages } = resolveConfig(ctl, { maxImages: parameterMaxImages })
+        const { maxImages, maxResponseBytes, maxImageBytes } = resolveConfig(ctl, { maxImages: parameterMaxImages })
         const subjects: ImageSubject[] = explicitUrls.map(source => ({ src: source, alt: "", title: "" }))
 
         if (hasWebsite) {
@@ -129,6 +129,7 @@ export function createViewImagesTool(
             signal: context.signal,
             retry,
             onFailedAttempt: createRetryNotifier(context.status, "website fetch"),
+            maxBytes: maxResponseBytes,
           })
           const scraped = extractPageImages(new JSDOM(html), websiteURL, maxImages)
 
@@ -147,7 +148,7 @@ export function createViewImagesTool(
         const batch = await downloadImages(
           subjects.map(subject => subject.src),
           impit,
-          { workingDirectory: ctl.getWorkingDirectory(), timestamp: Date.now() },
+          { workingDirectory: ctl.getWorkingDirectory(), timestamp: Date.now(), maxBytes: maxImageBytes },
           {
             warn: context.warn,
             signal: context.signal,

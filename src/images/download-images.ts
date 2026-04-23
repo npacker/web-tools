@@ -11,13 +11,15 @@ import type { Impit } from "impit"
 import type { Options as PRetryOptions } from "p-retry"
 
 /**
- * Options controlling placement of the downloaded batch.
+ * Options controlling placement of the downloaded batch and the per-image size cap.
  */
 interface DownloadImagesOptions {
   /** Directory into which downloaded files are written. */
   workingDirectory: string
   /** Epoch-millisecond timestamp used as the filename prefix for every file in the batch. */
   timestamp: number
+  /** Hard upper bound on each image payload, in bytes. */
+  maxBytes: number
 }
 
 /**
@@ -102,6 +104,7 @@ async function downloadOne(
       workingDirectory: options.workingDirectory,
       timestamp: options.timestamp,
       index: position + 1,
+      maxBytes: options.maxBytes,
     },
     context
   )

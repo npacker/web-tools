@@ -122,7 +122,7 @@ export function createImageSearchTool(
       await rateLimiter.wait()
 
       try {
-        const { pageSize, safeSearch, vqdImageDelayMs } = resolveConfig(ctl, {
+        const { pageSize, safeSearch, vqdImageDelayMs, maxImageBytes } = resolveConfig(ctl, {
           pageSize: parameterPageSize,
           safeSearch: parameterSafeSearch,
         })
@@ -177,7 +177,7 @@ export function createImageSearchTool(
         const batch = await downloadImages(
           imageUrls,
           impit,
-          { workingDirectory: ctl.getWorkingDirectory(), timestamp: Date.now() },
+          { workingDirectory: ctl.getWorkingDirectory(), timestamp: Date.now(), maxBytes: maxImageBytes },
           {
             warn: context.warn,
             signal: context.signal,
