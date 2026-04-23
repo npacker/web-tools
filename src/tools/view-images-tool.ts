@@ -12,6 +12,7 @@ import { filenameFromUrl } from "../fs"
 import { createRetryNotifier, httpUrlSchema } from "../http"
 import { downloadImages } from "../images"
 import { extractPageImages } from "../parsers"
+import { escapeMarkdownText, escapeMarkdownUrl } from "../text"
 import { fetchWebsite } from "../website"
 
 import type { TTLCache } from "../cache"
@@ -170,7 +171,10 @@ export function createViewImagesTool(
           if (result.ok) {
             const altForMarkdown = subject.alt === "" ? `Image ${index + 1}` : subject.alt
 
-            return { ...base, image: `![${altForMarkdown}](${result.localPath})` }
+            return {
+              ...base,
+              image: `![${escapeMarkdownText(altForMarkdown)}](${escapeMarkdownUrl(result.localPath)})`,
+            }
           }
 
           return { ...base, error: `Failed to fetch image from ${result.url}` }
