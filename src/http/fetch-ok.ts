@@ -6,10 +6,45 @@ import pRetry from "p-retry"
 
 import { FetchError } from "./fetch-error"
 import { isRetryableFetchError } from "./retry"
+import { assertPublicUrl } from "./url-guard"
 
 import type { RetryOptions } from "./retry"
 import type { Impit } from "impit"
 import type { Options as PRetryOptions } from "p-retry"
+
+/**
+ * Maximum number of redirect hops to follow before throwing. Each hop is re-validated
+ * through the SSRF guard so DNS rebinding and redirect-to-internal cannot be used to
+ * bypass the destination allowlist.
+ *
+ * @const {number}
+ * @default
+ */
+const MAX_REDIRECT_HOPS = 10
+
+/**
+ * Lower bound of HTTP redirect status codes.
+ *
+ * @const {number}
+ * @default
+ */
+const HTTP_REDIRECT_MIN = 300
+
+/**
+ * Upper bound (exclusive) of HTTP redirect status codes.
+ *
+ * @const {number}
+ * @default
+ */
+const HTTP_REDIRECT_MAX_EXCLUSIVE = 400
+
+/**
+ * HTTP status code for `Not Modified`, which shares the 3xx range but is not a redirect.
+ *
+ * @const {number}
+ * @default
+ */
+const HTTP_NOT_MODIFIED = 304
 
 /**
  * Options passed to every outbound request, primarily to support cancellation and retries.
@@ -22,6 +57,25 @@ export interface RequestOptions {
   /** Observer invoked after each failed attempt, before the backoff sleep. */
   onFailedAttempt?: PRetryOptions["onFailedAttempt"]
 }
+
+/**
+ * Result of a single redirect-handling hop, indicating either a final response or the next URL to follow.
+ */
+type HopResult =
+  | {
+      /** Discriminant marking a final (non-redirect) response. */
+      kind: "done"
+
+      /** The fully received response to return to the caller. */
+      response: Awaited<ReturnType<Impit["fetch"]>>
+    }
+  | {
+      /** Discriminant marking a redirect that should be followed. */
+      kind: "redirect"
+
+      /** Value of the `Location` header, resolved against the current URL by the caller. */
+      location: string
+    }
 
 /**
  * Issue a GET request through the shared `impit` client, throwing `FetchError` on failure or non-2xx.
@@ -51,7 +105,8 @@ export async function fetchOk(impit: Impit, url: string, options: RequestOptions
 }
 
 /**
- * Execute a single GET attempt, normalising transport failures into `FetchError`.
+ * Execute a single GET attempt, manually following redirects and validating each hop through
+ * the SSRF guard. Transport failures and redirect anomalies are normalised into `FetchError`.
  *
  * @param impit Shared HTTP client used for the request.
  * @param url Target URL to fetch.
@@ -63,25 +118,88 @@ async function attemptFetch(
   url: string,
   signal: AbortSignal
 ): Promise<Awaited<ReturnType<Impit["fetch"]>>> {
+  return followRedirects(impit, url, url, signal, MAX_REDIRECT_HOPS)
+}
+
+/**
+ * Recursively issue a GET against `currentUrl`, re-validating the SSRF guard on every hop,
+ * until a non-redirect response is returned or the hop budget is exhausted.
+ *
+ * @param impit Shared HTTP client used for the request.
+ * @param originalUrl URL originally requested by the caller, used in the "too many redirects" error.
+ * @param currentUrl URL to fetch in this attempt.
+ * @param signal Signal used to abort the in-flight request.
+ * @param hopsRemaining Number of redirect hops still permitted before aborting.
+ * @returns The successful response.
+ */
+async function followRedirects(
+  impit: Impit,
+  originalUrl: string,
+  currentUrl: string,
+  signal: AbortSignal,
+  hopsRemaining: number
+): Promise<Awaited<ReturnType<Impit["fetch"]>>> {
+  await assertPublicUrl(currentUrl)
+  const hop = await performHop(impit, currentUrl, signal)
+
+  if (hop.kind === "done") {
+    return hop.response
+  }
+
+  if (hopsRemaining <= 0) {
+    throw new FetchError("Too many redirects", undefined, originalUrl)
+  }
+
+  const nextUrl = new URL(hop.location, currentUrl).toString()
+
+  return followRedirects(impit, originalUrl, nextUrl, signal, hopsRemaining - 1)
+}
+
+/**
+ * Issue a single GET and classify the response as either a final success or a redirect instruction.
+ *
+ * @param impit Shared HTTP client used for the request.
+ * @param currentUrl URL to fetch in this hop.
+ * @param signal Signal used to abort the in-flight request.
+ * @returns A `done` result carrying the final response, or a `redirect` result carrying the next `Location`.
+ */
+async function performHop(impit: Impit, currentUrl: string, signal: AbortSignal): Promise<HopResult> {
   let response: Awaited<ReturnType<Impit["fetch"]>>
 
   try {
-    response = await impit.fetch(url, {
-      method: "GET",
-      signal,
-    })
+    response = await impit.fetch(currentUrl, { method: "GET", signal, redirect: "manual" })
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       throw error
     }
 
     const message = error instanceof Error ? error.message : String(error)
-    throw new FetchError(`Request failed: ${message}`, undefined, url, { cause: error })
+    throw new FetchError(`Request failed: ${message}`, undefined, currentUrl, { cause: error })
+  }
+
+  if (isRedirectStatus(response.status)) {
+    const location = response.headers.get("location")
+
+    if (location === null || location === "") {
+      throw new FetchError("Redirect missing Location header", response.status, currentUrl)
+    }
+
+    return { kind: "redirect", location }
   }
 
   if (!response.ok) {
-    throw new FetchError(`HTTP ${response.status} ${response.statusText}`, response.status, url)
+    throw new FetchError(`HTTP ${response.status} ${response.statusText}`, response.status, currentUrl)
   }
 
-  return response
+  return { kind: "done", response }
+}
+
+/**
+ * Determine whether an HTTP status code represents a followable redirect response.
+ *
+ * @param status HTTP status code to classify.
+ * @returns `true` when the status is in the 3xx range excluding `304 Not Modified`.
+ */
+function isRedirectStatus(status: number): boolean {
+  return status >= HTTP_REDIRECT_MIN && status < HTTP_REDIRECT_MAX_EXCLUSIVE && status !== HTTP_NOT_MODIFIED
 }

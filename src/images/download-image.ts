@@ -10,7 +10,7 @@ import pRetry from "p-retry"
 
 import { errorMessage, isAbortError } from "../errors"
 import { toMarkdownPath } from "../fs"
-import { FetchError, isRetryableFetchError } from "../http"
+import { assertPublicUrl, FetchError, isRetryableFetchError } from "../http"
 import { imageExtensionFromHeaders, isSupportedImageExtension, normalizeImageExtension } from "../parsers"
 
 import type { RetryOptions } from "../http"
@@ -18,12 +18,47 @@ import type { Impit } from "impit"
 import type { Options as PRetryOptions } from "p-retry"
 
 /**
- * Timeout applied to each image download, in milliseconds.
+ * Timeout applied to each image download, in milliseconds. The timeout covers the entire
+ * redirect chain rather than individual hops.
  *
  * @const {number}
  * @default
  */
 const IMAGE_DOWNLOAD_TIMEOUT_MS = 10_000
+
+/**
+ * Maximum number of redirect hops to follow before throwing. Each hop is re-validated
+ * through the SSRF guard so DNS rebinding and redirect-to-internal cannot be used to
+ * bypass the destination allowlist.
+ *
+ * @const {number}
+ * @default
+ */
+const MAX_REDIRECT_HOPS = 10
+
+/**
+ * Lower bound of HTTP redirect status codes.
+ *
+ * @const {number}
+ * @default
+ */
+const HTTP_REDIRECT_MIN = 300
+
+/**
+ * Upper bound (exclusive) of HTTP redirect status codes.
+ *
+ * @const {number}
+ * @default
+ */
+const HTTP_REDIRECT_MAX_EXCLUSIVE = 400
+
+/**
+ * HTTP status code for `Not Modified`, which shares the 3xx range but is not a redirect.
+ *
+ * @const {number}
+ * @default
+ */
+const HTTP_NOT_MODIFIED = 304
 
 /**
  * Contextual hooks provided by the caller for logging and cancellation.
@@ -108,8 +143,29 @@ export async function downloadImage(
 }
 
 /**
- * Execute a single image GET attempt with a bounded timeout, normalising transport failures
- * and timeouts into `FetchError` so they can be retried uniformly.
+ * Result of a single redirect-handling hop, indicating either a final response or the next URL to follow.
+ */
+type HopResult =
+  | {
+      /** Discriminant marking a final (non-redirect) response. */
+      kind: "done"
+
+      /** The fully received response to return to the caller. */
+      response: Awaited<ReturnType<Impit["fetch"]>>
+    }
+  | {
+      /** Discriminant marking a redirect that should be followed. */
+      kind: "redirect"
+
+      /** Value of the `Location` header, resolved against the current URL by the caller. */
+      location: string
+    }
+
+/**
+ * Execute a single image GET attempt with a bounded timeout, manually following redirects and
+ * validating each hop through the SSRF guard. The timeout covers the entire redirect chain so
+ * an attacker cannot chain short requests to exceed the intended budget. Transport failures and
+ * timeouts are normalised into `FetchError` so they can be retried uniformly.
  *
  * @param url Source URL of the image to download.
  * @param impit Shared HTTP client used for the request.
@@ -124,13 +180,72 @@ async function attemptImageFetch(
 ): Promise<Awaited<ReturnType<Impit["fetch"]>>> {
   const timeoutSignal = AbortSignal.timeout(IMAGE_DOWNLOAD_TIMEOUT_MS)
   const combinedSignal = AbortSignal.any([signal, timeoutSignal])
+
+  return followImageRedirects(impit, url, url, signal, combinedSignal, MAX_REDIRECT_HOPS)
+}
+
+/**
+ * Recursively issue a GET against `currentUrl`, re-validating the SSRF guard on every hop,
+ * until a non-redirect response is returned or the hop budget is exhausted.
+ *
+ * @param impit Shared HTTP client used for the request.
+ * @param originalUrl URL originally requested by the caller, used in the "too many redirects" error and timeout message.
+ * @param currentUrl URL to fetch in this attempt.
+ * @param signal External abort signal used to distinguish timeouts from user aborts.
+ * @param combinedSignal Signal combining the external abort signal with the chain-wide timeout.
+ * @param hopsRemaining Number of redirect hops still permitted before aborting.
+ * @returns The successful response.
+ */
+async function followImageRedirects(
+  impit: Impit,
+  originalUrl: string,
+  currentUrl: string,
+  signal: AbortSignal,
+  combinedSignal: AbortSignal,
+  hopsRemaining: number
+): Promise<Awaited<ReturnType<Impit["fetch"]>>> {
+  await assertPublicUrl(currentUrl)
+  const hop = await performImageHop(impit, originalUrl, currentUrl, signal, combinedSignal)
+
+  if (hop.kind === "done") {
+    return hop.response
+  }
+
+  if (hopsRemaining <= 0) {
+    throw new FetchError("Too many redirects", undefined, originalUrl)
+  }
+
+  const nextUrl = new URL(hop.location, currentUrl).toString()
+
+  return followImageRedirects(impit, originalUrl, nextUrl, signal, combinedSignal, hopsRemaining - 1)
+}
+
+/**
+ * Issue a single image GET and classify the response as either a final success or a redirect instruction.
+ *
+ * @param impit Shared HTTP client used for the request.
+ * @param originalUrl URL originally requested by the caller, used as the `url` on timeout errors.
+ * @param currentUrl URL to fetch in this hop.
+ * @param signal External abort signal used to distinguish timeouts from user aborts.
+ * @param combinedSignal Signal combining the external abort signal with the chain-wide timeout.
+ * @returns A `done` result carrying the final response, or a `redirect` result carrying the next `Location`.
+ */
+async function performImageHop(
+  impit: Impit,
+  originalUrl: string,
+  currentUrl: string,
+  signal: AbortSignal,
+  combinedSignal: AbortSignal
+): Promise<HopResult> {
   let response: Awaited<ReturnType<Impit["fetch"]>>
 
   try {
-    response = await impit.fetch(url, { method: "GET", signal: combinedSignal })
+    response = await impit.fetch(currentUrl, { method: "GET", signal: combinedSignal, redirect: "manual" })
   } catch (error) {
     if (isAbortError(error) && !signal.aborted) {
-      throw new FetchError(`Request timed out after ${IMAGE_DOWNLOAD_TIMEOUT_MS}ms`, undefined, url, { cause: error })
+      throw new FetchError(`Request timed out after ${IMAGE_DOWNLOAD_TIMEOUT_MS}ms`, undefined, originalUrl, {
+        cause: error,
+      })
     }
 
     if (isAbortError(error)) {
@@ -138,14 +253,34 @@ async function attemptImageFetch(
     }
 
     const message = error instanceof Error ? error.message : String(error)
-    throw new FetchError(`Request failed: ${message}`, undefined, url, { cause: error })
+    throw new FetchError(`Request failed: ${message}`, undefined, currentUrl, { cause: error })
+  }
+
+  if (isRedirectStatus(response.status)) {
+    const location = response.headers.get("location")
+
+    if (location === null || location === "") {
+      throw new FetchError("Redirect missing Location header", response.status, currentUrl)
+    }
+
+    return { kind: "redirect", location }
   }
 
   if (!response.ok) {
-    throw new FetchError(`HTTP ${response.status} ${response.statusText}`, response.status, url)
+    throw new FetchError(`HTTP ${response.status} ${response.statusText}`, response.status, currentUrl)
   }
 
-  return response
+  return { kind: "done", response }
+}
+
+/**
+ * Determine whether an HTTP status code represents a followable redirect response.
+ *
+ * @param status HTTP status code to classify.
+ * @returns `true` when the status is in the 3xx range excluding `304 Not Modified`.
+ */
+function isRedirectStatus(status: number): boolean {
+  return status >= HTTP_REDIRECT_MIN && status < HTTP_REDIRECT_MAX_EXCLUSIVE && status !== HTTP_NOT_MODIFIED
 }
 
 /**
