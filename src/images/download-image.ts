@@ -21,7 +21,7 @@ import type { Options as PRetryOptions } from "p-retry"
  * Timeout applied to each image download, in milliseconds.
  *
  * @const {number}
- * @default 10_000
+ * @default
  */
 const IMAGE_DOWNLOAD_TIMEOUT_MS = 10_000
 

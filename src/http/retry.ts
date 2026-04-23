@@ -22,7 +22,7 @@ const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504])
  * Conversion factor from milliseconds to seconds, used when rendering retry delays.
  *
  * @const {number}
- * @default 1000
+ * @default
  */
 const MS_PER_SECOND = 1000
 

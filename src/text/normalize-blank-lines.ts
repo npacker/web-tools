@@ -7,7 +7,7 @@
  * this are collapsed to a single blank line between paragraphs.
  *
  * @const {number}
- * @default 2
+ * @default
  */
 const MAX_CONSECUTIVE_NEWLINES = 2
 

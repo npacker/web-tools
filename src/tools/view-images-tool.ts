@@ -23,7 +23,7 @@ import type { Impit } from "impit"
  * Lower bound on the image count when a website URL is provided.
  *
  * @const {number}
- * @default 1
+ * @default
  */
 const MIN_VIEW_IMAGES_COUNT = 1
 
@@ -31,7 +31,7 @@ const MIN_VIEW_IMAGES_COUNT = 1
  * Upper bound on the image count when a website URL is provided.
  *
  * @const {number}
- * @default 200
+ * @default
  */
 const MAX_VIEW_IMAGES_COUNT = 200
 

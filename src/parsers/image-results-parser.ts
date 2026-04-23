@@ -19,7 +19,7 @@ const SUPPORTED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "svg"] 
  * Fallback extension used when neither content-type nor URL yields a recognised image format.
  *
  * @const {string}
- * @default "jpg"
+ * @default
  */
 const FALLBACK_EXTENSION = "jpg"
 
@@ -27,7 +27,7 @@ const FALLBACK_EXTENSION = "jpg"
  * Pattern matching the file extension of a URL's path segment, ignoring any query string.
  *
  * @const {RegExp}
- * @default /\.([a-z0-9]+)(?:\?|$)/i
+ * @default
  */
 export const URL_EXTENSION_PATTERN = /\.([a-z0-9]+)(?:\?|$)/i
 

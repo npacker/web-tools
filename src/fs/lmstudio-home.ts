@@ -15,7 +15,7 @@ import path from "node:path"
  * LM Studio home path for subsequent lookups.
  *
  * @const {string}
- * @default ".lmstudio-home-pointer"
+ * @default
  */
 const POINTER_FILE_NAME = ".lmstudio-home-pointer"
 

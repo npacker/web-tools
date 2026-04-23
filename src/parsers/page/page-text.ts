@@ -16,7 +16,7 @@ import type { ContentFormat } from "../../config/resolve-config"
  * avoid returning chunks whose match is essentially noise.
  *
  * @const {number}
- * @default 0.3
+ * @default
  */
 const FUSE_SCORE_THRESHOLD = 0.3
 
@@ -24,7 +24,7 @@ const FUSE_SCORE_THRESHOLD = 0.3
  * Paragraph separator used when joining the selected chunks back together for emission.
  *
  * @const {string}
- * @default "\n\n"
+ * @default
  */
 const CHUNK_JOIN_SEPARATOR = "\n\n"
 

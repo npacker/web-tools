@@ -10,7 +10,7 @@ import { normalizeText } from "../text"
  * CSS selector matching individual result blocks on the DuckDuckGo HTML endpoint.
  *
  * @const {string}
- * @default ".result"
+ * @default
  */
 const SEARCH_RESULT_SELECTOR = ".result"
 
@@ -18,7 +18,7 @@ const SEARCH_RESULT_SELECTOR = ".result"
  * CSS selector matching the result link within a result block.
  *
  * @const {string}
- * @default ".result__a"
+ * @default
  */
 const SEARCH_RESULT_LINK_SELECTOR = ".result__a"
 
@@ -26,7 +26,7 @@ const SEARCH_RESULT_LINK_SELECTOR = ".result__a"
  * CSS selector matching the snippet element within a result block.
  *
  * @const {string}
- * @default ".result__snippet"
+ * @default
  */
 const SEARCH_RESULT_SNIPPET_SELECTOR = ".result__snippet"
 
@@ -34,7 +34,7 @@ const SEARCH_RESULT_SNIPPET_SELECTOR = ".result__snippet"
  * Maximum character length for a result snippet.
  *
  * @const {number}
- * @default 300
+ * @default
  */
 const MAX_SNIPPET_LENGTH = 300
 

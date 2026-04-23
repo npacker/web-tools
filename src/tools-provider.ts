@@ -22,7 +22,7 @@ import type { Tool, ToolsProviderController } from "@lmstudio/sdk"
  * Root directory name used for the plugin's on-disk `cacache` store.
  *
  * @const {string}
- * @default "lms-plugin-duckduckgo-cache"
+ * @default
  */
 const CACHE_DIRECTORY_NAME = "lms-plugin-duckduckgo-cache"
 
@@ -30,7 +30,7 @@ const CACHE_DIRECTORY_NAME = "lms-plugin-duckduckgo-cache"
  * Subdirectory under the cache root dedicated to web/image search results.
  *
  * @const {string}
- * @default "search"
+ * @default
  */
 const SEARCH_CACHE_SUBDIR = "search"
 
@@ -38,7 +38,7 @@ const SEARCH_CACHE_SUBDIR = "search"
  * Maximum number of search result entries retained in the search cache.
  *
  * @const {number}
- * @default 100
+ * @default
  */
 const SEARCH_CACHE_MAX_SIZE = 100
 
@@ -46,7 +46,7 @@ const SEARCH_CACHE_MAX_SIZE = 100
  * Subdirectory under the cache root dedicated to VQD tokens.
  *
  * @const {string}
- * @default "vqd"
+ * @default
  */
 const VQD_CACHE_SUBDIR = "vqd"
 
@@ -54,7 +54,7 @@ const VQD_CACHE_SUBDIR = "vqd"
  * Maximum number of VQD tokens retained in the VQD cache.
  *
  * @const {number}
- * @default 50
+ * @default
  */
 const VQD_CACHE_MAX_SIZE = 50
 
@@ -62,7 +62,7 @@ const VQD_CACHE_MAX_SIZE = 50
  * Subdirectory under the cache root dedicated to fetched website HTML payloads.
  *
  * @const {string}
- * @default "website"
+ * @default
  */
 const WEBSITE_CACHE_SUBDIR = "website"
 
@@ -70,7 +70,7 @@ const WEBSITE_CACHE_SUBDIR = "website"
  * Maximum number of website HTML payloads retained in the website cache.
  *
  * @const {number}
- * @default 50
+ * @default
  */
 const WEBSITE_CACHE_MAX_SIZE = 50
 

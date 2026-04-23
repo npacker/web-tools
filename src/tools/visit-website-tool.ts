@@ -22,7 +22,7 @@ import type { Impit } from "impit"
  * Output format choices accepted by the `contentFormat` parameter.
  *
  * @const {readonly ContentFormat[]}
- * @default ["markdown", "text"]
+ * @default
  */
 const CONTENT_FORMAT_OPTIONS = ["markdown", "text"] as const satisfies readonly ContentFormat[]
 

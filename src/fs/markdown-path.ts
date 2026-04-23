@@ -6,7 +6,7 @@
  * Pattern matching a leading Windows drive letter, with or without a preceding slash.
  *
  * @const {RegExp}
- * @default /^\/?[A-Z]:/
+ * @default
  */
 const WINDOWS_DRIVE_PATTERN = /^\/?[A-Z]:/
 
