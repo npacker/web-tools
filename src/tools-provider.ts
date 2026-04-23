@@ -75,6 +75,16 @@ const WEBSITE_CACHE_SUBDIR = "website"
 const WEBSITE_CACHE_MAX_SIZE = 50
 
 /**
+ * Maximum number of concurrent image downloads permitted across the plugin. Caps the fan-out
+ * driven by a page with many `<img>` tags so a single tool invocation cannot open hundreds
+ * of parallel connections against a target.
+ *
+ * @const {number}
+ * @default
+ */
+const MAX_IMAGE_CONCURRENCY = 6
+
+/**
  * Register the plugin's four tools with the LM Studio SDK controller.
  *
  * The rate limiter is constructed per-session (rather than module-scoped) so user-configured
@@ -87,7 +97,8 @@ export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[
   const timing = resolveTimingConfig(ctl)
   const impit = createImpit()
   const cacheRoot = path.join(findLMStudioHome(), "plugin-data", CACHE_DIRECTORY_NAME)
-  const rateLimiter = new RateLimiter(timing.requestIntervalMs)
+  const rateLimiter = new RateLimiter({ minIntervalMs: timing.requestIntervalMs })
+  const imageLimiter = new RateLimiter({ maxConcurrent: MAX_IMAGE_CONCURRENCY })
   const vqdCache = new TTLCache<string>(
     path.join(cacheRoot, VQD_CACHE_SUBDIR),
     timing.vqdCacheTtlMs,
@@ -107,8 +118,8 @@ export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[
 
   return [
     createWebSearchTool(ctl, impit, searchCache, rateLimiter, retry),
-    createImageSearchTool(ctl, impit, vqdCache, rateLimiter, retry),
+    createImageSearchTool(ctl, impit, vqdCache, rateLimiter, imageLimiter, retry),
     createVisitWebsiteTool(ctl, impit, websiteCache, rateLimiter, retry),
-    createViewImagesTool(ctl, impit, websiteCache, rateLimiter, retry),
+    createViewImagesTool(ctl, impit, websiteCache, rateLimiter, imageLimiter, retry),
   ]
 }

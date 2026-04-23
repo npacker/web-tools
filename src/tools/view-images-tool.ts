@@ -72,6 +72,7 @@ interface ViewedImage {
  * @param impit Shared HTTP client used for HTML fetches and image downloads.
  * @param websiteCache Cache holding recent HTML payloads keyed by URL.
  * @param rateLimiter Shared limiter enforcing the minimum gap between outbound requests.
+ * @param imageLimiter Shared limiter capping the number of image downloads in flight concurrently.
  * @param retry Retry policy applied to every outbound request.
  * @returns The configured View Images tool.
  */
@@ -80,6 +81,7 @@ export function createViewImagesTool(
   impit: Impit,
   websiteCache: TTLCache<string>,
   rateLimiter: RateLimiter,
+  imageLimiter: RateLimiter,
   retry: RetryOptions
 ): Tool {
   return tool({
@@ -152,6 +154,7 @@ export function createViewImagesTool(
           {
             warn: context.warn,
             signal: context.signal,
+            limiter: imageLimiter,
             retry,
             onFailedAttempt: createRetryNotifier(context.status, "image download"),
           }

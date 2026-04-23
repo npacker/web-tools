@@ -1,5 +1,5 @@
 /**
- * Rate limiter utility for controlling request frequency.
+ * Rate limiter utility for controlling request frequency and concurrency.
  */
 
 import Bottleneck from "bottleneck"
@@ -14,19 +14,32 @@ async function noop(): Promise<void> {
 }
 
 /**
- * Enforces a minimum interval between successive operations, backed by Bottleneck.
+ * Construction options for `RateLimiter`.
+ */
+export interface RateLimiterOptions {
+  /** Minimum gap enforced between successive scheduled operations, in milliseconds. Defaults to `0`. */
+  minIntervalMs?: number
+  /** Maximum number of operations allowed to run concurrently. Defaults to `1`. */
+  maxConcurrent?: number
+}
+
+/**
+ * Enforces a minimum interval and/or a concurrency cap on scheduled operations, backed by Bottleneck.
  */
 export class RateLimiter {
-  /** Underlying Bottleneck limiter configured with `minTime` and serial execution. */
+  /** Underlying Bottleneck limiter configured with `minTime` and `maxConcurrent`. */
   private readonly limiter: Bottleneck
 
   /**
-   * Create a limiter configured with the given minimum interval.
+   * Create a limiter configured with the given minimum interval and concurrency cap.
    *
-   * @param minIntervalMs Minimum gap enforced between requests, in milliseconds.
+   * @param options Limiter configuration. `minIntervalMs` defaults to `0` and `maxConcurrent` defaults to `1`.
    */
-  public constructor(minIntervalMs: number) {
-    this.limiter = new Bottleneck({ minTime: minIntervalMs, maxConcurrent: 1 })
+  public constructor(options: RateLimiterOptions) {
+    this.limiter = new Bottleneck({
+      minTime: options.minIntervalMs ?? 0,
+      maxConcurrent: options.maxConcurrent ?? 1,
+    })
   }
 
   /**
@@ -37,5 +50,16 @@ export class RateLimiter {
    */
   public async wait(): Promise<void> {
     await this.limiter.schedule(noop)
+  }
+
+  /**
+   * Schedule an async task through the limiter, honouring both the minimum-interval and concurrency caps.
+   * The returned promise settles with the task's result (or rejection), unchanged.
+   *
+   * @param task Async task to execute once the limiter admits it.
+   * @returns The task's resolved value.
+   */
+  public async schedule<T>(task: () => Promise<T>): Promise<T> {
+    return this.limiter.schedule(task)
   }
 }

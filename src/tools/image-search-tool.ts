@@ -72,6 +72,7 @@ const DEFAULT_PAGE_NUMBER = 1
  * @param impit Shared HTTP client used for outbound requests and image downloads.
  * @param vqdCache Cache holding VQD tokens keyed by query.
  * @param rateLimiter Shared limiter enforcing the minimum gap between requests.
+ * @param imageLimiter Shared limiter capping the number of image downloads in flight concurrently.
  * @param retry Retry policy applied to every outbound request.
  * @returns The configured image search tool.
  */
@@ -80,6 +81,7 @@ export function createImageSearchTool(
   impit: Impit,
   vqdCache: TTLCache<string>,
   rateLimiter: RateLimiter,
+  imageLimiter: RateLimiter,
   retry: RetryOptions
 ): Tool {
   return tool({
@@ -181,6 +183,7 @@ export function createImageSearchTool(
           {
             warn: context.warn,
             signal: context.signal,
+            limiter: imageLimiter,
             retry,
             onFailedAttempt: createRetryNotifier(context.status, "image download"),
           }

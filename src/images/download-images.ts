@@ -7,6 +7,7 @@ import path from "node:path"
 import { downloadImage } from "./download-image"
 
 import type { RetryOptions } from "../http"
+import type { RateLimiter } from "../timing"
 import type { Impit } from "impit"
 import type { Options as PRetryOptions } from "p-retry"
 
@@ -30,6 +31,8 @@ export interface DownloadImagesContext {
   warn: (message: string) => void
   /** Signal used to abort the in-flight downloads. */
   signal: AbortSignal
+  /** Limiter capping the number of downloads in flight concurrently. */
+  limiter: RateLimiter
   /** Retry policy applied to transient download failures. */
   retry?: RetryOptions
   /** Observer invoked after each failed attempt, before the backoff sleep. */
@@ -72,7 +75,11 @@ export async function downloadImages(
   options: DownloadImagesOptions,
   context: DownloadImagesContext
 ): Promise<DownloadedImage[]> {
-  return Promise.all(urls.map(async (url, position) => downloadOne(url, position, impit, options, context)))
+  return Promise.all(
+    urls.map(async (url, position) =>
+      context.limiter.schedule(async () => downloadOne(url, position, impit, options, context))
+    )
+  )
 }
 
 /**
