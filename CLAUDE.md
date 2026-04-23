@@ -34,7 +34,7 @@ Entry point [src/index.ts](src/index.ts) registers a config schematic and a tool
 [src/parsers/page/page-text.ts](src/parsers/page/page-text.ts) feeds raw HTML to `@mozilla/readability` to strip boilerplate (nav, sidebars, comments), then routes Readability's `.content` HTML through either:
 
 - **Markdown** (default) — [src/text/html-to-markdown.ts](src/text/html-to-markdown.ts) via a shared `turndown` service (ATX headings, `-` bullets, fenced code, inline links, inline images). `script`/`style`/`noscript`/`template` are stripped before conversion.
-- **Plain text** — [src/text/html-to-text.ts](src/text/html-to-text.ts) walks the DOM and inserts newlines at block boundaries so paragraphs and lists remain separated without markdown syntax.
+- **Plain text** — [src/text/html-to-text.ts](src/text/html-to-text.ts) wraps `html-to-text` with token-conservative options: word wrapping disabled, anchor URLs dropped (only inner text kept), `<img>`/`<noscript>`/`<template>` skipped, headings and table headers left in source case rather than uppercased, and list items prefixed with `- `.
 
 Both paths share [src/text/normalize-blank-lines.ts](src/text/normalize-blank-lines.ts) for trailing-whitespace and blank-line collapsing. `contentFormat` is selectable per-call (Zod `enum`) and plugin-wide (`select` field, default `"markdown"`). `contentLimit` is plugin-only — not exposed as a tool parameter so the model cannot override the user-set or default budget. The tool still returns `contentLength`, the pre-truncation character count, so the model can detect truncation and refine with `findInPage`.
 
@@ -75,6 +75,7 @@ ESLint enforces two rules on `src/tools/*-tool.ts`: the file must contain exactl
 - `jsdom` — HTML parsing
 - `@mozilla/readability` — readable article extraction for Visit Website (boilerplate removal, not text extraction)
 - `turndown` — HTML → Markdown conversion for Visit Website's content field
+- `html-to-text` — HTML → plain-text conversion for Visit Website's content field when markdown is opted out
 - `zod` — tool parameter schemas
 - `bottleneck` — backs the shared `RateLimiter`
 - `cacache` — disk-backed cache store for all three TTL caches

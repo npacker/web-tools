@@ -3,113 +3,45 @@
  * all markdown syntax. Used by the Visit Website tool when the caller opts out of markdown.
  */
 
-import { JSDOM } from "jsdom"
+import { convert } from "html-to-text"
 
 import { normalizeBlankLines } from "./normalize-blank-lines"
 
-import type { DOMWindow } from "jsdom"
+import type { HtmlToTextOptions } from "html-to-text"
 
 /**
- * Element type exposed by a jsdom window, used for the recursive serializer signature. Keeping
- * the type local avoids pulling the global `Element` identifier into lint's scope.
- */
-type DomElement = InstanceType<DOMWindow["Element"]>
-
-/**
- * HTML tag names whose content should be surrounded by newlines so adjacent block boundaries
- * survive text extraction. Upper-case matches `Element.tagName` in the HTML namespace.
+ * Converter options tuned for token efficiency: word wrapping is disabled so paragraphs are not
+ * fragmented across lines, anchors render only their inner text (the URL is dropped), images and
+ * `<noscript>`/`<template>` subtrees are excluded entirely, headings and table headers retain
+ * their original case instead of being uppercased, and list items use a two-character prefix.
  *
- * @const {Set<string>}
+ * @const {HtmlToTextOptions}
  */
-const BLOCK_TAGS = new Set<string>([
-  "ADDRESS",
-  "ARTICLE",
-  "ASIDE",
-  "BLOCKQUOTE",
-  "DD",
-  "DETAILS",
-  "DIALOG",
-  "DIV",
-  "DL",
-  "DT",
-  "FIELDSET",
-  "FIGCAPTION",
-  "FIGURE",
-  "FOOTER",
-  "FORM",
-  "H1",
-  "H2",
-  "H3",
-  "H4",
-  "H5",
-  "H6",
-  "HEADER",
-  "HGROUP",
-  "HR",
-  "LI",
-  "MAIN",
-  "NAV",
-  "OL",
-  "P",
-  "PRE",
-  "SECTION",
-  "SUMMARY",
-  "TABLE",
-  "TD",
-  "TH",
-  "TR",
-  "UL",
-])
+const CONVERT_OPTIONS: HtmlToTextOptions = {
+  wordwrap: false,
+  selectors: [
+    { selector: "a", options: { ignoreHref: true } },
+    { selector: "img", format: "skip" },
+    { selector: "noscript", format: "skip" },
+    { selector: "template", format: "skip" },
+    { selector: "h1", options: { uppercase: false } },
+    { selector: "h2", options: { uppercase: false } },
+    { selector: "h3", options: { uppercase: false } },
+    { selector: "h4", options: { uppercase: false } },
+    { selector: "h5", options: { uppercase: false } },
+    { selector: "h6", options: { uppercase: false } },
+    { selector: "ul", options: { itemPrefix: "- " } },
+    { selector: "table", options: { uppercaseHeaderCells: false } },
+  ],
+}
 
 /**
- * HTML tag names whose subtree is excluded from the extracted text.
- *
- * @const {Set<string>}
- */
-const SKIP_TAGS = new Set<string>(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE"])
-
-/**
- * Convert an HTML fragment to plain text, inserting newlines at block boundaries so headings,
- * paragraphs, and list items remain separated. Scripts, styles, and templates are removed.
+ * Convert an HTML fragment to plain text via the `html-to-text` package, then collapse runs of
+ * blank lines and trim trailing whitespace.
  *
  * @param html HTML fragment to convert.
  * @returns The plain-text representation, with runs of blank lines collapsed and trailing whitespace trimmed.
  */
 export function htmlToText(html: string): string {
-  const { document } = new JSDOM(html).window
-
-  return normalizeBlankLines(serializeElement(document.body))
-}
-
-/**
- * Recursively serialize an element subtree into text, wrapping block elements in newlines so
- * adjacent block content does not collide.
- *
- * @param element Element to serialize.
- * @returns The serialized text of the element's subtree.
- */
-function serializeElement(element: DomElement): string {
-  const { tagName } = element
-
-  if (SKIP_TAGS.has(tagName)) {
-    return ""
-  }
-
-  if (tagName === "BR") {
-    return "\n"
-  }
-
-  const pieces: string[] = []
-
-  for (const child of element.childNodes) {
-    if (child.nodeType === child.TEXT_NODE) {
-      pieces.push(child.textContent ?? "")
-    } else if (child.nodeType === child.ELEMENT_NODE) {
-      pieces.push(serializeElement(child as DomElement))
-    }
-  }
-
-  const inner = pieces.join("")
-
-  return BLOCK_TAGS.has(tagName) ? `\n${inner}\n` : inner
+  return normalizeBlankLines(convert(html, CONVERT_OPTIONS))
 }
