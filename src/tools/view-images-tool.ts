@@ -12,7 +12,6 @@ import { filenameFromUrl } from "../fs"
 import { createRetryNotifier, httpUrlSchema } from "../http"
 import { downloadImages } from "../images"
 import { extractPageImages } from "../parsers"
-import { rejectUnknownParameters } from "../strict-parameters"
 import { escapeMarkdownText, escapeMarkdownUrl } from "../text"
 import { fetchWebsite } from "../website"
 
@@ -115,13 +114,7 @@ export function createViewImagesTool(
      * @returns Per-image records with filename, alt, title, and either a markdown reference or an error, or a user-facing error string.
      */
     implementation: async (arguments_, context) => {
-      const guarded = rejectUnknownParameters(arguments_, ["imageURLs", "websiteURL", "maxImages"] as const)
-
-      if (typeof guarded === "string") {
-        return guarded
-      }
-
-      const { imageURLs, websiteURL, maxImages: parameterMaxImages } = guarded
+      const { imageURLs, websiteURL, maxImages: parameterMaxImages } = arguments_
       const explicitUrls = imageURLs ?? []
       const hasWebsite = websiteURL !== undefined && websiteURL !== ""
 

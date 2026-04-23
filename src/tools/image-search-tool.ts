@@ -11,7 +11,6 @@ import { formatToolError, NoImageResultsError } from "../errors"
 import { createRetryNotifier, FetchError } from "../http"
 import { downloadImages } from "../images"
 import { extractImageUrls } from "../parsers"
-import { rejectUnknownParameters } from "../strict-parameters"
 import { type RateLimiter, sleep } from "../timing"
 
 import type { TTLCache } from "../cache"
@@ -121,13 +120,7 @@ export function createImageSearchTool(
      * @returns Either the downloaded file paths, the remote URLs on download failure, or a user-facing error string.
      */
     implementation: async (arguments_, context) => {
-      const guarded = rejectUnknownParameters(arguments_, ["query", "pageSize", "safeSearch", "page"] as const)
-
-      if (typeof guarded === "string") {
-        return guarded
-      }
-
-      const { query, pageSize: parameterPageSize, safeSearch: parameterSafeSearch, page } = guarded
+      const { query, pageSize: parameterPageSize, safeSearch: parameterSafeSearch, page } = arguments_
       context.status("Initiating DuckDuckGo image search...")
       await rateLimiter.wait()
 

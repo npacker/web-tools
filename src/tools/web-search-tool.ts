@@ -10,7 +10,6 @@ import { resolveConfig } from "../config/resolve-config"
 import { searchWeb } from "../duckduckgo"
 import { formatToolError, NoWebResultsError } from "../errors"
 import { createRetryNotifier } from "../http"
-import { rejectUnknownParameters } from "../strict-parameters"
 
 import type { RetryOptions } from "../http"
 import type { RateLimiter } from "../timing"
@@ -109,13 +108,7 @@ export function createWebSearchTool(
      * @returns Either the result tuples or a user-facing error string.
      */
     implementation: async (arguments_, context) => {
-      const guarded = rejectUnknownParameters(arguments_, ["query", "pageSize", "safeSearch", "page"] as const)
-
-      if (typeof guarded === "string") {
-        return guarded
-      }
-
-      const { query, pageSize: parameterPageSize, safeSearch: parameterSafeSearch, page } = guarded
+      const { query, pageSize: parameterPageSize, safeSearch: parameterSafeSearch, page } = arguments_
       context.status("Initiating DuckDuckGo web search...")
       await rateLimiter.wait()
 
