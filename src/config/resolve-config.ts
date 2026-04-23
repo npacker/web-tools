@@ -15,7 +15,7 @@ import type { ToolsProviderController } from "@lmstudio/sdk"
  * @const {number}
  * @default
  */
-export const DEFAULT_PAGE_SIZE = 5
+const DEFAULT_PAGE_SIZE = 5
 
 /**
  * Default safe-search mode when neither plugin nor override supplies a value.
@@ -202,8 +202,6 @@ export interface ResolvedTimingConfig {
  * Optional per-invocation overrides applied on top of plugin configuration.
  */
 interface ConfigOverrides {
-  /** Page size override provided by the caller. */
-  pageSize?: number
   /** Safe-search override provided by the caller. */
   safeSearch?: SafeSearch
   /** Max-images override provided by the caller. */
@@ -231,7 +229,7 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
   const pluginMaxImageMb = pluginConfig.get("maxImageMb") as number | null
 
   return {
-    pageSize: resolvePageSize(pluginPageSize, overrides.pageSize),
+    pageSize: resolvePageSize(pluginPageSize),
     safeSearch: resolveSafeSearch(pluginSafeSearch, overrides.safeSearch),
     includeSnippets: pluginIncludeSnippets ?? DEFAULT_INCLUDE_SNIPPETS,
     maxImages: resolveAutoNumeric(pluginMaxImages, overrides.maxImages, DEFAULT_MAX_IMAGES),
@@ -319,16 +317,13 @@ function resolveMbToBytes(pluginMb: number | null, defaultMb: number): number {
 }
 
 /**
- * Resolves page size with proper priority.
+ * Resolves page size from plugin configuration.
  *
  * @param pluginValue Value read from plugin configuration, or `null` when unset.
- * @param override Runtime override from the tool invocation.
  * @returns The effective page size.
  */
-function resolvePageSize(pluginValue: number | null, override: number | undefined): number {
-  const fromPlugin = pluginValue !== null && pluginValue !== 0 ? pluginValue : undefined
-
-  return fromPlugin ?? override ?? DEFAULT_PAGE_SIZE
+function resolvePageSize(pluginValue: number | null): number {
+  return pluginValue !== null && pluginValue !== 0 ? pluginValue : DEFAULT_PAGE_SIZE
 }
 
 /**

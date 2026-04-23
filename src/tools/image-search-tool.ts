@@ -5,7 +5,7 @@
 import { tool, type Tool, type ToolsProviderController } from "@lmstudio/sdk"
 import { z } from "zod"
 
-import { DEFAULT_PAGE_SIZE, DEFAULT_SAFE_SEARCH, resolveConfig } from "../config/resolve-config"
+import { DEFAULT_SAFE_SEARCH, resolveConfig } from "../config/resolve-config"
 import { fetchVqdToken, searchImages } from "../duckduckgo"
 import { formatToolError, NoImageResultsError } from "../errors"
 import { createRetryNotifier, FetchError } from "../http"
@@ -24,22 +24,6 @@ import type { Impit } from "impit"
  * @const {ReadonlySet<number>}
  */
 const STALE_VQD_STATUS_CODES: ReadonlySet<number> = new Set([400, 401, 403, 418])
-
-/**
- * Lower bound on the configurable page size.
- *
- * @const {number}
- * @default
- */
-const MIN_PAGE_SIZE = 1
-
-/**
- * Upper bound on the configurable page size.
- *
- * @const {number}
- * @default
- */
-const MAX_PAGE_SIZE = 10
 
 /**
  * Lower bound on the requested page number.
@@ -89,14 +73,6 @@ export function createImageSearchTool(
     description: "Search for images on DuckDuckGo using a query string and return a list of image URLs.",
     parameters: {
       query: z.string().describe("The search query for finding images."),
-      pageSize: z
-        .number()
-        .int()
-        .min(MIN_PAGE_SIZE)
-        .max(MAX_PAGE_SIZE)
-        .optional()
-        .default(DEFAULT_PAGE_SIZE)
-        .describe("The number of image results per page."),
       safeSearch: z.enum(["strict", "moderate", "off"]).optional().default(DEFAULT_SAFE_SEARCH).describe("Safe Search"),
       page: z
         .number()
@@ -113,20 +89,18 @@ export function createImageSearchTool(
      *
      * @param arguments_ Validated tool parameters.
      * @param arguments_.query Search query string.
-     * @param arguments_.pageSize Optional per-call page size override.
      * @param arguments_.safeSearch Optional per-call safe-search override.
      * @param arguments_.page Page number being requested.
      * @param context Runtime tool context supplied by the SDK.
      * @returns Either the downloaded file paths, the remote URLs on download failure, or a user-facing error string.
      */
     implementation: async (arguments_, context) => {
-      const { query, pageSize: parameterPageSize, safeSearch: parameterSafeSearch, page } = arguments_
+      const { query, safeSearch: parameterSafeSearch, page } = arguments_
       context.status("Initiating DuckDuckGo image search...")
       await rateLimiter.wait()
 
       try {
         const { pageSize, safeSearch, vqdImageDelayMs, maxImageBytes } = resolveConfig(ctl, {
-          pageSize: parameterPageSize,
           safeSearch: parameterSafeSearch,
         })
         let vqd = await fetchVqdToken(impit, vqdCache, query, {

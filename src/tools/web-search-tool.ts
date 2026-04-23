@@ -16,22 +16,6 @@ import type { RateLimiter } from "../timing"
 import type { Impit } from "impit"
 
 /**
- * Lower bound on the configurable page size.
- *
- * @const {number}
- * @default
- */
-const MIN_PAGE_SIZE = 1
-
-/**
- * Upper bound on the configurable page size.
- *
- * @const {number}
- * @default
- */
-const MAX_PAGE_SIZE = 10
-
-/**
  * Lower bound on the requested page number.
  *
  * @const {number}
@@ -78,13 +62,6 @@ export function createWebSearchTool(
       "Search for web pages on DuckDuckGo using a query string, returning a list of URLs with titles and snippet previews.",
     parameters: {
       query: z.string().describe("The search query for finding web pages."),
-      pageSize: z
-        .number()
-        .int()
-        .min(MIN_PAGE_SIZE)
-        .max(MAX_PAGE_SIZE)
-        .optional()
-        .describe("The number of web results per page."),
       safeSearch: z.enum(["strict", "moderate", "off"]).optional().describe("Safe Search."),
       page: z
         .number()
@@ -101,20 +78,18 @@ export function createWebSearchTool(
      *
      * @param arguments_ Validated tool parameters.
      * @param arguments_.query Search query string.
-     * @param arguments_.pageSize Optional per-call page size override.
      * @param arguments_.safeSearch Optional per-call safe-search override.
      * @param arguments_.page Page number being requested.
      * @param context Runtime tool context supplied by the SDK.
      * @returns Either the result tuples or a user-facing error string.
      */
     implementation: async (arguments_, context) => {
-      const { query, pageSize: parameterPageSize, safeSearch: parameterSafeSearch, page } = arguments_
+      const { query, safeSearch: parameterSafeSearch, page } = arguments_
       context.status("Initiating web search...")
       await rateLimiter.wait()
 
       try {
         const { pageSize, safeSearch, includeSnippets } = resolveConfig(ctl, {
-          pageSize: parameterPageSize,
           safeSearch: parameterSafeSearch,
         })
         const cacheKey = searchCacheKey("web", query, safeSearch, page)

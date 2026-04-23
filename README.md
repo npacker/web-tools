@@ -11,11 +11,10 @@ DuckDuckGo web search.
 | Parameter | Type | Notes |
 | --- | --- | --- |
 | `query` | string | Required. |
-| `pageSize` | int 1–10 | Optional; overrides plugin setting when supplied. |
 | `safeSearch` | `"strict" \| "moderate" \| "off"` | Optional; overrides plugin setting when supplied. |
 | `page` | int 1–100 | Optional, defaults to 1. Enables pagination. |
 
-Returns an array of `[title, url]` pairs. Results are cached by `(query, safeSearch, page)`.
+Returns an array of `[title, url]` pairs. Results are cached by `(query, safeSearch, page)`. The results-per-page count (`pageSize`) is a plugin-only setting — it is not exposed as a tool parameter so the model cannot override the user-set or default value.
 
 ### Image Search
 
@@ -24,11 +23,10 @@ DuckDuckGo image search. Requires a VQD token scraped from the DuckDuckGo homepa
 | Parameter | Type | Notes |
 | --- | --- | --- |
 | `query` | string | Required. |
-| `pageSize` | int 1–10 | Optional; overrides plugin setting. |
 | `safeSearch` | `"strict" \| "moderate" \| "off"` | Optional; overrides plugin setting. |
 | `page` | int 1–100 | Optional, defaults to 1. |
 
-Matching images are downloaded into the chat's working directory and returned as local file paths. If a download fails, the remote URL is returned for that slot instead so the assistant always gets something displayable.
+Matching images are downloaded into the chat's working directory and returned as local file paths. If a download fails, the remote URL is returned for that slot instead so the assistant always gets something displayable. The results-per-page count (`pageSize`) is a plugin-only setting — it is not exposed as a tool parameter so the model cannot override the user-set or default value.
 
 ### Visit Website
 
