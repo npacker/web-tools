@@ -3,11 +3,13 @@
  *
  * Backed by `raw-body`, which performs the `Content-Length` pre-check, streaming drain,
  * limit enforcement, and charset-aware decoding via `iconv-lite` in one call. Stream
- * cancellation on overflow is handled internally by `raw-body`.
+ * cancellation on overflow is handled internally by `raw-body`. Charset extraction
+ * from the `content-type` header goes through the `content-type` module.
  */
 
 import { Readable } from "node:stream"
 
+import { parse as parseContentType } from "content-type"
 import { encodingExists } from "iconv-lite"
 import getRawBody from "raw-body"
 
@@ -146,19 +148,22 @@ function resolveEncoding(contentType: string | null): string {
 }
 
 /**
- * Parse the `charset` parameter from a `content-type` header value, case-insensitively.
+ * Parse the `charset` parameter from a `content-type` header value via the `content-type`
+ * module. Returns `undefined` when the header is absent, malformed, or carries no charset.
  *
  * @param contentType Raw header value, or `null` when absent.
- * @returns The declared charset, or `undefined` when no charset is present.
+ * @returns The declared charset, or `undefined` when none can be derived.
  */
 function extractCharset(contentType: string | null): string | undefined {
   if (contentType === null) {
     return undefined
   }
 
-  const match = /charset\s*=\s*"?([^";]+)"?/i.exec(contentType)
-
-  return match?.[1]?.trim()
+  try {
+    return parseContentType(contentType).parameters.charset
+  } catch {
+    return undefined
+  }
 }
 
 /**
