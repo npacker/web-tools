@@ -1,10 +1,5 @@
 /**
  * Server-side request forgery (SSRF) guard.
- *
- * Rejects destinations that target loopback, RFC 1918 private space, link-local ranges,
- * or cloud metadata addresses before any outbound request is issued. Intended to be
- * invoked against both the original URL and every redirect hop so DNS rebinding and
- * redirect-to-internal cannot bypass the check.
  */
 
 import dns from "node:dns/promises"

@@ -1,10 +1,5 @@
 /**
  * Bounded response-body readers that reject payloads exceeding a byte ceiling.
- *
- * Backed by `raw-body`, which performs the `Content-Length` pre-check, streaming drain,
- * limit enforcement, and charset-aware decoding via `iconv-lite` in one call. Stream
- * cancellation on overflow is handled internally by `raw-body`. Charset extraction
- * from the `content-type` header goes through the `content-type` module.
  */
 
 import { Readable } from "node:stream"
