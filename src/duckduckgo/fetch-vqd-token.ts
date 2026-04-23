@@ -14,6 +14,14 @@ import type { RequestOptions } from "../http"
 import type { Impit } from "impit"
 
 /**
+ * Optional behavior flags accepted by `fetchVqdToken`.
+ */
+interface FetchVqdTokenFlags {
+  /** Skip the cache lookup and overwrite any cached token with a freshly scraped one. */
+  forceRefresh?: boolean
+}
+
+/**
  * Retrieve the VQD token for a query, serving a cached value when available and scraping the
  * DuckDuckGo homepage otherwise.
  *
@@ -21,6 +29,7 @@ import type { Impit } from "impit"
  * @param vqdCache Cache holding VQD tokens keyed by query.
  * @param query Search query whose VQD token is required.
  * @param options Options controlling the outbound request.
+ * @param flags Optional behavior flags.
  * @returns The cached or freshly scraped VQD token.
  * @throws {VqdTokenError} When the homepage cannot be fetched or the token cannot be located.
  */
@@ -28,13 +37,17 @@ export async function fetchVqdToken(
   impit: Impit,
   vqdCache: TTLCache<string>,
   query: string,
-  options: RequestOptions
+  options: RequestOptions,
+  flags?: FetchVqdTokenFlags
 ): Promise<string> {
   const cacheKey = `vqd:${query}`
-  const cached = await vqdCache.get(cacheKey)
 
-  if (cached !== undefined) {
-    return cached
+  if (flags?.forceRefresh !== true) {
+    const cached = await vqdCache.get(cacheKey)
+
+    if (cached !== undefined) {
+      return cached
+    }
   }
 
   const url = buildVqdUrl(query).toString()

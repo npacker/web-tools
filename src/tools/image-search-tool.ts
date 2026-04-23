@@ -8,7 +8,7 @@ import { z } from "zod"
 import { DEFAULT_PAGE_SIZE, DEFAULT_SAFE_SEARCH, resolveConfig } from "../config/resolve-config"
 import { fetchVqdToken, searchImages } from "../duckduckgo"
 import { formatToolError, NoImageResultsError } from "../errors"
-import { createRetryNotifier } from "../http"
+import { createRetryNotifier, FetchError } from "../http"
 import { downloadImages } from "../images"
 import { extractImageUrls } from "../parsers"
 import { type RateLimiter, sleep } from "../timing"
@@ -16,6 +16,14 @@ import { type RateLimiter, sleep } from "../timing"
 import type { TTLCache } from "../cache"
 import type { RetryOptions } from "../http"
 import type { Impit } from "impit"
+
+/**
+ * HTTP status codes DuckDuckGo uses to reject a stale or invalid VQD token.
+ * Encountering one triggers a single-shot token refresh + retry.
+ *
+ * @const {ReadonlySet<number>}
+ */
+const STALE_VQD_STATUS_CODES: ReadonlySet<number> = new Set([400, 401, 403, 418])
 
 /**
  * Lower bound on the configurable page size.
@@ -118,18 +126,47 @@ export function createImageSearchTool(
           pageSize: parameterPageSize,
           safeSearch: parameterSafeSearch,
         })
-        const vqd = await fetchVqdToken(impit, vqdCache, query, {
+        let vqd = await fetchVqdToken(impit, vqdCache, query, {
           signal: context.signal,
           retry,
           onFailedAttempt: createRetryNotifier(context.status, "VQD token fetch"),
         })
         await sleep(vqdImageDelayMs)
         const parameters = { query, pageSize, safeSearch, page }
-        const imageResults = await searchImages(impit, parameters, vqd, {
+        const searchOptions = {
           signal: context.signal,
           retry,
           onFailedAttempt: createRetryNotifier(context.status, "image search"),
-        })
+        }
+        let imageResults: Awaited<ReturnType<typeof searchImages>>
+
+        try {
+          imageResults = await searchImages(impit, parameters, vqd, searchOptions)
+        } catch (error) {
+          if (
+            !(error instanceof FetchError) ||
+            error.statusCode === undefined ||
+            !STALE_VQD_STATUS_CODES.has(error.statusCode)
+          ) {
+            throw error
+          }
+
+          context.status("VQD token rejected; refreshing and retrying image search...")
+          vqd = await fetchVqdToken(
+            impit,
+            vqdCache,
+            query,
+            {
+              signal: context.signal,
+              retry,
+              onFailedAttempt: createRetryNotifier(context.status, "VQD token refresh"),
+            },
+            { forceRefresh: true }
+          )
+          await sleep(vqdImageDelayMs)
+          imageResults = await searchImages(impit, parameters, vqd, searchOptions)
+        }
+
         const imageUrls = extractImageUrls(imageResults, pageSize)
 
         if (imageUrls.length === 0) {

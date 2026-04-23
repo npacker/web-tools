@@ -57,7 +57,7 @@ export class TTLCache<T> {
     const metadata = info.metadata as CacheMetadata | undefined
 
     if (metadata === undefined || this.isExpired(metadata)) {
-      await this.deleteEntry(key)
+      await this.delete(key)
 
       return undefined
     }
@@ -89,7 +89,7 @@ export class TTLCache<T> {
    *
    * @param key Key to remove.
    */
-  private async deleteEntry(key: string): Promise<void> {
+  public async delete(key: string): Promise<void> {
     await cacache.rm.entry(this.cachePath, key)
   }
 
