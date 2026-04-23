@@ -1,12 +1,15 @@
 /**
- * Bounded response-body readers that enforce a byte ceiling against oversized payloads.
+ * Bounded response-body readers that reject payloads exceeding a byte ceiling.
  *
- * Both readers perform a soft pre-check against the `Content-Length` header and a hard
- * streaming check while consuming the body. On overflow the underlying stream is cancelled
- * so the socket is released before the `FetchError` is thrown. `readLimitedText` additionally
- * honours the `charset` parameter of the response's `content-type` header, falling back to
- * UTF-8 when the charset is absent, empty, or unknown to `TextDecoder`.
+ * Backed by `raw-body`, which performs the `Content-Length` pre-check, streaming drain,
+ * limit enforcement, and charset-aware decoding via `iconv-lite` in one call. Stream
+ * cancellation on overflow is handled internally by `raw-body`.
  */
+
+import { Readable } from "node:stream"
+
+import { encodingExists } from "iconv-lite"
+import getRawBody from "raw-body"
 
 import { FetchError } from "./fetch-error"
 
@@ -29,7 +32,8 @@ const BYTES_PER_MB = 1024 * 1024
 const MB_MESSAGE_FRACTION_DIGITS = 1
 
 /**
- * Default character set used when the response omits `charset` or supplies an unknown label.
+ * Default character set applied when the response omits `charset` or advertises an
+ * encoding that `iconv-lite` does not recognise.
  *
  * @const {string}
  * @default
@@ -37,45 +41,19 @@ const MB_MESSAGE_FRACTION_DIGITS = 1
 const DEFAULT_CHARSET = "utf8"
 
 /**
- * One read result yielded by a byte-stream reader.
+ * Shape of the error object `raw-body` rejects with on limit violations or malformed
+ * streams. Declared locally because the library's `RawBodyError` type is not exported
+ * from its main entry point.
  */
-interface ReadResult {
-  /** Set to `true` once the stream has been fully consumed. */
-  done: boolean
-  /** Chunk produced by this read, or `undefined` when no chunk is available. */
-  value?: Uint8Array
-}
-
-/**
- * Structural handle matching the subset of `ReadableStreamDefaultReader<Uint8Array>` we use.
- * We intentionally declare this structurally rather than referencing the global
- * `ReadableStream` so the `n/no-unsupported-features/node-builtins` rule does not flag code
- * that merely consumes `impit`'s already-available body stream.
- */
-interface ByteStreamReader {
-  /** Read the next chunk, resolving with `{ done: true }` when the stream is exhausted. */
-  read: () => Promise<ReadResult>
-  /** Cancel the underlying stream, releasing the socket. */
-  cancel: () => Promise<void>
-  /** Release the reader lock after consumption. */
-  releaseLock: () => void
-}
-
-/**
- * Minimal structural view of `response.body`, narrowed to the method we call on it. This
- * avoids referencing the global `ReadableStream` type directly.
- */
-interface ByteStreamSource {
-  /** Acquire a reader over the underlying stream. */
-  getReader: () => ByteStreamReader
+interface RawBodyError {
+  /** Categorical tag; `"entity.too.large"` signals a limit violation. */
+  type: string
+  /** Number of bytes received before the error fired, when applicable. */
+  received?: number
 }
 
 /**
  * Read a response body into a `Buffer`, rejecting payloads larger than `maxBytes`.
- *
- * The reader performs a `Content-Length` pre-check before streaming, and a running-total
- * check during streaming to catch misreporting servers and chunked responses. On overflow
- * the underlying stream is cancelled so the socket is released.
  *
  * @param response Response produced by the shared `impit` client.
  * @param maxBytes Hard upper bound on the accumulated payload, in bytes.
@@ -84,37 +62,22 @@ interface ByteStreamSource {
  * @throws {FetchError} When the body length exceeds `maxBytes`.
  */
 export async function readLimitedBytes(response: ImpitResponse, maxBytes: number, url: string): Promise<Buffer> {
-  assertContentLengthWithinLimit(response, maxBytes, url)
-
-  const body = response.body as unknown as ByteStreamSource | null | undefined
-
-  if (body === null || body === undefined) {
-    const bytes = await response.bytes()
-
-    if (bytes.length > maxBytes) {
-      throw buildOverflowError(maxBytes, url)
-    }
-
-    return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-  }
-
-  const reader = body.getReader()
-
   try {
-    const [chunks, total] = await drainReader(reader, maxBytes, url, [], 0)
-
-    return Buffer.concat(chunks, total)
-  } finally {
-    reader.releaseLock()
+    return await getRawBody(toNodeReadable(response), {
+      limit: maxBytes,
+      length: parseContentLength(response),
+    })
+  } catch (error) {
+    throw mapError(error, maxBytes, url)
   }
 }
 
 /**
  * Read a response body as a decoded string, rejecting payloads larger than `maxBytes`.
  *
- * Decoding uses the `charset` parameter of the response's `content-type` header when present,
- * otherwise UTF-8. Unknown charset labels are quietly downgraded to UTF-8 so servers advertising
- * exotic encodings cannot wedge the tool.
+ * The declared `charset` of the response's `content-type` header is honoured when
+ * `iconv-lite` recognises the label; otherwise UTF-8 is substituted so exotic
+ * encodings cannot wedge the tool.
  *
  * @param response Response produced by the shared `impit` client.
  * @param maxBytes Hard upper bound on the accumulated payload, in bytes.
@@ -123,94 +86,63 @@ export async function readLimitedBytes(response: ImpitResponse, maxBytes: number
  * @throws {FetchError} When the body length exceeds `maxBytes`.
  */
 export async function readLimitedText(response: ImpitResponse, maxBytes: number, url: string): Promise<string> {
-  const buffer = await readLimitedBytes(response, maxBytes, url)
-  const charset = extractCharset(response.headers.get("content-type"))
-
-  return decodeWithFallback(buffer, charset)
+  try {
+    return await getRawBody(toNodeReadable(response), {
+      limit: maxBytes,
+      length: parseContentLength(response),
+      encoding: resolveEncoding(response.headers.get("content-type")),
+    })
+  } catch (error) {
+    throw mapError(error, maxBytes, url)
+  }
 }
 
 /**
- * Recursively consume the reader, accumulating chunks and enforcing the byte ceiling on each
- * read. A recursive tail call is used in preference to a `while` loop so the eslint
- * `no-await-in-loop` rule does not need to be suppressed — each chunk await lives in its own
- * function activation.
+ * Adapt the response's Web-Streams body into a Node `Readable` so `raw-body` can
+ * consume it.
  *
- * @param reader Underlying byte-stream reader.
- * @param maxBytes Hard upper bound on the accumulated payload, in bytes.
- * @param url Target URL used when composing the `FetchError` for diagnostics.
- * @param chunks Chunks accumulated so far.
- * @param total Total byte count across `chunks`.
- * @returns A tuple of the final chunk list and total byte count.
- * @throws {FetchError} When the body length exceeds `maxBytes`.
+ * @param response Response whose body stream is being drained.
+ * @returns A Node `Readable` that proxies the response body.
  */
-async function drainReader(
-  reader: ByteStreamReader,
-  maxBytes: number,
-  url: string,
-  chunks: Uint8Array[],
-  total: number
-): Promise<[Uint8Array[], number]> {
-  const { done, value } = await reader.read()
-
-  if (done) {
-    return [chunks, total]
-  }
-
-  if (value === undefined) {
-    return drainReader(reader, maxBytes, url, chunks, total)
-  }
-
-  const nextTotal = total + value.byteLength
-
-  if (nextTotal > maxBytes) {
-    await reader.cancel()
-    throw buildOverflowError(maxBytes, url)
-  }
-
-  chunks.push(value)
-
-  return drainReader(reader, maxBytes, url, chunks, nextTotal)
+function toNodeReadable(response: ImpitResponse): Readable {
+  return Readable.fromWeb(response.body as unknown as Parameters<typeof Readable.fromWeb>[0])
 }
 
 /**
- * Throw a `FetchError` when the response's `Content-Length` header advertises a payload
- * larger than `maxBytes`. A missing or malformed header is treated as unknown and allowed
- * through to the streaming check.
+ * Parse the `Content-Length` header as a non-negative integer for `raw-body`'s
+ * pre-check. A missing or malformed header yields `undefined`, deferring enforcement
+ * to the streaming check.
  *
  * @param response Response whose headers should be inspected.
- * @param maxBytes Hard upper bound on the accumulated payload, in bytes.
- * @param url Target URL used when composing the `FetchError` for diagnostics.
- * @throws {FetchError} When the declared content length exceeds `maxBytes`.
+ * @returns The declared length, or `undefined` when unknown.
  */
-function assertContentLengthWithinLimit(response: ImpitResponse, maxBytes: number, url: string): void {
-  const headerValue = response.headers.get("content-length")
+function parseContentLength(response: ImpitResponse): number | undefined {
+  const header = response.headers.get("content-length")
 
-  if (headerValue === null) {
-    return
+  if (header === null) {
+    return undefined
   }
 
-  const declared = Number.parseInt(headerValue, 10)
+  const declared = Number.parseInt(header, 10)
 
-  if (!Number.isFinite(declared)) {
-    return
-  }
-
-  if (declared > maxBytes) {
-    throw buildOverflowError(maxBytes, url)
-  }
+  return Number.isFinite(declared) ? declared : undefined
 }
 
 /**
- * Construct the overflow error with the configured limit rendered as megabytes.
+ * Resolve the charset for text decoding, falling back to UTF-8 when the declared
+ * charset is missing or not recognised by `iconv-lite`.
  *
- * @param maxBytes Hard upper bound on the accumulated payload, in bytes.
- * @param url Target URL carried on the resulting error for diagnostics.
- * @returns A `FetchError` describing the overflow.
+ * @param contentType Raw `content-type` header value, or `null` when absent.
+ * @returns A charset label accepted by `iconv-lite`.
  */
-function buildOverflowError(maxBytes: number, url: string): FetchError {
-  const mb = (maxBytes / BYTES_PER_MB).toFixed(MB_MESSAGE_FRACTION_DIGITS)
+function resolveEncoding(contentType: string | null): string {
+  const charset = extractCharset(contentType)
 
-  return new FetchError(`Response exceeds ${mb} MB`, undefined, url)
+  if (charset === undefined) {
+    return DEFAULT_CHARSET
+  }
+
+  return encodingExists(charset) ? charset : DEFAULT_CHARSET
 }
 
 /**
@@ -230,19 +162,42 @@ function extractCharset(contentType: string | null): string | undefined {
 }
 
 /**
- * Decode a buffer using the requested charset, falling back to UTF-8 when the label is
- * missing, empty, or unknown to `TextDecoder`.
+ * Map a thrown value from `raw-body` into a `FetchError`, translating limit violations
+ * to the user-facing overflow message and leaving other `Error` instances untouched.
  *
- * @param buffer Bytes to decode.
- * @param charset Declared charset, or `undefined` when the response did not specify one.
- * @returns The decoded string.
+ * @param error Thrown value caught from `getRawBody`.
+ * @param maxBytes Hard upper bound on the accumulated payload, in bytes.
+ * @param url Target URL carried on the resulting error for diagnostics.
+ * @returns An `Error` suitable for rethrowing to the caller.
  */
-function decodeWithFallback(buffer: Buffer, charset: string | undefined): string {
-  const label = charset === undefined || charset === "" ? DEFAULT_CHARSET : charset
+function mapError(error: unknown, maxBytes: number, url: string): Error {
+  if (isRawBodyLimitError(error)) {
+    const megabytes = (maxBytes / BYTES_PER_MB).toFixed(MB_MESSAGE_FRACTION_DIGITS)
 
-  try {
-    return new TextDecoder(label).decode(buffer)
-  } catch {
-    return new TextDecoder(DEFAULT_CHARSET).decode(buffer)
+    return new FetchError(`Response exceeds ${megabytes} MB`, undefined, url, { cause: error })
   }
+
+  if (error instanceof Error) {
+    return error
+  }
+
+  return new FetchError("Response body read failed", undefined, url, { cause: error })
+}
+
+/**
+ * Type-guard reporting whether a thrown value is `raw-body`'s limit-violation error.
+ *
+ * @param error Thrown value caught from `getRawBody`.
+ * @returns `true` when the value carries the `"entity.too.large"` tag.
+ */
+function isRawBodyLimitError(error: unknown): error is RawBodyError {
+  if (typeof error !== "object" || error === null) {
+    return false
+  }
+
+  if (!("type" in error)) {
+    return false
+  }
+
+  return error.type === "entity.too.large"
 }
