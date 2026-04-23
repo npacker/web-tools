@@ -8,7 +8,7 @@ import { z } from "zod"
 
 import { resolveConfig } from "../config/resolve-config"
 import { formatToolError } from "../errors"
-import { createRetryNotifier } from "../http"
+import { createRetryNotifier, httpUrlSchema } from "../http"
 import { buildPageExcerpt, extractHeadings } from "../parsers"
 import { fetchWebsite } from "../website"
 
@@ -48,7 +48,7 @@ export function createVisitWebsiteTool(
     description:
       "Visit a website and return its title, top-level headings, and content. When contentLength exceeds the returned content length the page was truncated — refine with findInPage.",
     parameters: {
-      url: z.string().url().describe("The URL of the website to visit"),
+      url: httpUrlSchema.describe("The URL of the website to visit"),
       findInPage: z
         .array(z.string())
         .optional()

@@ -9,7 +9,7 @@ import { z } from "zod"
 import { resolveConfig } from "../config/resolve-config"
 import { formatToolError } from "../errors"
 import { filenameFromUrl } from "../fs"
-import { createRetryNotifier } from "../http"
+import { createRetryNotifier, httpUrlSchema } from "../http"
 import { downloadImages } from "../images"
 import { extractPageImages } from "../parsers"
 import { fetchWebsite } from "../website"
@@ -87,10 +87,10 @@ export function createViewImagesTool(
     description: "Download images from a website or a list of image URLs to make them viewable.",
     parameters: {
       imageURLs: z
-        .array(z.string().url())
+        .array(httpUrlSchema)
         .optional()
         .describe("List of image URLs to view that were not obtained via the Visit Website tool."),
-      websiteURL: z.string().url().optional().describe("The URL of the website, whose images to view."),
+      websiteURL: httpUrlSchema.optional().describe("The URL of the website, whose images to view."),
       maxImages: z
         .number()
         .int()
