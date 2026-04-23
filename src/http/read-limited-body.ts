@@ -60,10 +60,7 @@ interface RawBodyError {
  */
 export async function readLimitedBytes(response: ImpitResponse, maxBytes: number, url: string): Promise<Buffer> {
   try {
-    return await getRawBody(toNodeReadable(response), {
-      limit: maxBytes,
-      length: parseContentLength(response),
-    })
+    return await getRawBody(toNodeReadable(response), { limit: maxBytes })
   } catch (error) {
     throw mapError(error, maxBytes, url)
   }
@@ -86,7 +83,6 @@ export async function readLimitedText(response: ImpitResponse, maxBytes: number,
   try {
     return await getRawBody(toNodeReadable(response), {
       limit: maxBytes,
-      length: parseContentLength(response),
       encoding: resolveEncoding(response.headers.get("content-type")),
     })
   } catch (error) {
@@ -103,26 +99,6 @@ export async function readLimitedText(response: ImpitResponse, maxBytes: number,
  */
 function toNodeReadable(response: ImpitResponse): Readable {
   return Readable.fromWeb(response.body as unknown as Parameters<typeof Readable.fromWeb>[0])
-}
-
-/**
- * Parse the `Content-Length` header as a non-negative integer for `raw-body`'s
- * pre-check. A missing or malformed header yields `undefined`, deferring enforcement
- * to the streaming check.
- *
- * @param response Response whose headers should be inspected.
- * @returns The declared length, or `undefined` when unknown.
- */
-function parseContentLength(response: ImpitResponse): number | undefined {
-  const header = response.headers.get("content-length")
-
-  if (header === null) {
-    return undefined
-  }
-
-  const declared = Number.parseInt(header, 10)
-
-  return Number.isFinite(declared) ? declared : undefined
 }
 
 /**
