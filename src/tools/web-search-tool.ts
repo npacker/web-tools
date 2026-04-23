@@ -109,7 +109,7 @@ export function createWebSearchTool(
      */
     implementation: async (arguments_, context) => {
       const { query, pageSize: parameterPageSize, safeSearch: parameterSafeSearch, page } = arguments_
-      context.status("Initiating DuckDuckGo web search...")
+      context.status("Initiating web search...")
       await rateLimiter.wait()
 
       try {
