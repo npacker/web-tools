@@ -2,6 +2,8 @@
  * Concurrent multi-URL image download, preserving input order in the result array.
  */
 
+import path from "node:path"
+
 import { downloadImage } from "./download-image"
 
 import type { RetryOptions } from "../http"
@@ -112,16 +114,24 @@ async function downloadOne(
 }
 
 /**
- * Report whether a URL is already local to the working directory or uses a non-HTTP scheme.
+ * Report whether a URL should bypass the HTTP download path — either because it resolves
+ * inside the working directory or because it uses a non-HTTP scheme.
+ *
+ * Scheme detection is case-insensitive. The working-directory check resolves both paths
+ * and uses a directory-boundary prefix test, so sibling directories sharing a name prefix
+ * (for example `/tmp/foo-evil` against a working directory of `/tmp/foo`) do not match.
  *
  * @param url URL to inspect.
  * @param workingDirectory Directory treated as local to the plugin session.
  * @returns `true` when the URL should bypass the HTTP download path.
  */
 function isLocalOrNonHttpUrl(url: string, workingDirectory: string): boolean {
-  if (url.startsWith(workingDirectory)) {
-    return true
-  }
+  const scheme = /^[a-z][a-z0-9+.-]*:/i.exec(url)?.[0].toLowerCase()
+  if (scheme === "http:" || scheme === "https:") return false
+  if (scheme !== undefined) return true
 
-  return !url.startsWith("http://") && !url.startsWith("https://")
+  const resolved = path.resolve(url)
+  const resolvedWorkingDirectory = path.resolve(workingDirectory)
+
+  return resolved === resolvedWorkingDirectory || resolved.startsWith(resolvedWorkingDirectory + path.sep)
 }
