@@ -122,9 +122,14 @@ export function createWebSearchTool(
         if (cached !== undefined) {
           context.status(`Found ${cached.count} web pages (cached).`)
 
-          return includeSnippets
-            ? cached.results
-            : cached.results.map(([label, url]) => [label, url] as [string, string])
+          if (includeSnippets) {
+            return { results: cached.results, count: cached.count }
+          }
+
+          return {
+            results: cached.results.map(([label, url]) => [label, url] as [string, string]),
+            count: cached.count,
+          }
         }
 
         const parameters = { query, pageSize, safeSearch, page }
@@ -142,10 +147,13 @@ export function createWebSearchTool(
         await cache.set(cacheKey, result)
 
         if (includeSnippets) {
-          return result.results
+          return { results: result.results, count: result.count }
         }
 
-        return result.results.map(([label, url]) => [label, url] as [string, string])
+        return {
+          results: result.results.map(([label, url]) => [label, url] as [string, string]),
+          count: result.count,
+        }
       } catch (error) {
         return formatToolError(error, context, "web-search")
       }
