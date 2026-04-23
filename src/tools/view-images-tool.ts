@@ -91,7 +91,7 @@ export function createViewImagesTool(
     description: "Download images from a website or a list of image URLs to make them viewable.",
     parameters: {
       imageURLs: z
-        .array(httpUrlSchema)
+        .union([z.array(httpUrlSchema), httpUrlSchema.transform(url => [url])])
         .optional()
         .describe("List of image URLs to view that were not obtained via the Visit Website tool."),
       websiteURL: httpUrlSchema.optional().describe("The URL of the website, whose images to view."),

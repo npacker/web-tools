@@ -51,7 +51,7 @@ export function createVisitWebsiteTool(
     parameters: {
       url: httpUrlSchema.describe("The URL of the website to visit"),
       findInPage: z
-        .array(z.string())
+        .union([z.array(z.string()), z.string().transform(term => [term])])
         .optional()
         .describe("Strongly recommended: optional search terms to prioritize which content slices are returned."),
       contentFormat: z.enum(CONTENT_FORMAT_OPTIONS).optional().describe("Output format of the content field."),
