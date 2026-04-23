@@ -29,7 +29,9 @@ export async function searchWeb(
   const response = await fetchOk(impit, url, options)
   const html = await response.text()
   const parsed = parseSearchResults(html, parameters.pageSize)
-  const results = parsed.map(({ label, url: resultUrl }) => [label, resultUrl] as [string, string])
+  const results = parsed.map(
+    ({ label, url: resultUrl, snippet }) => [label, resultUrl, snippet] as [string, string, string]
+  )
 
   return {
     results,

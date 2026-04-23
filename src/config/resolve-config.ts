@@ -50,6 +50,14 @@ const DEFAULT_CONTENT_LIMIT = 10_000
 const DEFAULT_CONTENT_FORMAT = "markdown" as const
 
 /**
+ * Default for whether web search results should include preview snippets.
+ *
+ * @const {boolean}
+ * @default true
+ */
+const DEFAULT_INCLUDE_SNIPPETS = true
+
+/**
  * Default TTL for the web/image search result cache, in milliseconds.
  *
  * @const {number}
@@ -134,6 +142,8 @@ interface ResolvedConfig {
   pageSize: number
   /** Safe-search mode to apply to the request. */
   safeSearch: SafeSearch
+  /** Whether web search results should include preview snippets. */
+  includeSnippets: boolean
   /** Maximum number of images scraped by the View Images tool. */
   maxImages: number
   /** Visible-text character budget for the Visit Website tool. */
@@ -186,6 +196,7 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
   const pluginConfig = ctl.getPluginConfig(configSchematics)
   const pluginPageSize = pluginConfig.get("pageSize") as number | null
   const pluginSafeSearch = pluginConfig.get("safeSearch") as SafeSearch | typeof AUTO_CONFIG_VALUE
+  const pluginIncludeSnippets = pluginConfig.get("includeSnippets") as boolean | null
   const pluginMaxImages = pluginConfig.get("maxImages") as number | null
   const pluginContentLimit = pluginConfig.get("contentLimit") as number | null
   const pluginContentFormat = pluginConfig.get("contentFormat") as ContentFormat | null
@@ -194,6 +205,7 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
   return {
     pageSize: resolvePageSize(pluginPageSize, overrides.pageSize),
     safeSearch: resolveSafeSearch(pluginSafeSearch, overrides.safeSearch),
+    includeSnippets: pluginIncludeSnippets ?? DEFAULT_INCLUDE_SNIPPETS,
     maxImages: resolveAutoNumeric(pluginMaxImages, overrides.maxImages, DEFAULT_MAX_IMAGES),
     contentLimit: pluginContentLimit !== null && pluginContentLimit !== 0 ? pluginContentLimit : DEFAULT_CONTENT_LIMIT,
     contentFormat: overrides.contentFormat ?? pluginContentFormat ?? DEFAULT_CONTENT_FORMAT,

@@ -74,7 +74,8 @@ export function createWebSearchTool(
 ): Tool {
   return tool({
     name: "Web Search",
-    description: "Search for web pages on DuckDuckGo using a query string, returning a list of URLs.",
+    description:
+      "Search for web pages on DuckDuckGo using a query string, returning a list of URLs with titles and snippet previews.",
     parameters: {
       query: z.string().describe("The search query for finding web pages"),
       pageSize: z
@@ -111,7 +112,7 @@ export function createWebSearchTool(
       await rateLimiter.wait()
 
       try {
-        const { pageSize, safeSearch } = resolveConfig(ctl, {
+        const { pageSize, safeSearch, includeSnippets } = resolveConfig(ctl, {
           pageSize: parameterPageSize,
           safeSearch: parameterSafeSearch,
         })
@@ -121,7 +122,9 @@ export function createWebSearchTool(
         if (cached !== undefined) {
           context.status(`Found ${cached.count} web pages (cached).`)
 
-          return cached.results
+          return includeSnippets
+            ? cached.results
+            : cached.results.map(([label, url]) => [label, url] as [string, string])
         }
 
         const parameters = { query, pageSize, safeSearch, page }
@@ -138,7 +141,11 @@ export function createWebSearchTool(
         context.status(`Found ${result.results.length} web pages.`)
         await cache.set(cacheKey, result)
 
-        return result.results
+        if (includeSnippets) {
+          return result.results
+        }
+
+        return result.results.map(([label, url]) => [label, url] as [string, string])
       } catch (error) {
         return formatToolError(error, context, "web-search")
       }

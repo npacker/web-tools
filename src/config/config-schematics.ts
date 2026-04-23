@@ -41,6 +41,15 @@ export const configSchematics = createConfigSchematics()
     AUTO_CONFIG_VALUE
   )
   .field(
+    "includeSnippets",
+    "boolean",
+    {
+      displayName: "Include Snippets in Search Results",
+      subtitle: "When enabled, web search results include a preview text snippet from each page",
+    },
+    true
+  )
+  .field(
     "maxImages",
     "numeric",
     {
