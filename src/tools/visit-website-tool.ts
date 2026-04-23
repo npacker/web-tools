@@ -3,7 +3,6 @@
  */
 
 import { tool, type Tool, type ToolsProviderController } from "@lmstudio/sdk"
-import { JSDOM } from "jsdom"
 import { z } from "zod"
 
 import { resolveConfig } from "../config/resolve-config"
@@ -69,7 +68,7 @@ export function createVisitWebsiteTool(
           maxBytes: maxResponseBytes,
         })
         context.status("Website visited successfully.")
-        const headings = extractHeadings(new JSDOM(html))
+        const headings = extractHeadings(html)
         const { content, totalLength: contentLength } = buildPageExcerpt(
           html,
           url,

@@ -56,58 +56,74 @@ export interface PageExcerpt {
 /**
  * Extract the document title and the first heading of each of the first three heading levels.
  *
- * @param dom Parsed website DOM.
- * @returns The extracted heading fields; missing headings default to an empty string.
+ * @param html Raw HTML payload.
+ * @returns The extracted heading fields; missing or unparseable headings default to an empty string.
  */
-export function extractHeadings(dom: JSDOM): PageHeadings {
-  const { document } = dom.window
+export function extractHeadings(html: string): PageHeadings {
+  try {
+    const { document } = new JSDOM(html).window
 
-  return {
-    title: normalizeText(document.querySelector("title")?.textContent),
-    h1: normalizeText(document.querySelector("h1")?.textContent),
-    h2: normalizeText(document.querySelector("h2")?.textContent),
-    h3: normalizeText(document.querySelector("h3")?.textContent),
+    return {
+      title: normalizeText(document.querySelector("title")?.textContent),
+      h1: normalizeText(document.querySelector("h1")?.textContent),
+      h2: normalizeText(document.querySelector("h2")?.textContent),
+      h3: normalizeText(document.querySelector("h3")?.textContent),
+    }
+  } catch {
+    return { title: "", h1: "", h2: "", h3: "" }
   }
 }
 
 /**
  * Extract the main readable content of the document via Mozilla Readability, falling back to the
- * body's inner HTML when Readability cannot identify an article, then format the HTML into the
- * requested output shape (markdown or plain text).
+ * body's inner HTML when Readability can't identify an article, and to the raw HTML string when
+ * jsdom itself cannot parse the page.
  *
  * @param html Raw HTML payload.
  * @param url Absolute URL of the page, used by Readability to resolve relative references.
  * @param format Output format applied to the extracted content.
- * @returns The cleaned article content, or an empty string when neither extraction strategy yields content.
+ * @returns The extracted content, formatted into the requested output shape.
  */
 function extractVisibleText(html: string, url: string, format: ContentFormat): string {
-  const readabilityDom = new JSDOM(html, { url })
-  const articleContent = parseReadability(readabilityDom)
+  const articleContent = parseReadability(html, url)
 
-  if (articleContent !== null && articleContent !== undefined && articleContent !== "") {
+  if (articleContent !== undefined && articleContent !== "") {
     return formatHtml(articleContent, format)
   }
 
-  const fallbackDom = new JSDOM(html)
-  const { body } = fallbackDom.window.document
-
-  return formatHtml(body.innerHTML, format)
+  return formatHtml(extractBodyHtml(html) ?? html, format)
 }
 
 /**
- * Run Mozilla Readability against the supplied document, returning its extracted content HTML or
- * a nullish value when extraction fails. Readability can throw synchronously when jsdom's CSSOM
- * parser chokes on inline styles — notably CSS custom properties inside shorthand values such as
- * `border: var(--border-width, 1px) solid #fff`, which trip a CSSOM bug that surfaces as
- * `Cannot create property 'border-width' on string '…'`. Swallow those throws so the caller's
- * raw-body fallback can still produce text for the page.
+ * Build a jsdom document and run Mozilla Readability against it, returning its extracted content
+ * HTML or `undefined` when construction or extraction fails.
  *
- * @param dom Parsed website DOM Readability should read.
- * @returns The article HTML, or `null`/`undefined` when Readability cannot identify or parse one.
+ * @param html Raw HTML payload.
+ * @param url Absolute URL used by Readability to resolve relative references.
+ * @returns The article HTML, or `undefined` when jsdom or Readability throws or finds nothing.
  */
-function parseReadability(dom: JSDOM): string | null | undefined {
+function parseReadability(html: string, url: string): string | undefined {
   try {
-    return new Readability(dom.window.document).parse()?.content
+    const dom = new JSDOM(html, { url })
+
+    return new Readability(dom.window.document).parse()?.content ?? undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Parse the HTML into a jsdom document and return its `<body>` inner HTML, or `undefined` when
+ * jsdom throws.
+ *
+ * @param html Raw HTML payload.
+ * @returns The body's inner HTML, or `undefined` when jsdom fails to parse or serialize.
+ */
+function extractBodyHtml(html: string): string | undefined {
+  try {
+    const dom = new JSDOM(html)
+
+    return dom.window.document.body.innerHTML
   } catch {
     return undefined
   }
