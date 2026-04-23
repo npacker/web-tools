@@ -31,14 +31,6 @@ const SEARCH_RESULT_LINK_SELECTOR = ".result__a"
 const SEARCH_RESULT_SNIPPET_SELECTOR = ".result__snippet"
 
 /**
- * Maximum character length for a result snippet.
- *
- * @const {number}
- * @default
- */
-const MAX_SNIPPET_LENGTH = 300
-
-/**
  * A single parsed web search result.
  */
 interface SearchResult {
@@ -91,11 +83,7 @@ export function parseSearchResults(html: string, maxResults: number): SearchResu
     }
 
     const snippetElement = block.querySelector(SEARCH_RESULT_SNIPPET_SELECTOR)
-    let snippet = normalizeText(snippetElement?.textContent)
-
-    if (snippet.length > MAX_SNIPPET_LENGTH) {
-      snippet = `${snippet.slice(0, MAX_SNIPPET_LENGTH)}...`
-    }
+    const snippet = normalizeText(snippetElement?.textContent)
 
     seenUrls.add(url)
     results.push({ label, url, snippet })
