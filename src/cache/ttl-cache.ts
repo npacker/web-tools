@@ -13,6 +13,26 @@ interface CacheMetadata {
 }
 
 /**
+ * Runtime validator for the `CacheMetadata` shape stored alongside each cacache entry.
+ * Protects against malformed or stale-schema metadata written by earlier plugin versions
+ * producing silent `NaN` comparisons in the expiry check.
+ *
+ * @param value Untyped metadata value pulled from a cacache entry.
+ * @returns `true` when the value is a non-null object with a numeric `expiry` property.
+ */
+function isCacheMetadata(value: unknown): value is CacheMetadata {
+  if (typeof value !== "object" || value === null) {
+    return false
+  }
+
+  if (!("expiry" in value)) {
+    return false
+  }
+
+  return typeof value.expiry === "number"
+}
+
+/**
  * Disk-backed cache with per-entry time-to-live and bounded capacity.
  */
 export class TTLCache<T> {
@@ -54,9 +74,9 @@ export class TTLCache<T> {
       return undefined
     }
 
-    const metadata = info.metadata as CacheMetadata | undefined
+    const rawMetadata: unknown = info.metadata
 
-    if (metadata === undefined || this.isExpired(metadata)) {
+    if (!isCacheMetadata(rawMetadata) || this.isExpired(rawMetadata)) {
       await this.delete(key)
 
       return undefined
@@ -119,9 +139,9 @@ export class TTLCache<T> {
     const expired: typeof entries = []
 
     for (const entry of entries) {
-      const metadata = entry.metadata as CacheMetadata | undefined
+      const rawMetadata: unknown = entry.metadata
 
-      if (metadata === undefined || now > metadata.expiry) {
+      if (!isCacheMetadata(rawMetadata) || now > rawMetadata.expiry) {
         expired.push(entry)
       } else {
         live.push(entry)
