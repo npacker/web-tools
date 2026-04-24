@@ -240,7 +240,7 @@ Cache sizes and subdirs are defined in `src/tools-provider.ts`; the `TTLCache` i
 Three error hierarchies are load-bearing:
 
 - **`FetchError`** (`src/http/fetch-error.ts`) — HTTP/network failures, carries `url` and optional `cause`.
-- **`VqdTokenError`** (`src/duckduckgo/vqd-token-error.ts`) — token acquisition failures with `VqdTokenFailureReason` of `element_missing`, `value_empty`, or `fetch_failed`.
+- **`VqdTokenError`** (`src/duckduckgo/vqd-token-error.ts`) — token acquisition failures with `VqdTokenFailureReason` of `token_not_found` or `fetch_failed`.
 - **`NoResultsError`** base with `NoWebResultsError` / `NoImageResultsError` (`src/errors/no-results-error.ts`).
 
 `formatToolError` in `src/errors/tool-error.ts` converts these into user-facing strings per tool kind (`web-search`, `image-search`, `website`, `image-download`), including abort-detection via `DOMException.name === "AbortError"`.

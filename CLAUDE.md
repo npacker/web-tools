@@ -51,7 +51,7 @@ Three **disk-backed** TTL caches (via `cacache`) are constructed once in `toolsP
 Cache sizes and subdirs are defined in [src/tools-provider.ts](src/tools-provider.ts); the `TTLCache` implementation is in [src/cache/ttl-cache.ts](src/cache/ttl-cache.ts). TTL defaults live in [src/config/resolve-config.ts](src/config/resolve-config.ts).
 
 ### Image search specifics
-Image endpoints require a **VQD token** scraped from the DuckDuckGo homepage. A configurable delay (`vqdImageDelaySeconds`, default 2s) is inserted between the VQD fetch and the image API call. Token acquisition failures raise `VqdTokenError` ([src/duckduckgo/vqd-token-error.ts](src/duckduckgo/vqd-token-error.ts)) with a `VqdTokenFailureReason` of `element_missing`, `value_empty`, or `fetch_failed`.
+Image endpoints require a **VQD token** scraped from the DuckDuckGo homepage. A configurable delay (`vqdImageDelaySeconds`, default 2s) is inserted between the VQD fetch and the image API call. The token is extracted via regex from inline script URLs of the form `vqd=<token>` (see [src/parsers/vqd-parser.ts](src/parsers/vqd-parser.ts)) — DuckDuckGo removed the original hidden-input form field. Token acquisition failures raise `VqdTokenError` ([src/duckduckgo/vqd-token-error.ts](src/duckduckgo/vqd-token-error.ts)) with a `VqdTokenFailureReason` of `token_not_found` or `fetch_failed`.
 
 ### Safe search encoding
 DuckDuckGo uses non-obvious `p` param values: `strict→"1"`, `moderate→""`, `off→"-1"`. Centralized in [src/duckduckgo/safe-search.ts](src/duckduckgo/safe-search.ts).

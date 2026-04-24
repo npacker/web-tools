@@ -5,7 +5,7 @@
 /**
  * Possible reasons why VQD token acquisition failed.
  */
-export type VqdTokenFailureReason = "element_missing" | "value_empty" | "fetch_failed"
+export type VqdTokenFailureReason = "token_not_found" | "fetch_failed"
 
 /**
  * Raised when the VQD token required for image search cannot be obtained.
@@ -36,12 +36,8 @@ export class VqdTokenError extends Error {
  */
 function formatVqdReason(reason: VqdTokenFailureReason): string {
   switch (reason) {
-    case "element_missing": {
-      return "the search form input element was not found on the DuckDuckGo homepage"
-    }
-
-    case "value_empty": {
-      return "the input element's value attribute was empty or missing"
+    case "token_not_found": {
+      return "no VQD token was found in the DuckDuckGo homepage payload"
     }
 
     case "fetch_failed": {

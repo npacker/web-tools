@@ -27,6 +27,15 @@ interface ImageSearchResponse {
 }
 
 /**
+ * `Referer` value sent with image-search XHRs so DuckDuckGo's anti-bot layer treats the call
+ * as a legitimate in-page request rather than direct API probing.
+ *
+ * @const {string}
+ * @default
+ */
+const IMAGE_SEARCH_REFERER = "https://duckduckgo.com/"
+
+/**
  * Perform a DuckDuckGo image search and return the raw result rows.
  *
  * @param impit Shared HTTP client used for the request.
@@ -42,7 +51,10 @@ export async function searchImages(
   options: RequestOptions
 ): Promise<DuckDuckGoImageResult[]> {
   const url = buildImageSearchUrl(parameters, vqd).toString()
-  const response = await fetchOk(impit, url, options)
+  const response = await fetchOk(impit, url, {
+    ...options,
+    headers: { ...options.headers, Referer: IMAGE_SEARCH_REFERER },
+  })
   const data = (await response.json()) as ImageSearchResponse
 
   return data.results ?? []

@@ -2,38 +2,30 @@
  * HTML parsing for DuckDuckGo VQD token scraping.
  */
 
-import { JSDOM } from "jsdom"
-
 import { VqdTokenError } from "../duckduckgo/vqd-token-error"
 
 /**
- * CSS selector matching the VQD token input element on the DuckDuckGo homepage.
+ * Regex matching a VQD token embedded in inline script URLs on the DuckDuckGo homepage,
+ * e.g. `/d.js?q=cat&...&vqd=4-39717207539857670938764204880008698093&...`.
  *
- * @const {string}
+ * @const {RegExp}
  * @default
  */
-const VQD_INPUT_SELECTOR = 'input[name="vqd"]'
+const VQD_TOKEN_PATTERN = /vqd=([\w-]+)/
 
 /**
  * Extract the VQD token from a DuckDuckGo homepage HTML payload.
  *
- * @param html Raw HTML payload containing the VQD input element.
+ * @param html Raw HTML payload containing a VQD token reference.
  * @returns The VQD token value.
- * @throws {VqdTokenError} When the input element is absent or its value is empty.
+ * @throws {VqdTokenError} When no VQD token can be located in the payload.
  */
 export function extractVqdToken(html: string): string {
-  const dom = new JSDOM(html)
-  const vqdInput = dom.window.document.querySelector(VQD_INPUT_SELECTOR)
+  const match = VQD_TOKEN_PATTERN.exec(html)
 
-  if (vqdInput === null) {
-    throw new VqdTokenError("element_missing")
+  if (match === null) {
+    throw new VqdTokenError("token_not_found")
   }
 
-  const value = vqdInput.getAttribute("value")
-
-  if (value === null || value === "") {
-    throw new VqdTokenError("value_empty")
-  }
-
-  return value
+  return match[1]
 }

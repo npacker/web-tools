@@ -56,6 +56,8 @@ export interface RequestOptions {
   retry?: RetryOptions
   /** Observer invoked after each failed attempt, before the backoff sleep. */
   onFailedAttempt?: PRetryOptions["onFailedAttempt"]
+  /** Extra request headers layered onto the `impit` browser-impersonation defaults. */
+  headers?: Record<string, string>
 }
 
 /**
@@ -87,7 +89,7 @@ type HopResult =
  * @throws {FetchError} When the transport fails or the response carries a non-2xx status.
  */
 export async function fetchOk(impit: Impit, url: string, options: RequestOptions): Promise<ReturnType<Impit["fetch"]>> {
-  return pRetry(async () => attemptFetch(impit, url, options.signal), {
+  return pRetry(async () => attemptFetch(impit, url, options.signal, options.headers), {
     retries: 0,
     ...options.retry,
     signal: options.signal,
@@ -111,14 +113,16 @@ export async function fetchOk(impit: Impit, url: string, options: RequestOptions
  * @param impit Shared HTTP client used for the request.
  * @param url Target URL to fetch.
  * @param signal Signal used to abort the in-flight request.
+ * @param headers Extra request headers layered onto every hop.
  * @returns The successful response.
  */
 async function attemptFetch(
   impit: Impit,
   url: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  headers: Record<string, string> | undefined
 ): Promise<Awaited<ReturnType<Impit["fetch"]>>> {
-  return followRedirects(impit, url, url, signal, MAX_REDIRECT_HOPS)
+  return followRedirects(impit, url, url, signal, headers, MAX_REDIRECT_HOPS)
 }
 
 /**
@@ -129,6 +133,7 @@ async function attemptFetch(
  * @param originalUrl URL originally requested by the caller, used in the "too many redirects" error.
  * @param currentUrl URL to fetch in this attempt.
  * @param signal Signal used to abort the in-flight request.
+ * @param headers Extra request headers layered onto every hop.
  * @param hopsRemaining Number of redirect hops still permitted before aborting.
  * @returns The successful response.
  */
@@ -137,10 +142,11 @@ async function followRedirects(
   originalUrl: string,
   currentUrl: string,
   signal: AbortSignal,
+  headers: Record<string, string> | undefined,
   hopsRemaining: number
 ): Promise<Awaited<ReturnType<Impit["fetch"]>>> {
   await assertPublicUrl(currentUrl)
-  const hop = await performHop(impit, currentUrl, signal)
+  const hop = await performHop(impit, currentUrl, signal, headers)
 
   if (hop.kind === "done") {
     return hop.response
@@ -152,7 +158,7 @@ async function followRedirects(
 
   const nextUrl = new URL(hop.location, currentUrl).toString()
 
-  return followRedirects(impit, originalUrl, nextUrl, signal, hopsRemaining - 1)
+  return followRedirects(impit, originalUrl, nextUrl, signal, headers, hopsRemaining - 1)
 }
 
 /**
@@ -161,13 +167,19 @@ async function followRedirects(
  * @param impit Shared HTTP client used for the request.
  * @param currentUrl URL to fetch in this hop.
  * @param signal Signal used to abort the in-flight request.
+ * @param headers Extra request headers layered onto the `impit` browser-impersonation defaults.
  * @returns A `done` result carrying the final response, or a `redirect` result carrying the next `Location`.
  */
-async function performHop(impit: Impit, currentUrl: string, signal: AbortSignal): Promise<HopResult> {
+async function performHop(
+  impit: Impit,
+  currentUrl: string,
+  signal: AbortSignal,
+  headers: Record<string, string> | undefined
+): Promise<HopResult> {
   let response: Awaited<ReturnType<Impit["fetch"]>>
 
   try {
-    response = await impit.fetch(currentUrl, { method: "GET", signal, redirect: "manual" })
+    response = await impit.fetch(currentUrl, { method: "GET", signal, redirect: "manual", headers })
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
       throw error
