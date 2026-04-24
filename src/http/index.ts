@@ -1,5 +1,7 @@
 export { fetchOk } from "./fetch-ok"
 export type { RequestOptions } from "./fetch-ok"
+export { followRedirects } from "./follow-redirects"
+export type { FollowRedirectsOptions } from "./follow-redirects"
 export { createImpit } from "./impit-client"
 export { FetchError } from "./fetch-error"
 export { isRetryableFetchError, createRetryNotifier } from "./retry"
