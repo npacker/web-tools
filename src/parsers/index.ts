@@ -7,4 +7,4 @@ export {
   normalizeImageExtension,
 } from "./image-results-parser"
 export { extractPageImages, type PageImage } from "./page/page-images"
-export { extractHeadings, buildPageExcerpt } from "./page/page-text"
+export { extractHtmlPage, buildTextExcerpt } from "./page/page-text"

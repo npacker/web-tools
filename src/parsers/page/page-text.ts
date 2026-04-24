@@ -29,6 +29,14 @@ const FUSE_SCORE_THRESHOLD = 0.3
 const CHUNK_JOIN_SEPARATOR = "\n\n"
 
 /**
+ * Empty headings record used when jsdom cannot parse the input at all.
+ *
+ * @const {PageHeadings}
+ * @default
+ */
+const EMPTY_HEADINGS: PageHeadings = { title: "", h1: "", h2: "", h3: "" }
+
+/**
  * Structured extraction of the core heading fields on a page.
  */
 interface PageHeadings {
@@ -54,76 +62,123 @@ export interface PageExcerpt {
 }
 
 /**
- * Extract the document title and the first heading of each of the first three heading levels.
- *
- * @param html Raw HTML payload.
- * @returns The extracted heading fields; missing or unparseable headings default to an empty string.
+ * Combined headings + excerpt payload for an HTML page, produced by a single jsdom parse.
  */
-export function extractHeadings(html: string): PageHeadings {
-  try {
-    const { document } = new JSDOM(html).window
-
-    return {
-      title: normalizeText(document.querySelector("title")?.textContent),
-      h1: normalizeText(document.querySelector("h1")?.textContent),
-      h2: normalizeText(document.querySelector("h2")?.textContent),
-      h3: normalizeText(document.querySelector("h3")?.textContent),
-    }
-  } catch {
-    return { title: "", h1: "", h2: "", h3: "" }
-  }
+export interface HtmlPageResult {
+  /** Extracted heading fields (title and first h1/h2/h3); empty strings when unparseable. */
+  headings: PageHeadings
+  /** Content excerpt along with the pre-truncation length. */
+  excerpt: PageExcerpt
 }
 
 /**
- * Extract the main readable content of the document via Mozilla Readability, falling back to the
- * body's inner HTML when Readability can't identify an article, and to the raw HTML string when
- * jsdom itself cannot parse the page.
+ * Extract headings and a size-bounded content excerpt from an HTML page in a single jsdom
+ * parse. Headings are read before Mozilla Readability is invoked because Readability mutates
+ * its input document, stripping the chrome (nav, sidebars) that might otherwise hide a page's
+ * `<title>` or leading `<h1>` from later queries.
  *
  * @param html Raw HTML payload.
  * @param url Absolute URL of the page, used by Readability to resolve relative references.
+ * @param contentLimit Character budget for the returned excerpt.
+ * @param searchTerms Optional search terms biasing excerpt selection.
  * @param format Output format applied to the extracted content.
- * @returns The extracted content, formatted into the requested output shape.
+ * @returns The combined headings and excerpt for the page.
  */
-function extractVisibleText(html: string, url: string, format: ContentFormat): string {
-  const articleContent = parseReadability(html, url)
+export function extractHtmlPage(
+  html: string,
+  url: string,
+  contentLimit: number,
+  searchTerms: string[] | undefined,
+  format: ContentFormat
+): HtmlPageResult {
+  const dom = buildDom(html, url)
 
-  if (articleContent !== undefined && articleContent !== "") {
-    return formatHtml(articleContent, format)
+  if (dom === undefined) {
+    return { headings: EMPTY_HEADINGS, excerpt: applyContentLimit(html, contentLimit, searchTerms) }
   }
 
-  return formatHtml(extractBodyHtml(html) ?? html, format)
+  const headings = extractHeadingsFromDom(dom)
+
+  if (contentLimit <= 0) {
+    return { headings, excerpt: { content: "", totalLength: 0 } }
+  }
+
+  return { headings, excerpt: applyContentLimit(extractVisibleText(dom, format), contentLimit, searchTerms) }
 }
 
 /**
- * Build a jsdom document and run Mozilla Readability against it, returning its extracted content
- * HTML or `undefined` when construction or extraction fails.
+ * Build a size-bounded excerpt from a pre-extracted text body (PDF text, raw text, JSON).
+ *
+ * @param text Full text payload already extracted by the caller.
+ * @param contentLimit Character budget for the returned text.
+ * @param searchTerms Optional search terms biasing content selection.
+ * @returns The excerpt and the total length of the full text before truncation.
+ */
+export function buildTextExcerpt(text: string, contentLimit: number, searchTerms: string[] | undefined): PageExcerpt {
+  return applyContentLimit(text, contentLimit, searchTerms)
+}
+
+/**
+ * Parse HTML into a jsdom instance carrying the absolute URL so Readability can resolve
+ * relative references, returning `undefined` when jsdom cannot construct the DOM.
  *
  * @param html Raw HTML payload.
- * @param url Absolute URL used by Readability to resolve relative references.
- * @returns The article HTML, or `undefined` when jsdom or Readability throws or finds nothing.
+ * @param url Absolute URL of the page.
+ * @returns The constructed jsdom instance, or `undefined` on parse failure.
  */
-function parseReadability(html: string, url: string): string | undefined {
+function buildDom(html: string, url: string): JSDOM | undefined {
   try {
-    const dom = new JSDOM(html, { url })
-
-    return new Readability(dom.window.document).parse()?.content ?? undefined
+    return new JSDOM(html, { url })
   } catch {
     return undefined
   }
 }
 
 /**
- * Parse the HTML into a jsdom document and return its `<body>` inner HTML, or `undefined` when
- * jsdom throws.
+ * Extract the document title and the first h1/h2/h3 from a jsdom document.
  *
- * @param html Raw HTML payload.
- * @returns The body's inner HTML, or `undefined` when jsdom fails to parse or serialize.
+ * @param dom Jsdom instance wrapping the parsed HTML document.
+ * @returns The extracted heading fields, each empty when the corresponding element is missing.
  */
-function extractBodyHtml(html: string): string | undefined {
-  try {
-    const dom = new JSDOM(html)
+function extractHeadingsFromDom(dom: JSDOM): PageHeadings {
+  const { document } = dom.window
 
-    return dom.window.document.body.innerHTML
+  return {
+    title: normalizeText(document.querySelector("title")?.textContent),
+    h1: normalizeText(document.querySelector("h1")?.textContent),
+    h2: normalizeText(document.querySelector("h2")?.textContent),
+    h3: normalizeText(document.querySelector("h3")?.textContent),
+  }
+}
+
+/**
+ * Extract the main readable content via Mozilla Readability, falling back to the body's inner
+ * HTML when Readability can't identify an article.
+ *
+ * @param dom Jsdom instance wrapping the parsed HTML document.
+ * @param format Output format applied to the extracted content.
+ * @returns The extracted content, formatted into the requested output shape.
+ */
+function extractVisibleText(dom: JSDOM, format: ContentFormat): string {
+  const articleContent = runReadability(dom)
+
+  if (articleContent !== undefined && articleContent !== "") {
+    return formatHtml(articleContent, format)
+  }
+
+  return formatHtml(dom.window.document.body.innerHTML, format)
+}
+
+/**
+ * Run Mozilla Readability against the supplied document, returning its extracted article
+ * HTML or `undefined` when Readability throws or finds nothing.
+ *
+ * @param dom Jsdom instance whose document Readability will parse and mutate in place.
+ * @returns The article HTML, or `undefined` when extraction fails.
+ */
+function runReadability(dom: JSDOM): string | undefined {
+  try {
+    return new Readability(dom.window.document).parse()?.content ?? undefined
   } catch {
     return undefined
   }
@@ -149,42 +204,32 @@ function formatHtml(htmlFragment: string, format: ContentFormat): string {
 }
 
 /**
- * Build the visible-text payload for the Visit Website tool: when search terms are supplied
- * and the full text exceeds the budget, concatenate the highest-scoring paragraphs selected
- * via fuzzy matching; otherwise return a head slice of the full text. Also reports the
- * pre-truncation length so callers can detect truncation and refine with search terms or
- * raise the plugin setting.
+ * Apply the shared content-limit policy: when search terms are supplied and the full text
+ * exceeds the budget, concatenate the highest-scoring paragraphs selected via fuzzy matching;
+ * otherwise return a head slice. Also reports the pre-truncation length so callers can detect
+ * truncation and refine with search terms or raise the plugin setting.
  *
- * @param html Raw HTML payload used by Readability to extract the main article text.
- * @param url Absolute URL of the page, passed to Readability for relative-link resolution.
+ * @param text Full text to excerpt.
  * @param contentLimit Character budget for the returned text.
  * @param searchTerms Optional search terms biasing content selection.
- * @param format Output format applied to the extracted content.
- * @returns The excerpt and the total length of the full extracted content before truncation.
+ * @returns The excerpt and the total length of the full text before truncation.
  */
-export function buildPageExcerpt(
-  html: string,
-  url: string,
-  contentLimit: number,
-  searchTerms: string[] | undefined,
-  format: ContentFormat
-): PageExcerpt {
+function applyContentLimit(text: string, contentLimit: number, searchTerms: string[] | undefined): PageExcerpt {
   if (contentLimit <= 0) {
     return { content: "", totalLength: 0 }
   }
 
-  const allContent = extractVisibleText(html, url, format)
-  const totalLength = allContent.length
+  const totalLength = text.length
 
   if (searchTerms !== undefined && searchTerms.length > 0 && contentLimit < totalLength) {
-    const sliced = sliceAroundTerms(allContent, searchTerms, contentLimit)
+    const sliced = sliceAroundTerms(text, searchTerms, contentLimit)
 
     if (sliced.length > 0) {
       return { content: sliced, totalLength }
     }
   }
 
-  return { content: allContent.slice(0, contentLimit), totalLength }
+  return { content: text.slice(0, contentLimit), totalLength }
 }
 
 /**

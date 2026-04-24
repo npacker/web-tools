@@ -16,6 +16,7 @@ import { createVisitWebsiteTool } from "./tools/visit-website-tool"
 import { createWebSearchTool } from "./tools/web-search-tool"
 
 import type { SearchResultsPayload } from "./cache"
+import type { FetchedPage } from "./website"
 import type { Tool, ToolsProviderController } from "@lmstudio/sdk"
 
 /**
@@ -109,7 +110,7 @@ export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[
     timing.searchCacheTtlMs,
     SEARCH_CACHE_MAX_SIZE
   )
-  const websiteCache = new TTLCache<string>(
+  const websiteCache = new TTLCache<FetchedPage>(
     path.join(cacheRoot, WEBSITE_CACHE_SUBDIR),
     timing.websiteCacheTtlMs,
     WEBSITE_CACHE_MAX_SIZE

@@ -6,6 +6,7 @@ import { VqdTokenError } from "../duckduckgo/vqd-token-error"
 import { FetchError } from "../http/fetch-error"
 
 import { NoResultsError } from "./no-results-error"
+import { UnsupportedContentTypeError } from "./unsupported-content-type-error"
 
 /**
  * Minimal context surface required by the tool-error formatter for warning output.
@@ -79,6 +80,10 @@ export function formatToolError(error: unknown, context: ToolErrorContext, kind:
     return error.message
   }
 
+  if (error instanceof UnsupportedContentTypeError) {
+    return formatUnsupportedContentType(error, kind)
+  }
+
   if (error instanceof VqdTokenError) {
     return `Error: ${appendCause(error.message, error.cause)}`
   }
@@ -94,6 +99,29 @@ export function formatToolError(error: unknown, context: ToolErrorContext, kind:
   context.warn(`${templates.unexpectedPrefix}: ${message}`)
 
   return `Error: ${message}`
+}
+
+/**
+ * Render an `UnsupportedContentTypeError` into a tool-specific user-facing message, naming
+ * the detected MIME type. Only the two tool flows that actually fetch remote pages can
+ * surface this error; the search flows never reach a page classifier, so they are handled
+ * by a defensive fallback that preserves diagnostic fidelity if that invariant is ever
+ * broken.
+ *
+ * @param error The unsupported-content-type error to render.
+ * @param kind Tool flow the error originated from, controlling message phrasing.
+ * @returns The formatted user-facing error string.
+ */
+function formatUnsupportedContentType(error: UnsupportedContentTypeError, kind: ToolErrorKind): string {
+  if (kind === "website") {
+    return `Error: Cannot read ${error.mimeType} content — this tool can only handle HTML, PDF, plain text, and JSON pages.`
+  }
+
+  if (kind === "image-download") {
+    return `Error: Cannot extract images from ${error.mimeType} content — only HTML pages are supported.`
+  }
+
+  return `Error: Unexpected unsupported-content-type error during ${kind}: ${error.mimeType}.`
 }
 
 /**

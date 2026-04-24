@@ -7,7 +7,7 @@ import { JSDOM } from "jsdom"
 import { z } from "zod"
 
 import { resolveConfig } from "../config/resolve-config"
-import { formatToolError } from "../errors"
+import { formatToolError, UnsupportedContentTypeError } from "../errors"
 import { filenameFromUrl } from "../fs"
 import { createRetryNotifier, httpUrlSchema } from "../http"
 import { downloadImages } from "../images"
@@ -18,6 +18,7 @@ import { fetchWebsite } from "../website"
 import type { TTLCache } from "../cache"
 import type { RetryOptions } from "../http"
 import type { RateLimiter } from "../timing"
+import type { FetchedPage } from "../website"
 import type { Impit } from "impit"
 
 /**
@@ -80,7 +81,7 @@ interface ViewedImage {
 export function createViewImagesTool(
   ctl: ToolsProviderController,
   impit: Impit,
-  websiteCache: TTLCache<string>,
+  websiteCache: TTLCache<FetchedPage>,
   rateLimiter: RateLimiter,
   imageLimiter: RateLimiter,
   retry: RetryOptions
@@ -126,13 +127,18 @@ export function createViewImagesTool(
         if (hasWebsite) {
           context.status("Fetching image URLs from website...")
           await rateLimiter.wait()
-          const html = await fetchWebsite(impit, websiteCache, websiteURL, {
+          const page = await fetchWebsite(impit, websiteCache, websiteURL, {
             signal: context.signal,
             retry,
             onFailedAttempt: createRetryNotifier(context.status, "website fetch"),
             maxBytes: maxResponseBytes,
           })
-          const scraped = extractPageImages(new JSDOM(html), websiteURL, maxImages)
+
+          if (page.kind !== "html") {
+            throw new UnsupportedContentTypeError(page.mimeType, websiteURL)
+          }
+
+          const scraped = extractPageImages(new JSDOM(page.html), websiteURL, maxImages)
 
           for (const image of scraped) {
             subjects.push({ src: image.src, alt: image.alt, title: image.title })
