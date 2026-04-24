@@ -34,7 +34,7 @@ const CHUNK_JOIN_SEPARATOR = "\n\n"
  * @const {PageHeadings}
  * @default
  */
-const EMPTY_HEADINGS: PageHeadings = { title: "", h1: "", h2: "", h3: "" }
+const EMPTY_HEADINGS: PageHeadings = { title: "", h1: "", h2: "" }
 
 /**
  * Structured extraction of the core heading fields on a page.
@@ -46,8 +46,6 @@ interface PageHeadings {
   h1: string
   /** Text of the first `<h2>` element, or an empty string when absent. */
   h2: string
-  /** Text of the first `<h3>` element, or an empty string when absent. */
-  h3: string
 }
 
 /**
@@ -65,7 +63,7 @@ export interface PageExcerpt {
  * Combined headings + excerpt payload for an HTML page, produced by a single jsdom parse.
  */
 export interface HtmlPageResult {
-  /** Extracted heading fields (title and first h1/h2/h3); empty strings when unparseable. */
+  /** Extracted heading fields (title and first h1/h2); empty strings when unparseable. */
   headings: PageHeadings
   /** Content excerpt along with the pre-truncation length. */
   excerpt: PageExcerpt
@@ -135,7 +133,7 @@ function buildDom(html: string, url: string): JSDOM | undefined {
 }
 
 /**
- * Extract the document title and the first h1/h2/h3 from a jsdom document.
+ * Extract the document title and the first h1/h2 from a jsdom document.
  *
  * @param dom Jsdom instance wrapping the parsed HTML document.
  * @returns The extracted heading fields, each empty when the corresponding element is missing.
@@ -147,7 +145,6 @@ function extractHeadingsFromDom(dom: JSDOM): PageHeadings {
     title: normalizeText(document.querySelector("title")?.textContent),
     h1: normalizeText(document.querySelector("h1")?.textContent),
     h2: normalizeText(document.querySelector("h2")?.textContent),
-    h3: normalizeText(document.querySelector("h3")?.textContent),
   }
 }
 
@@ -323,32 +320,42 @@ function selectAroundMatches(rankedIndices: number[], chunks: string[], limit: n
  * Enumerate chunk indices in priority order for symmetric neighbourhood expansion: the matches
  * themselves first, then their ±1 neighbours (iterated across all matches), then ±2, and so on
  * out to the document edges. Duplicate indices are emitted when multiple matches share a
- * neighbour; the caller is expected to deduplicate.
+ * neighbour; the caller is expected to deduplicate. Lazy so callers that fill their budget
+ * early avoid materializing the tail of the sequence.
  *
  * @param rankedIndices Chunk indices ordered from best to worst fuzzy match.
  * @param chunkCount Total number of chunks in the source document.
- * @returns Flat list of candidate chunk indices in emission order.
+ * @yields {number} Candidate chunk indices in emission order.
  */
-function prioritizedCandidates(rankedIndices: number[], chunkCount: number): number[] {
-  const candidates: number[] = [...rankedIndices]
+function* prioritizedCandidates(rankedIndices: number[], chunkCount: number): Generator<number> {
   const lastIndex = chunkCount - 1
 
-  for (let radius = 1; radius <= lastIndex; radius++) {
+  yield* rankedIndices
+
+  let maxReach = 0
+
+  for (const matchIndex of rankedIndices) {
+    const reach = Math.max(matchIndex, lastIndex - matchIndex)
+
+    if (reach > maxReach) {
+      maxReach = reach
+    }
+  }
+
+  for (let radius = 1; radius <= maxReach; radius++) {
     for (const matchIndex of rankedIndices) {
       const left = matchIndex - radius
       const right = matchIndex + radius
 
       if (left >= 0) {
-        candidates.push(left)
+        yield left
       }
 
       if (right <= lastIndex) {
-        candidates.push(right)
+        yield right
       }
     }
   }
-
-  return candidates
 }
 
 /**

@@ -27,8 +27,6 @@ export interface VisitWebsiteResult {
   h1?: string
   /** First `<h2>` of an HTML page, omitted for non-HTML kinds. */
   h2?: string
-  /** First `<h3>` of an HTML page, omitted for non-HTML kinds. */
-  h3?: string
   /** Excerpt of the page content, truncated to the configured character budget. */
   content?: string
   /** Character count of the full extracted content before truncation or windowing. */
@@ -73,7 +71,6 @@ export function renderVisitResult(url: string, page: FetchedPage, inputs: Excerp
       title: headings.title,
       h1: headings.h1,
       h2: headings.h2,
-      h3: headings.h3,
       content: excerpt.content,
       contentLength: excerpt.totalLength,
     })
@@ -109,8 +106,6 @@ interface ResultFields {
   h1?: string
   /** Candidate h2; dropped when empty. */
   h2?: string
-  /** Candidate h3; dropped when empty. */
-  h3?: string
   /** Candidate content; dropped when empty. */
   content?: string
   /** Candidate content length; dropped when zero. */
@@ -138,10 +133,6 @@ function assembleResult(fields: ResultFields): VisitWebsiteResult {
 
   if (fields.h2 !== undefined && fields.h2.length > 0) {
     result.h2 = fields.h2
-  }
-
-  if (fields.h3 !== undefined && fields.h3.length > 0) {
-    result.h3 = fields.h3
   }
 
   if (fields.content !== undefined && fields.content.length > 0) {
