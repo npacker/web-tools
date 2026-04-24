@@ -9,7 +9,7 @@ import { isRetryableFetchError } from "./retry"
 import { assertPublicUrl } from "./url-guard"
 
 import type { RetryOptions } from "./retry"
-import type { Impit } from "impit"
+import type { Impit, ImpitResponse } from "impit"
 import type { Options as PRetryOptions } from "p-retry"
 
 /**
@@ -69,7 +69,7 @@ type HopResult =
       kind: "done"
 
       /** The fully received response to return to the caller. */
-      response: Awaited<ReturnType<Impit["fetch"]>>
+      response: ImpitResponse
     }
   | {
       /** Discriminant marking a redirect that should be followed. */
@@ -88,7 +88,7 @@ type HopResult =
  * @returns The successful response.
  * @throws {FetchError} When the transport fails or the response carries a non-2xx status.
  */
-export async function fetchOk(impit: Impit, url: string, options: RequestOptions): Promise<ReturnType<Impit["fetch"]>> {
+export async function fetchOk(impit: Impit, url: string, options: RequestOptions): Promise<ImpitResponse> {
   return pRetry(async () => attemptFetch(impit, url, options.signal, options.headers), {
     retries: 0,
     ...options.retry,
@@ -121,7 +121,7 @@ async function attemptFetch(
   url: string,
   signal: AbortSignal,
   headers: Record<string, string> | undefined
-): Promise<Awaited<ReturnType<Impit["fetch"]>>> {
+): Promise<ImpitResponse> {
   return followRedirects(impit, url, url, signal, headers, MAX_REDIRECT_HOPS)
 }
 
@@ -144,7 +144,7 @@ async function followRedirects(
   signal: AbortSignal,
   headers: Record<string, string> | undefined,
   hopsRemaining: number
-): Promise<Awaited<ReturnType<Impit["fetch"]>>> {
+): Promise<ImpitResponse> {
   await assertPublicUrl(currentUrl)
   const hop = await performHop(impit, currentUrl, signal, headers)
 
@@ -176,7 +176,7 @@ async function performHop(
   signal: AbortSignal,
   headers: Record<string, string> | undefined
 ): Promise<HopResult> {
-  let response: Awaited<ReturnType<Impit["fetch"]>>
+  let response: ImpitResponse
 
   try {
     response = await impit.fetch(currentUrl, { method: "GET", signal, redirect: "manual", headers })

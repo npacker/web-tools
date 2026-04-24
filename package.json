@@ -27,6 +27,7 @@
     "bottleneck": "^2.19.5",
     "cacache": "^20.0.4",
     "content-type": "^1.0.5",
+    "dssrf": "^1.0.2",
     "file-type": "^22.0.1",
     "fuse.js": "^7.3.0",
     "html-to-text": "^9.0.5",

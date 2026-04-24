@@ -14,7 +14,7 @@ import { assertPublicUrl, FetchError, isRetryableFetchError, readLimitedBytes } 
 import { imageExtensionFromHeaders, isSupportedImageExtension, normalizeImageExtension } from "../parsers"
 
 import type { RetryOptions } from "../http"
-import type { Impit } from "impit"
+import type { Impit, ImpitResponse } from "impit"
 import type { Options as PRetryOptions } from "p-retry"
 
 /**
@@ -153,7 +153,7 @@ type HopResult =
       kind: "done"
 
       /** The fully received response to return to the caller. */
-      response: Awaited<ReturnType<Impit["fetch"]>>
+      response: ImpitResponse
     }
   | {
       /** Discriminant marking a redirect that should be followed. */
@@ -175,11 +175,7 @@ type HopResult =
  * @returns The successful response.
  * @throws {FetchError} When the transport fails, the timeout fires, or the response carries a non-2xx status.
  */
-async function attemptImageFetch(
-  url: string,
-  impit: Impit,
-  signal: AbortSignal
-): Promise<Awaited<ReturnType<Impit["fetch"]>>> {
+async function attemptImageFetch(url: string, impit: Impit, signal: AbortSignal): Promise<ImpitResponse> {
   const timeoutSignal = AbortSignal.timeout(IMAGE_DOWNLOAD_TIMEOUT_MS)
   const combinedSignal = AbortSignal.any([signal, timeoutSignal])
 
@@ -205,7 +201,7 @@ async function followImageRedirects(
   signal: AbortSignal,
   combinedSignal: AbortSignal,
   hopsRemaining: number
-): Promise<Awaited<ReturnType<Impit["fetch"]>>> {
+): Promise<ImpitResponse> {
   await assertPublicUrl(currentUrl)
   const hop = await performImageHop(impit, originalUrl, currentUrl, signal, combinedSignal)
 
@@ -239,7 +235,7 @@ async function performImageHop(
   signal: AbortSignal,
   combinedSignal: AbortSignal
 ): Promise<HopResult> {
-  let response: Awaited<ReturnType<Impit["fetch"]>>
+  let response: ImpitResponse
 
   try {
     response = await impit.fetch(currentUrl, { method: "GET", signal: combinedSignal, redirect: "manual" })
