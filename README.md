@@ -11,10 +11,9 @@ DuckDuckGo web search.
 | Parameter | Type | Notes |
 | --- | --- | --- |
 | `query` | string | Required. |
-| `safeSearch` | `"strict" \| "moderate" \| "off"` | Optional; overrides plugin setting when supplied. |
 | `page` | int 1–100 | Optional, defaults to 1. Enables pagination. |
 
-Returns an array of `[title, url]` pairs. Results are cached by `(query, safeSearch, page)`. The results-per-page cap is controlled by the plugin's `limitWebResults` toggle and `webMaxResults` slider (default 10, max 30) — these are plugin-only settings and are not exposed as tool parameters. Disabling `limitWebResults` returns every result DuckDuckGo includes on the page.
+Returns an array of `[title, url]` pairs. Results are cached by `(query, safeSearch, page)`. The results-per-page cap is controlled by the plugin's `limitWebResults` toggle and `webMaxResults` slider (default 10, max 30) — these are plugin-only settings and are not exposed as tool parameters. Disabling `limitWebResults` returns every result DuckDuckGo includes on the page. Safe-search mode is plugin-only (default moderate).
 
 ### Image Search
 
@@ -23,10 +22,9 @@ DuckDuckGo image search. Requires a VQD token scraped from the DuckDuckGo homepa
 | Parameter | Type | Notes |
 | --- | --- | --- |
 | `query` | string | Required. |
-| `safeSearch` | `"strict" \| "moderate" \| "off"` | Optional; overrides plugin setting. |
 | `page` | int 1–100 | Optional, defaults to 1. |
 
-Matching images are downloaded into the chat's working directory and returned as local file paths. If a download fails, the remote URL is returned for that slot instead so the assistant always gets something displayable. The results-per-page cap is controlled by the plugin's `limitImageResults` toggle and `imageMaxResults` slider (default 10, max 100) — these are plugin-only settings and are not exposed as tool parameters. Disabling `limitImageResults` returns every image DuckDuckGo includes on the page.
+Matching images are downloaded into the chat's working directory and returned as local file paths. If a download fails, the remote URL is returned for that slot instead so the assistant always gets something displayable. The results-per-page cap is controlled by the plugin's `limitImageResults` toggle and `imageMaxResults` slider (default 10, max 100) — these are plugin-only settings and are not exposed as tool parameters. Disabling `limitImageResults` returns every image DuckDuckGo includes on the page. Safe-search mode is plugin-only (default moderate).
 
 ### Visit Website
 
@@ -88,7 +86,7 @@ All fields are exposed in the LM Studio plugin UI. Two sentinel conventions appl
 | Field | Range | Default | Purpose |
 | --- | --- | --- | --- |
 | Search Results Per Page | 0–10 | `0` → 5 | Page size for web and image search. `0` lets the assistant decide. |
-| Safe Search | strict / moderate / off / Auto | Auto → `moderate` | DuckDuckGo safe-search mode. Auto lets the assistant decide. |
+| Safe Search | strict / moderate / off / Auto | Auto → `moderate` | DuckDuckGo safe-search mode. |
 | View Images: Max Images | -1–200 | `-1` → 10 | Maximum images scraped when View Images receives a `websiteURL`. |
 | Visit Website: Content Character Limit | 0–100 000 | `0` → 10 000 | Visible-text character budget for the page excerpt. |
 | Visit Website: Content Format | Markdown / Plain text | Markdown | Output format of the `content` field. Markdown retains headings, lists, and inline links; Plain text strips syntax and preserves only line breaks. |

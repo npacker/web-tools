@@ -5,7 +5,7 @@
 import { tool, type Tool, type ToolsProviderController } from "@lmstudio/sdk"
 import { z } from "zod"
 
-import { DEFAULT_SAFE_SEARCH, resolveConfig } from "../config/resolve-config"
+import { resolveConfig } from "../config/resolve-config"
 import { fetchVqdToken, searchImages } from "../duckduckgo"
 import { formatToolError, NoImageResultsError } from "../errors"
 import { createRetryNotifier, FetchError } from "../http"
@@ -73,7 +73,6 @@ export function createImageSearchTool(
     description: "Search for images on DuckDuckGo using a query string and return a list of image URLs.",
     parameters: {
       query: z.string().describe("The search query for finding images."),
-      safeSearch: z.enum(["strict", "moderate", "off"]).optional().default(DEFAULT_SAFE_SEARCH).describe("Safe Search"),
       page: z
         .number()
         .int()
@@ -89,21 +88,18 @@ export function createImageSearchTool(
      *
      * @param arguments_ Validated tool parameters.
      * @param arguments_.query Search query string.
-     * @param arguments_.safeSearch Optional per-call safe-search override.
      * @param arguments_.page Page number being requested.
      * @param context Runtime tool context supplied by the SDK.
      * @returns Either the downloaded file paths, the remote URLs on download failure, or a user-facing error string.
      */
     implementation: async (arguments_, context) => {
-      const { query, safeSearch: parameterSafeSearch, page } = arguments_
+      const { query, page } = arguments_
       context.status("Initiating DuckDuckGo image search...")
       await rateLimiter.wait()
 
       try {
         const { imageMaxResults, imagePageStride, safeSearch, imageSearchRequestDelayMs, maxImageBytes } =
-          resolveConfig(ctl, {
-            safeSearch: parameterSafeSearch,
-          })
+          resolveConfig(ctl)
         let vqd = await fetchVqdToken(impit, vqdCache, query, {
           signal: context.signal,
           retry,

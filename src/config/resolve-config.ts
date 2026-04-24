@@ -43,7 +43,7 @@ const DEFAULT_MAX_RESULTS = 10
  * @const {"moderate"}
  * @default
  */
-export const DEFAULT_SAFE_SEARCH = "moderate" as const
+const DEFAULT_SAFE_SEARCH = "moderate" as const
 
 /**
  * Default number of images scraped by the View Images tool when no value is provided.
@@ -228,8 +228,6 @@ export interface ResolvedTimingConfig {
  * Optional per-invocation overrides applied on top of plugin configuration.
  */
 interface ConfigOverrides {
-  /** Safe-search override provided by the caller. */
-  safeSearch?: SafeSearch
   /** Max-images override provided by the caller. */
   maxImages?: number
 }
@@ -242,7 +240,7 @@ interface ConfigOverrides {
  * @param overrides Per-call overrides supplied by the tool invocation.
  * @returns The fully resolved configuration used to drive a request.
  */
-export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOverrides): ResolvedConfig {
+export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOverrides = {}): ResolvedConfig {
   const pluginConfig = ctl.getPluginConfig(configSchematics)
   const pluginLimitWeb = pluginConfig.get("limitWebResults") as boolean | null
   const pluginWebMax = pluginConfig.get("webMaxResults") as number | null
@@ -264,7 +262,7 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
     webPageStride: webLimited ? (pluginWebMax ?? DEFAULT_MAX_RESULTS) : WEB_NATIVE_PAGE_SIZE,
     imageMaxResults: imageLimited ? (pluginImageMax ?? DEFAULT_MAX_RESULTS) : Number.POSITIVE_INFINITY,
     imagePageStride: imageLimited ? (pluginImageMax ?? DEFAULT_MAX_RESULTS) : IMAGE_NATIVE_PAGE_SIZE,
-    safeSearch: resolveSafeSearch(pluginSafeSearch, overrides.safeSearch),
+    safeSearch: resolveSafeSearch(pluginSafeSearch),
     includeSnippets: pluginIncludeSnippets ?? DEFAULT_INCLUDE_SNIPPETS,
     maxImages: pluginMaxImages ?? overrides.maxImages ?? DEFAULT_MAX_IMAGES,
     contentLimit: pluginContentLimit ?? DEFAULT_CONTENT_LIMIT,
@@ -310,17 +308,11 @@ export function resolveTimingConfig(ctl: ToolsProviderController): ResolvedTimin
 }
 
 /**
- * Resolves safe search with proper priority.
+ * Resolves safe search from plugin configuration.
  *
  * @param pluginValue Value read from plugin configuration, possibly the auto sentinel.
- * @param override Runtime override from the tool invocation.
  * @returns The effective safe-search mode.
  */
-function resolveSafeSearch(
-  pluginValue: SafeSearch | typeof AUTO_CONFIG_VALUE,
-  override: SafeSearch | undefined
-): SafeSearch {
-  const fromPlugin = pluginValue === AUTO_CONFIG_VALUE ? undefined : pluginValue
-
-  return fromPlugin ?? override ?? DEFAULT_SAFE_SEARCH
+function resolveSafeSearch(pluginValue: SafeSearch | typeof AUTO_CONFIG_VALUE): SafeSearch {
+  return pluginValue === AUTO_CONFIG_VALUE ? DEFAULT_SAFE_SEARCH : pluginValue
 }

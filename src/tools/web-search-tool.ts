@@ -62,7 +62,6 @@ export function createWebSearchTool(
       "Search for web pages on DuckDuckGo using a query string, returning a list of URLs with titles and snippet previews.",
     parameters: {
       query: z.string().describe("The search query for finding web pages."),
-      safeSearch: z.enum(["strict", "moderate", "off"]).optional().describe("Safe Search."),
       page: z
         .number()
         .int()
@@ -78,20 +77,17 @@ export function createWebSearchTool(
      *
      * @param arguments_ Validated tool parameters.
      * @param arguments_.query Search query string.
-     * @param arguments_.safeSearch Optional per-call safe-search override.
      * @param arguments_.page Page number being requested.
      * @param context Runtime tool context supplied by the SDK.
      * @returns Either the result tuples or a user-facing error string.
      */
     implementation: async (arguments_, context) => {
-      const { query, safeSearch: parameterSafeSearch, page } = arguments_
+      const { query, page } = arguments_
       context.status("Initiating web search...")
       await rateLimiter.wait()
 
       try {
-        const { webMaxResults, webPageStride, safeSearch, includeSnippets } = resolveConfig(ctl, {
-          safeSearch: parameterSafeSearch,
-        })
+        const { webMaxResults, webPageStride, safeSearch, includeSnippets } = resolveConfig(ctl)
         const cacheKey = searchCacheKey("web", query, safeSearch, page)
         const cached = await cache.get(cacheKey)
 
