@@ -136,9 +136,11 @@ async function downloadOne(
  * @returns `true` when the URL should bypass the HTTP download path.
  */
 function isLocalOrNonHttpUrl(url: string, workingDirectory: string): boolean {
-  const scheme = /^[a-z][a-z0-9+.-]*:/i.exec(url)?.[0].toLowerCase()
-  if (scheme === "http:" || scheme === "https:") return false
-  if (scheme !== undefined) return true
+  if (URL.canParse(url)) {
+    const { protocol } = new URL(url)
+
+    return protocol !== "http:" && protocol !== "https:"
+  }
 
   const resolved = path.resolve(url)
   const resolvedWorkingDirectory = path.resolve(workingDirectory)
