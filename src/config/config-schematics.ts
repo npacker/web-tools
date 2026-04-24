@@ -4,65 +4,11 @@ import { AUTO_CONFIG_VALUE } from "./auto-sentinel"
 
 /**
  * Plugin configuration schematics registered with LM Studio.
- * Exposes the page size and safe search settings shown in the plugin UI.
+ * Exposes the settings shown in the plugin UI.
  *
  * @const {object}
  */
 export const configSchematics = createConfigSchematics()
-  .field(
-    "limitWebResults",
-    "boolean",
-    {
-      displayName: "Limit Web Search Results",
-      subtitle: "When disabled, every result DuckDuckGo returns on the requested page is included.",
-    },
-    true
-  )
-  .field(
-    "webMaxResults",
-    "numeric",
-    {
-      displayName: "Web Search: Max Results",
-      subtitle: "1 to 30. Caps results per page; DuckDuckGo returns up to ~30.",
-      min: 1,
-      max: 30,
-      int: true,
-      slider: {
-        step: 1,
-        min: 1,
-        max: 30,
-      },
-      dependencies: [{ key: "limitWebResults", condition: { type: "equals", value: true } }],
-    },
-    10
-  )
-  .field(
-    "limitImageResults",
-    "boolean",
-    {
-      displayName: "Limit Image Search Results",
-      subtitle: "When disabled, every image DuckDuckGo returns on the requested page is included.",
-    },
-    true
-  )
-  .field(
-    "imageMaxResults",
-    "numeric",
-    {
-      displayName: "Image Search: Max Results",
-      subtitle: "1 to 100. Caps results per page; DuckDuckGo returns up to ~100.",
-      min: 1,
-      max: 100,
-      int: true,
-      slider: {
-        step: 1,
-        min: 1,
-        max: 100,
-      },
-      dependencies: [{ key: "limitImageResults", condition: { type: "equals", value: true } }],
-    },
-    10
-  )
   .field(
     "safeSearch",
     "select",
@@ -81,44 +27,64 @@ export const configSchematics = createConfigSchematics()
     "includeSnippets",
     "boolean",
     {
-      displayName: "Include Snippets in Search Results",
-      subtitle: "When enabled, web search results include a preview text snippet from each page",
+      displayName: "Web Search: Include Result Snippets",
+      subtitle: "Include a short preview snippet from each page alongside the title and URL.",
     },
     true
   )
   .field(
-    "maxImages",
+    "limitWebResults",
+    "boolean",
+    {
+      displayName: "Web Search: Limit Results",
+      subtitle: "When disabled, every result returned on the requested page is included.",
+    },
+    true
+  )
+  .field(
+    "webMaxResults",
     "numeric",
     {
-      displayName: "View Images: Max Images",
-      subtitle: "-1 to 200, -1 = default (10). Maximum images scraped when View Images receives a websiteURL.",
-      min: -1,
-      max: 200,
+      displayName: "Web Search: Max Results",
+      subtitle: "1 to 30. Maximum web search results to return from the requested page.",
+      min: 1,
+      max: 30,
       int: true,
       slider: {
         step: 1,
-        min: -1,
-        max: 200,
+        min: 1,
+        max: 30,
       },
+      dependencies: [{ key: "limitWebResults", condition: { type: "equals", value: true } }],
     },
-    -1
+    10
   )
   .field(
-    "contentLimit",
+    "limitImageResults",
+    "boolean",
+    {
+      displayName: "Image Search: Limit Results",
+      subtitle: "When disabled, every image returned on the requested page is included.",
+    },
+    true
+  )
+  .field(
+    "imageMaxResults",
     "numeric",
     {
-      displayName: "Visit Website: Content Character Limit",
-      subtitle: "1 to 100000, 0 = default (10000)",
-      min: 0,
-      max: 100_000,
+      displayName: "Image Search: Max Results",
+      subtitle: "1 to 100. Maximum image search results to return from the requested page.",
+      min: 1,
+      max: 100,
       int: true,
       slider: {
-        step: 1000,
-        min: 0,
-        max: 100_000,
+        step: 1,
+        min: 1,
+        max: 100,
       },
+      dependencies: [{ key: "limitImageResults", condition: { type: "equals", value: true } }],
     },
-    0
+    10
   )
   .field(
     "contentFormat",
@@ -129,179 +95,211 @@ export const configSchematics = createConfigSchematics()
         { value: "text", displayName: "Plain text" },
       ],
       displayName: "Visit Website: Content Format",
-      subtitle:
-        "Markdown retains headings, lists, and inline links; plain text strips syntax and preserves only line breaks.",
     },
     "markdown"
   )
   .field(
-    "searchCacheTtlSeconds",
+    "contentLimit",
     "numeric",
     {
-      displayName: "Search Cache TTL (seconds)",
-      subtitle: "-1 to 3600 seconds, -1 = default (900), 0 = caching disabled",
-      min: -1,
-      max: 3600,
+      displayName: "Visit Website: Content Character Limit",
+      subtitle: "1000 to 100000. Character limit applied to the extracted page content.",
+      min: 1000,
+      max: 100_000,
       int: true,
       slider: {
-        step: 60,
-        min: -1,
-        max: 3600,
+        step: 1000,
+        min: 1000,
+        max: 100_000,
       },
     },
-    -1
-  )
-  .field(
-    "vqdCacheTtlSeconds",
-    "numeric",
-    {
-      displayName: "VQD Token Cache TTL (seconds)",
-      subtitle: "-1 to 3600 seconds, -1 = default (600), 0 = caching disabled",
-      min: -1,
-      max: 3600,
-      int: true,
-      slider: {
-        step: 60,
-        min: -1,
-        max: 3600,
-      },
-    },
-    -1
-  )
-  .field(
-    "websiteCacheTtlSeconds",
-    "numeric",
-    {
-      displayName: "Website Cache TTL (seconds)",
-      subtitle: "-1 to 3600 seconds, -1 = default (600), 0 = caching disabled",
-      min: -1,
-      max: 3600,
-      int: true,
-      slider: {
-        step: 60,
-        min: -1,
-        max: 3600,
-      },
-    },
-    -1
-  )
-  .field(
-    "requestIntervalSeconds",
-    "numeric",
-    {
-      displayName: "Min Interval Between Requests (seconds)",
-      subtitle: "-1 to 30, -1 = default (5), 0 = no rate limiting",
-      min: -1,
-      max: 30,
-      int: true,
-      slider: {
-        step: 1,
-        min: -1,
-        max: 30,
-      },
-    },
-    -1
-  )
-  .field(
-    "maxRetries",
-    "numeric",
-    {
-      displayName: "Max Retries Per Request",
-      subtitle: "-1 to 10, -1 = default (3), 0 disables retries",
-      min: -1,
-      max: 10,
-      int: true,
-      slider: {
-        step: 1,
-        min: -1,
-        max: 10,
-      },
-    },
-    -1
-  )
-  .field(
-    "retryInitialBackoffSeconds",
-    "numeric",
-    {
-      displayName: "Retry Initial Backoff (seconds)",
-      subtitle: "-1 to 30, -1 = default (1), 0 = no delay",
-      min: -1,
-      max: 30,
-      int: true,
-      slider: {
-        step: 1,
-        min: -1,
-        max: 30,
-      },
-    },
-    -1
-  )
-  .field(
-    "retryMaxBackoffSeconds",
-    "numeric",
-    {
-      displayName: "Retry Max Backoff (seconds)",
-      subtitle: "-1 to 300, -1 = default (30), 0 = no delay",
-      min: -1,
-      max: 300,
-      int: true,
-      slider: {
-        step: 5,
-        min: -1,
-        max: 300,
-      },
-    },
-    -1
+    10_000
   )
   .field(
     "maxResponseMb",
     "numeric",
     {
       displayName: "Visit Website: Max Response Size (MB)",
-      subtitle: "1 to 100, -1 = default (5). Caps the HTML payload fetched by Visit Website.",
-      min: -1,
+      subtitle: "1 to 100. Caps the HTML payload fetched by Visit Website.",
+      min: 1,
       max: 100,
       int: true,
       slider: {
         step: 1,
-        min: -1,
+        min: 1,
         max: 100,
       },
     },
-    -1
+    5
+  )
+  .field(
+    "maxImages",
+    "numeric",
+    {
+      displayName: "View Images: Max Images",
+      subtitle: "1 to 200. Maximum images scraped when View Images receives a websiteURL.",
+      min: 1,
+      max: 200,
+      int: true,
+      slider: {
+        step: 1,
+        min: 1,
+        max: 200,
+      },
+    },
+    10
   )
   .field(
     "maxImageMb",
     "numeric",
     {
       displayName: "Max Image Size (MB)",
-      subtitle: "1 to 100, -1 = default (10). Caps per-image payload for Image Search and View Images.",
-      min: -1,
+      subtitle: "1 to 100. Caps per-image payload for Image Search and View Images.",
+      min: 1,
       max: 100,
       int: true,
       slider: {
         step: 1,
-        min: -1,
+        min: 1,
         max: 100,
       },
     },
-    -1
+    10
   )
   .field(
-    "vqdImageDelaySeconds",
+    "requestIntervalSeconds",
     "numeric",
     {
-      displayName: "VQD to Image API Delay (seconds)",
-      subtitle: "-1 to 10, -1 = default (2), 0 = no delay",
-      min: -1,
+      displayName: "Min Interval Between Requests (seconds)",
+      subtitle: "0 to 30 seconds. Set to 0 to disable rate limiting.",
+      min: 0,
+      max: 30,
+      int: true,
+      slider: {
+        step: 1,
+        min: 0,
+        max: 30,
+      },
+    },
+    5
+  )
+  .field(
+    "imageSearchRequestDelaySeconds",
+    "numeric",
+    {
+      displayName: "Image Search: Request Delay (seconds)",
+      subtitle: "0 to 10 seconds. Delay inserted before the image search API call.",
+      min: 0,
       max: 10,
       int: true,
       slider: {
         step: 1,
-        min: -1,
+        min: 0,
         max: 10,
       },
     },
-    -1
+    2
+  )
+  .field(
+    "maxRetries",
+    "numeric",
+    {
+      displayName: "Max Retries Per Request",
+      subtitle: "0 to 10. Set to 0 to disable retries.",
+      min: 0,
+      max: 10,
+      int: true,
+      slider: {
+        step: 1,
+        min: 0,
+        max: 10,
+      },
+    },
+    3
+  )
+  .field(
+    "retryInitialBackoffSeconds",
+    "numeric",
+    {
+      displayName: "Retry Initial Backoff (seconds)",
+      subtitle: "0 to 30 seconds.",
+      min: 0,
+      max: 30,
+      int: true,
+      slider: {
+        step: 1,
+        min: 0,
+        max: 30,
+      },
+    },
+    1
+  )
+  .field(
+    "retryMaxBackoffSeconds",
+    "numeric",
+    {
+      displayName: "Retry Max Backoff (seconds)",
+      subtitle: "0 to 300 seconds.",
+      min: 0,
+      max: 300,
+      int: true,
+      slider: {
+        step: 5,
+        min: 0,
+        max: 300,
+      },
+    },
+    30
+  )
+  .field(
+    "searchCacheTtlSeconds",
+    "numeric",
+    {
+      displayName: "Search Cache TTL (seconds)",
+      subtitle: "0 to 3600 seconds. Set to 0 to disable caching.",
+      min: 0,
+      max: 3600,
+      int: true,
+      slider: {
+        step: 60,
+        min: 0,
+        max: 3600,
+      },
+    },
+    900
+  )
+  .field(
+    "imageSearchTokenCacheTtlSeconds",
+    "numeric",
+    {
+      displayName: "Image Search Token Cache TTL (seconds)",
+      subtitle: "0 to 3600 seconds. Set to 0 to disable caching.",
+      min: 0,
+      max: 3600,
+      int: true,
+      slider: {
+        step: 60,
+        min: 0,
+        max: 3600,
+      },
+    },
+    600
+  )
+  .field(
+    "websiteCacheTtlSeconds",
+    "numeric",
+    {
+      displayName: "Website Cache TTL (seconds)",
+      subtitle: "0 to 3600 seconds. Set to 0 to disable caching.",
+      min: 0,
+      max: 3600,
+      int: true,
+      slider: {
+        step: 60,
+        min: 0,
+        max: 3600,
+      },
+    },
+    600
   )
   .build()

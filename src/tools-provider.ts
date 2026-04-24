@@ -101,7 +101,7 @@ export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[
   const imageLimiter = new RateLimiter({ maxConcurrent: MAX_IMAGE_CONCURRENCY })
   const vqdCache = new TTLCache<string>(
     path.join(cacheRoot, VQD_CACHE_SUBDIR),
-    timing.vqdCacheTtlMs,
+    timing.imageSearchTokenCacheTtlMs,
     VQD_CACHE_MAX_SIZE
   )
   const searchCache = new TTLCache<SearchResultsPayload>(

@@ -100,15 +100,16 @@ export function createImageSearchTool(
       await rateLimiter.wait()
 
       try {
-        const { imageMaxResults, imagePageStride, safeSearch, vqdImageDelayMs, maxImageBytes } = resolveConfig(ctl, {
-          safeSearch: parameterSafeSearch,
-        })
+        const { imageMaxResults, imagePageStride, safeSearch, imageSearchRequestDelayMs, maxImageBytes } =
+          resolveConfig(ctl, {
+            safeSearch: parameterSafeSearch,
+          })
         let vqd = await fetchVqdToken(impit, vqdCache, query, {
           signal: context.signal,
           retry,
           onFailedAttempt: createRetryNotifier(context.status, "VQD token fetch"),
         })
-        await sleep(vqdImageDelayMs)
+        await sleep(imageSearchRequestDelayMs)
         const parameters = { query, pageStride: imagePageStride, safeSearch, page }
         const searchOptions = {
           signal: context.signal,
@@ -140,7 +141,7 @@ export function createImageSearchTool(
             },
             { forceRefresh: true }
           )
-          await sleep(vqdImageDelayMs)
+          await sleep(imageSearchRequestDelayMs)
           imageResults = await searchImages(impit, parameters, vqd, searchOptions)
         }
 

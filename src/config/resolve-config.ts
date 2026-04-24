@@ -78,44 +78,44 @@ const DEFAULT_CONTENT_FORMAT = "markdown" as const
 const DEFAULT_INCLUDE_SNIPPETS = true
 
 /**
- * Default TTL for the web/image search result cache, in milliseconds.
+ * Default TTL for the web/image search result cache, in seconds.
  *
  * @const {number}
  * @default
  */
-const DEFAULT_SEARCH_CACHE_TTL_MS = 15 * 60_000
+const DEFAULT_SEARCH_CACHE_TTL_SECONDS = 15 * 60
 
 /**
- * Default TTL for the VQD token cache, in milliseconds.
+ * Default TTL for the image search token cache, in seconds.
  *
  * @const {number}
  * @default
  */
-const DEFAULT_VQD_CACHE_TTL_MS = 10 * 60_000
+const DEFAULT_IMAGE_SEARCH_TOKEN_CACHE_TTL_SECONDS = 10 * 60
 
 /**
- * Default TTL for the website HTML cache, in milliseconds.
+ * Default TTL for the website HTML cache, in seconds.
  *
  * @const {number}
  * @default
  */
-const DEFAULT_WEBSITE_CACHE_TTL_MS = 10 * 60_000
+const DEFAULT_WEBSITE_CACHE_TTL_SECONDS = 10 * 60
 
 /**
- * Default minimum interval enforced between outbound DuckDuckGo requests, in milliseconds.
+ * Default minimum interval enforced between outbound requests, in seconds.
  *
  * @const {number}
  * @default
  */
-const DEFAULT_REQUEST_INTERVAL_MS = 5000
+const DEFAULT_REQUEST_INTERVAL_SECONDS = 5
 
 /**
- * Default delay inserted between the VQD-token scrape and the image-search API call, in milliseconds.
+ * Default delay inserted before the image search API call, in seconds.
  *
  * @const {number}
  * @default
  */
-const DEFAULT_VQD_IMAGE_DELAY_MS = 2000
+const DEFAULT_IMAGE_SEARCH_REQUEST_DELAY_SECONDS = 2
 
 /**
  * Default number of retry attempts, including the first try, applied to every outbound request.
@@ -126,20 +126,20 @@ const DEFAULT_VQD_IMAGE_DELAY_MS = 2000
 const DEFAULT_MAX_RETRIES = 3
 
 /**
- * Default base backoff before the first retry, in milliseconds.
+ * Default base backoff before the first retry, in seconds.
  *
  * @const {number}
  * @default
  */
-const DEFAULT_RETRY_INITIAL_BACKOFF_MS = 1000
+const DEFAULT_RETRY_INITIAL_BACKOFF_SECONDS = 1
 
 /**
- * Default cap on a single retry backoff delay after exponential growth, in milliseconds.
+ * Default cap on a single retry backoff delay after exponential growth, in seconds.
  *
  * @const {number}
  * @default
  */
-const DEFAULT_RETRY_MAX_BACKOFF_MS = 30_000
+const DEFAULT_RETRY_MAX_BACKOFF_SECONDS = 30
 
 /**
  * Default upper bound on the HTML payload fetched by Visit Website, in megabytes.
@@ -200,8 +200,8 @@ interface ResolvedConfig {
   contentLimit: number
   /** Output format for the Visit Website tool's `content` field. */
   contentFormat: ContentFormat
-  /** Delay before the image-search API call, in milliseconds. */
-  vqdImageDelayMs: number
+  /** Delay before the image search API call, in milliseconds. */
+  imageSearchRequestDelayMs: number
   /** Hard upper bound on the HTML payload fetched by Visit Website, in bytes. */
   maxResponseBytes: number
   /** Hard upper bound on the per-image payload downloaded by Image Search and View Images, in bytes. */
@@ -214,8 +214,8 @@ interface ResolvedConfig {
 export interface ResolvedTimingConfig {
   /** TTL for the search result cache, in milliseconds. */
   searchCacheTtlMs: number
-  /** TTL for the VQD token cache, in milliseconds. */
-  vqdCacheTtlMs: number
+  /** TTL for the image search token cache, in milliseconds. */
+  imageSearchTokenCacheTtlMs: number
   /** TTL for the website HTML cache, in milliseconds. */
   websiteCacheTtlMs: number
   /** Minimum interval between outbound requests, in milliseconds. */
@@ -236,7 +236,7 @@ interface ConfigOverrides {
 
 /**
  * Resolves configuration by merging plugin config with runtime overrides.
- * Priority: runtime override > plugin config > default.
+ * Priority: plugin config > runtime override > default.
  *
  * @param ctl Tools provider controller exposing plugin configuration.
  * @param overrides Per-call overrides supplied by the tool invocation.
@@ -253,7 +253,7 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
   const pluginMaxImages = pluginConfig.get("maxImages") as number | null
   const pluginContentLimit = pluginConfig.get("contentLimit") as number | null
   const pluginContentFormat = pluginConfig.get("contentFormat") as ContentFormat | null
-  const pluginVqdImageDelaySeconds = pluginConfig.get("vqdImageDelaySeconds") as number | null
+  const pluginImageSearchRequestDelaySeconds = pluginConfig.get("imageSearchRequestDelaySeconds") as number | null
   const pluginMaxResponseMb = pluginConfig.get("maxResponseMb") as number | null
   const pluginMaxImageMb = pluginConfig.get("maxImageMb") as number | null
   const webLimited = pluginLimitWeb ?? true
@@ -266,12 +266,13 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
     imagePageStride: imageLimited ? (pluginImageMax ?? DEFAULT_MAX_RESULTS) : IMAGE_NATIVE_PAGE_SIZE,
     safeSearch: resolveSafeSearch(pluginSafeSearch, overrides.safeSearch),
     includeSnippets: pluginIncludeSnippets ?? DEFAULT_INCLUDE_SNIPPETS,
-    maxImages: resolveAutoNumeric(pluginMaxImages, overrides.maxImages, DEFAULT_MAX_IMAGES),
-    contentLimit: pluginContentLimit !== null && pluginContentLimit !== 0 ? pluginContentLimit : DEFAULT_CONTENT_LIMIT,
+    maxImages: pluginMaxImages ?? overrides.maxImages ?? DEFAULT_MAX_IMAGES,
+    contentLimit: pluginContentLimit ?? DEFAULT_CONTENT_LIMIT,
     contentFormat: pluginContentFormat ?? DEFAULT_CONTENT_FORMAT,
-    vqdImageDelayMs: resolveSecondsToMs(pluginVqdImageDelaySeconds, DEFAULT_VQD_IMAGE_DELAY_MS),
-    maxResponseBytes: resolveMbToBytes(pluginMaxResponseMb, DEFAULT_MAX_RESPONSE_MB),
-    maxImageBytes: resolveMbToBytes(pluginMaxImageMb, DEFAULT_MAX_IMAGE_MB),
+    imageSearchRequestDelayMs:
+      (pluginImageSearchRequestDelaySeconds ?? DEFAULT_IMAGE_SEARCH_REQUEST_DELAY_SECONDS) * MS_PER_SECOND,
+    maxResponseBytes: (pluginMaxResponseMb ?? DEFAULT_MAX_RESPONSE_MB) * BYTES_PER_MB,
+    maxImageBytes: (pluginMaxImageMb ?? DEFAULT_MAX_IMAGE_MB) * BYTES_PER_MB,
   }
 }
 
@@ -286,7 +287,7 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
 export function resolveTimingConfig(ctl: ToolsProviderController): ResolvedTimingConfig {
   const pluginConfig = ctl.getPluginConfig(configSchematics)
   const searchTtlSeconds = pluginConfig.get("searchCacheTtlSeconds") as number | null
-  const vqdTtlSeconds = pluginConfig.get("vqdCacheTtlSeconds") as number | null
+  const tokenTtlSeconds = pluginConfig.get("imageSearchTokenCacheTtlSeconds") as number | null
   const websiteTtlSeconds = pluginConfig.get("websiteCacheTtlSeconds") as number | null
   const intervalSeconds = pluginConfig.get("requestIntervalSeconds") as number | null
   const maxRetries = pluginConfig.get("maxRetries") as number | null
@@ -294,60 +295,18 @@ export function resolveTimingConfig(ctl: ToolsProviderController): ResolvedTimin
   const retryMaxSeconds = pluginConfig.get("retryMaxBackoffSeconds") as number | null
 
   return {
-    searchCacheTtlMs: resolveSecondsToMs(searchTtlSeconds, DEFAULT_SEARCH_CACHE_TTL_MS),
-    vqdCacheTtlMs: resolveSecondsToMs(vqdTtlSeconds, DEFAULT_VQD_CACHE_TTL_MS),
-    websiteCacheTtlMs: resolveSecondsToMs(websiteTtlSeconds, DEFAULT_WEBSITE_CACHE_TTL_MS),
-    requestIntervalMs: resolveSecondsToMs(intervalSeconds, DEFAULT_REQUEST_INTERVAL_MS),
+    searchCacheTtlMs: (searchTtlSeconds ?? DEFAULT_SEARCH_CACHE_TTL_SECONDS) * MS_PER_SECOND,
+    imageSearchTokenCacheTtlMs: (tokenTtlSeconds ?? DEFAULT_IMAGE_SEARCH_TOKEN_CACHE_TTL_SECONDS) * MS_PER_SECOND,
+    websiteCacheTtlMs: (websiteTtlSeconds ?? DEFAULT_WEBSITE_CACHE_TTL_SECONDS) * MS_PER_SECOND,
+    requestIntervalMs: (intervalSeconds ?? DEFAULT_REQUEST_INTERVAL_SECONDS) * MS_PER_SECOND,
     retryPolicy: {
-      retries: resolveRetries(maxRetries),
+      retries: maxRetries ?? DEFAULT_MAX_RETRIES,
       factor: 2,
-      minTimeout: resolveSecondsToMs(retryInitialSeconds, DEFAULT_RETRY_INITIAL_BACKOFF_MS),
-      maxTimeout: resolveSecondsToMs(retryMaxSeconds, DEFAULT_RETRY_MAX_BACKOFF_MS),
+      minTimeout: (retryInitialSeconds ?? DEFAULT_RETRY_INITIAL_BACKOFF_SECONDS) * MS_PER_SECOND,
+      maxTimeout: (retryMaxSeconds ?? DEFAULT_RETRY_MAX_BACKOFF_SECONDS) * MS_PER_SECOND,
       randomize: true,
     },
   }
-}
-
-/**
- * Convert the plugin's "max retries" field to the `retries` value consumed by `p-retry`.
- * A `null` or `-1` selects the default, and `0` explicitly disables retries, leaving a single attempt.
- *
- * @param pluginValue Value read from plugin configuration, or `null` when unset.
- * @returns Number of retries after the first attempt.
- */
-function resolveRetries(pluginValue: number | null): number {
-  const retries = pluginValue === null || pluginValue === -1 ? DEFAULT_MAX_RETRIES : pluginValue
-
-  return Math.max(0, retries)
-}
-
-/**
- * Converts a seconds-valued plugin field (with `-1` treated as "use default") to milliseconds.
- * A stored `0` is taken literally, representing "disabled" or "no delay" depending on the field.
- *
- * @param pluginSeconds Value read from plugin configuration, or `null` when unset.
- * @param defaultMs Fallback milliseconds value when the field is unset or `-1`.
- * @returns The effective value in milliseconds.
- */
-function resolveSecondsToMs(pluginSeconds: number | null, defaultMs: number): number {
-  if (pluginSeconds !== null && pluginSeconds !== -1) {
-    return pluginSeconds * MS_PER_SECOND
-  }
-
-  return defaultMs
-}
-
-/**
- * Converts a megabyte-valued plugin field (with `-1` or `null` treated as "use default") to bytes.
- *
- * @param pluginMb Value read from plugin configuration, or `null` when unset.
- * @param defaultMb Fallback value in megabytes when the field is unset or `-1`.
- * @returns The effective value in bytes.
- */
-function resolveMbToBytes(pluginMb: number | null, defaultMb: number): number {
-  const mb = pluginMb !== null && pluginMb !== -1 ? pluginMb : defaultMb
-
-  return mb * BYTES_PER_MB
 }
 
 /**
@@ -364,19 +323,4 @@ function resolveSafeSearch(
   const fromPlugin = pluginValue === AUTO_CONFIG_VALUE ? undefined : pluginValue
 
   return fromPlugin ?? override ?? DEFAULT_SAFE_SEARCH
-}
-
-/**
- * Resolves a numeric plugin value that treats `-1` as a "use default" sentinel.
- * A stored `0` is taken literally and represents a valid configuration (e.g. "no images").
- *
- * @param pluginValue Value read from plugin configuration, or `null` when unset.
- * @param override Runtime override from the tool invocation.
- * @param defaultValue Fallback value when neither plugin nor override supplies a concrete number.
- * @returns The effective numeric value.
- */
-function resolveAutoNumeric(pluginValue: number | null, override: number | undefined, defaultValue: number): number {
-  const fromPlugin = pluginValue !== null && pluginValue !== -1 ? pluginValue : undefined
-
-  return fromPlugin ?? override ?? defaultValue
 }
