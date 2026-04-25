@@ -36,7 +36,7 @@ export function createVisitWebsiteTool(
   return tool({
     name: "Visit Website",
     description:
-      "Visit a website and return its title, top-level headings, and content. Supports HTML pages, PDFs, plain text, and JSON. When contentLength exceeds the returned content length the page was truncated — refine with findInPage.",
+      "Visit a website and return its title, top-level headings, and content. When contentLength exceeds the returned content length, the content was truncated — refine with findInPage.",
     parameters: {
       url: httpUrlSchema.describe("The URL of the website to visit."),
       findInPage: z
