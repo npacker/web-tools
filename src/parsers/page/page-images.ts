@@ -3,7 +3,7 @@
  */
 
 import { normalizeText } from "../../text"
-import { URL_EXTENSION_PATTERN, isSupportedImageExtension } from "../image-results-parser"
+import { hasSupportedImageExtension } from "../image-results-parser"
 
 import type { JSDOM } from "jsdom"
 
@@ -45,7 +45,7 @@ export function extractPageImages(dom: JSDOM, baseUrl: string, maxImages: number
 
     const resolved = resolveUrl(rawSource, baseUrl)
 
-    if (resolved === undefined || !resolved.startsWith("http") || !urlHasImageExtension(resolved)) {
+    if (resolved === undefined || !resolved.startsWith("http") || !hasSupportedImageExtension(resolved)) {
       continue
     }
 
@@ -81,20 +81,4 @@ function resolveUrl(rawUrl: string, baseUrl: string): string | undefined {
   } catch {
     return undefined
   }
-}
-
-/**
- * Report whether a URL's path ends in a supported image extension, tolerating query strings.
- *
- * @param url URL to inspect.
- * @returns `true` when the trailing extension is recognised by the image parser.
- */
-function urlHasImageExtension(url: string): boolean {
-  const match = URL_EXTENSION_PATTERN.exec(url)
-
-  if (match === null) {
-    return false
-  }
-
-  return isSupportedImageExtension(match[1].toLowerCase())
 }

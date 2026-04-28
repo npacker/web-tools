@@ -24,14 +24,6 @@ const SUPPORTED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "svg"] 
 const FALLBACK_EXTENSION = "jpg"
 
 /**
- * Pattern matching the file extension of a URL's path segment, ignoring any query string.
- *
- * @const {RegExp}
- * @default
- */
-export const URL_EXTENSION_PATTERN = /\.([a-z0-9]+)(?:\?|$)/i
-
-/**
  * Extract and validate image URLs from search results.
  *
  * @param results Raw image search result entries returned by DuckDuckGo.
@@ -73,7 +65,7 @@ export function imageExtensionFromHeaders(contentType: string | null, url: strin
  * @param url URL to test.
  * @returns `true` when the URL's path ends with a recognised image extension.
  */
-function hasSupportedImageExtension(url: string): boolean {
+export function hasSupportedImageExtension(url: string): boolean {
   return extensionFromUrl(url) !== undefined
 }
 

@@ -2,6 +2,7 @@ export { parseSearchResults } from "./search-results-parser"
 export { extractVqdToken } from "./vqd-parser"
 export {
   extractImageUrls,
+  hasSupportedImageExtension,
   imageExtensionFromHeaders,
   isSupportedImageExtension,
   normalizeImageExtension,
