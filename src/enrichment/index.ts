@@ -1,0 +1,5 @@
+export { createMetascraper } from "./create-metascraper"
+export type { ScrapeEnrichmentMetadata, EnrichmentMetadata } from "./create-metascraper"
+export { enrichSearchResults } from "./enrich-search-results"
+export type { EnrichSearchResultsOptions } from "./enrich-search-results"
+export { shapeWebSearchResults } from "./shape-web-search-results"

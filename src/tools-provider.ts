@@ -7,9 +7,10 @@ import path from "node:path"
 
 import { TTLCache } from "./cache"
 import { resolveTimingConfig } from "./config/resolve-config"
+import { createMetascraper } from "./enrichment"
 import { findLMStudioHome } from "./fs"
 import { createImpit } from "./http"
-import { RateLimiter } from "./timing"
+import { PerHostRateLimiter, RateLimiter } from "./timing"
 import { createImageSearchTool } from "./tools/image-search-tool"
 import { createViewImagesTool } from "./tools/view-images-tool"
 import { createVisitWebsiteTool } from "./tools/visit-website-tool"
@@ -28,12 +29,14 @@ import type { Tool, ToolsProviderController } from "@lmstudio/sdk"
 const CACHE_DIRECTORY_NAME = "lms-plugin-duckduckgo-cache"
 
 /**
- * Subdirectory under the cache root dedicated to web/image search results.
+ * Subdirectory under the cache root dedicated to web/image search results. Bumped from
+ * `search` when the cached payload shape gained per-result enrichment metadata; old entries
+ * under the legacy directory are orphaned and may be deleted by hand.
  *
  * @const {string}
  * @default
  */
-const SEARCH_CACHE_SUBDIR = "search"
+const SEARCH_CACHE_SUBDIR = "search-enriched"
 
 /**
  * Maximum number of search result entries retained in the search cache.
@@ -99,6 +102,7 @@ export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[
   const impit = createImpit()
   const cacheRoot = path.join(findLMStudioHome(), "plugin-data", CACHE_DIRECTORY_NAME)
   const rateLimiter = new RateLimiter({ minIntervalMs: timing.requestIntervalMs })
+  const hostLimiter = new PerHostRateLimiter({ minIntervalMs: timing.requestIntervalMs })
   const imageLimiter = new RateLimiter({ maxConcurrent: MAX_IMAGE_CONCURRENCY })
   const vqdCache = new TTLCache<string>(
     path.join(cacheRoot, VQD_CACHE_SUBDIR),
@@ -115,10 +119,11 @@ export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[
     timing.websiteCacheTtlMs,
     WEBSITE_CACHE_MAX_SIZE
   )
+  const scraper = createMetascraper()
   const retry = timing.retryPolicy
 
   return [
-    createWebSearchTool(ctl, impit, searchCache, rateLimiter, retry),
+    createWebSearchTool(ctl, impit, searchCache, websiteCache, rateLimiter, hostLimiter, scraper, retry),
     createImageSearchTool(ctl, impit, vqdCache, rateLimiter, imageLimiter, retry),
     createVisitWebsiteTool(ctl, impit, websiteCache, rateLimiter, retry),
     createViewImagesTool(ctl, impit, websiteCache, rateLimiter, imageLimiter, retry),

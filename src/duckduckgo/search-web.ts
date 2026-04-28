@@ -13,13 +13,13 @@ import type { SearchParameters } from "./build-urls"
 import type { Impit } from "impit"
 
 /**
- * Perform a DuckDuckGo web search and return the parsed result tuples.
+ * Perform a DuckDuckGo web search and return the parsed result records.
  *
  * @param impit Shared HTTP client used for the request.
  * @param parameters Query and pagination parameters for the search.
  * @param maxResults Upper bound on the number of parsed results returned; `Infinity` for no cap.
  * @param options Options controlling the outbound request.
- * @returns The parsed search results along with their count.
+ * @returns The parsed search results along with their count, ready for enrichment.
  */
 export async function searchWeb(
   impit: Impit,
@@ -30,10 +30,7 @@ export async function searchWeb(
   const url = buildWebSearchUrl(parameters).toString()
   const response = await fetchOk(impit, url, options)
   const html = await response.text()
-  const parsed = parseSearchResults(html, maxResults)
-  const results = parsed.map(
-    ({ label, url: resultUrl, snippet }) => [label, resultUrl, snippet] as [string, string, string]
-  )
+  const results = parseSearchResults(html, maxResults)
 
   return {
     results,
