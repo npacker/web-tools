@@ -126,7 +126,12 @@ export function createViewImagesTool(
 
         if (hasWebsite) {
           context.status("Fetching image URLs from website...")
-          await rateLimiter.wait()
+          const cached = await websiteCache.get(websiteURL)
+
+          if (cached === undefined) {
+            await rateLimiter.wait()
+          }
+
           const page = await fetchWebsite(impit, websiteCache, websiteURL, {
             signal: context.signal,
             retry,

@@ -93,7 +93,6 @@ export function createWebSearchTool(
     implementation: async (arguments_, context) => {
       const { query, page } = arguments_
       context.status("Initiating web search...")
-      await rateLimiter.wait()
 
       try {
         const { webMaxResults, webPageStride, safeSearch, includeSnippets, enrichResults, maxResponseBytes } =
@@ -107,6 +106,7 @@ export function createWebSearchTool(
           return { results: shapeWebSearchResults(cached.results, includeSnippets), count: cached.count }
         }
 
+        await rateLimiter.wait()
         const parameters = { query, pageStride: webPageStride, safeSearch, page }
         const raw = await searchWeb(impit, parameters, webMaxResults, {
           signal: context.signal,

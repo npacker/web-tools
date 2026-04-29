@@ -57,10 +57,15 @@ export function createVisitWebsiteTool(
     implementation: async (arguments_, context) => {
       const { url, findInPage } = arguments_
       context.status("Visiting website...")
-      await rateLimiter.wait()
 
       try {
         const { contentLimit, contentFormat, maxResponseBytes } = resolveConfig(ctl, {})
+        const cached = await websiteCache.get(url)
+
+        if (cached === undefined) {
+          await rateLimiter.wait()
+        }
+
         const page = await fetchWebsite(impit, websiteCache, url, {
           signal: context.signal,
           retry,
