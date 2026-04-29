@@ -78,6 +78,14 @@ const DEFAULT_CONTENT_FORMAT = "markdown" as const
 const DEFAULT_INCLUDE_SNIPPETS = true
 
 /**
+ * Default for whether web search results should be enriched with metascraper-extracted metadata.
+ *
+ * @const {boolean}
+ * @default
+ */
+const DEFAULT_ENRICH_RESULTS = true
+
+/**
  * Default TTL for the web/image search result cache, in seconds.
  *
  * @const {number}
@@ -194,6 +202,8 @@ interface ResolvedConfig {
   safeSearch: SafeSearch
   /** Whether web search results should include preview snippets. */
   includeSnippets: boolean
+  /** Whether web search results should be enriched via the per-result metascraper fan-out. */
+  enrichResults: boolean
   /** Maximum number of images scraped by the View Images tool. */
   maxImages: number
   /** Visible-text character budget for the Visit Website tool. */
@@ -248,6 +258,7 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
   const pluginImageMax = pluginConfig.get("imageMaxResults") as number | null
   const pluginSafeSearch = pluginConfig.get("safeSearch") as SafeSearch | typeof AUTO_CONFIG_VALUE
   const pluginIncludeSnippets = pluginConfig.get("includeSnippets") as boolean | null
+  const pluginEnrichResults = pluginConfig.get("enrichResults") as boolean | null
   const pluginMaxImages = pluginConfig.get("maxImages") as number | null
   const pluginContentLimit = pluginConfig.get("contentLimit") as number | null
   const pluginContentFormat = pluginConfig.get("contentFormat") as ContentFormat | null
@@ -264,6 +275,7 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
     imagePageStride: imageLimited ? (pluginImageMax ?? DEFAULT_MAX_RESULTS) : IMAGE_NATIVE_PAGE_SIZE,
     safeSearch: resolveSafeSearch(pluginSafeSearch),
     includeSnippets: pluginIncludeSnippets ?? DEFAULT_INCLUDE_SNIPPETS,
+    enrichResults: pluginEnrichResults ?? DEFAULT_ENRICH_RESULTS,
     maxImages: pluginMaxImages ?? overrides.maxImages ?? DEFAULT_MAX_IMAGES,
     contentLimit: pluginContentLimit ?? DEFAULT_CONTENT_LIMIT,
     contentFormat: pluginContentFormat ?? DEFAULT_CONTENT_FORMAT,

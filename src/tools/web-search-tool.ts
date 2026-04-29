@@ -96,8 +96,9 @@ export function createWebSearchTool(
       await rateLimiter.wait()
 
       try {
-        const { webMaxResults, webPageStride, safeSearch, includeSnippets, maxResponseBytes } = resolveConfig(ctl)
-        const cacheKey = searchCacheKey("web", query, safeSearch, page)
+        const { webMaxResults, webPageStride, safeSearch, includeSnippets, enrichResults, maxResponseBytes } =
+          resolveConfig(ctl)
+        const cacheKey = searchCacheKey("web", query, safeSearch, page, enrichResults)
         const cached = await searchCache.get(cacheKey)
 
         if (cached !== undefined) {
@@ -117,19 +118,25 @@ export function createWebSearchTool(
           throw new NoWebResultsError(query)
         }
 
-        context.status(`Found ${raw.results.length} web pages. Enriching metadata...`)
+        let { results } = raw
 
-        const enriched = await enrichSearchResults(raw.results, scraper, impit, websiteCache, hostLimiter, {
-          signal: context.signal,
-          retry,
-          status: context.status,
-          maxBytes: maxResponseBytes,
-        })
-        const payload: SearchResultsPayload = { results: enriched, count: enriched.length }
+        if (enrichResults) {
+          context.status(`Found ${results.length} web pages. Enriching metadata...`)
+          results = await enrichSearchResults(results, scraper, impit, websiteCache, hostLimiter, {
+            signal: context.signal,
+            retry,
+            status: context.status,
+            maxBytes: maxResponseBytes,
+          })
+          context.status(`Enriched ${results.length} results.`)
+        } else {
+          context.status(`Found ${results.length} web pages.`)
+        }
+
+        const payload: SearchResultsPayload = { results, count: results.length }
         await searchCache.set(cacheKey, payload)
-        context.status(`Enriched ${enriched.length} results.`)
 
-        return { results: shapeWebSearchResults(enriched, includeSnippets), count: enriched.length }
+        return { results: shapeWebSearchResults(results, includeSnippets), count: results.length }
       } catch (error) {
         return formatToolError(error, context, "web-search")
       }

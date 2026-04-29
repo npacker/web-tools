@@ -33,6 +33,16 @@ export const configSchematics = createConfigSchematics()
     true
   )
   .field(
+    "enrichResults",
+    "boolean",
+    {
+      displayName: "Web Search: Enrich Results",
+      subtitle:
+        "Fetch each result page to extract publication date, OpenGraph type, and description. Disable to skip the per-result fan-out and return only title, URL, and snippet.",
+    },
+    true
+  )
+  .field(
     "limitWebResults",
     "boolean",
     {
