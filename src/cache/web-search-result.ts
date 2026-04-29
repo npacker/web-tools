@@ -7,7 +7,7 @@
  */
 export interface WebSearchResult {
   /** Human-readable title rendered by DuckDuckGo for the result link. */
-  label: string
+  title: string
   /** Destination URL of the result link. */
   url: string
   /** Preview snippet extracted from the DuckDuckGo result block; omitted from the wire shape when snippets are disabled in plugin config. */

@@ -100,7 +100,7 @@ function unwrapRedirect(href: string): string {
  */
 interface SearchResult {
   /** Human-readable title of the result link. */
-  label: string
+  title: string
   /** Destination URL of the result link. */
   url: string
   /** Preview text extracted from the search result page. */
@@ -143,9 +143,9 @@ export function parseSearchResults(html: string, maxResults: number): SearchResu
       continue
     }
 
-    const label = normalizeText(link.textContent)
+    const title = normalizeText(link.textContent)
 
-    if (label === "") {
+    if (title === "") {
       continue
     }
 
@@ -153,7 +153,7 @@ export function parseSearchResults(html: string, maxResults: number): SearchResu
     const snippet = normalizeText(snippetElement?.textContent)
 
     seenUrls.add(url)
-    results.push({ label, url, snippet })
+    results.push({ title, url, snippet })
   }
 
   return results
