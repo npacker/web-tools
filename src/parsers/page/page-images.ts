@@ -3,7 +3,7 @@
  */
 
 import { normalizeText } from "../../text"
-import { hasSupportedImageExtension } from "../image-results-parser"
+import { hasSupportedImageExtension } from "../image-extensions"
 
 import type { JSDOM } from "jsdom"
 

@@ -1,4 +1,5 @@
 export { escapeMarkdownText, escapeMarkdownUrl } from "./escape-markdown"
 export { htmlToMarkdown } from "./html-to-markdown"
 export { htmlToText } from "./html-to-text"
+export { normalizeBlankLines } from "./normalize-blank-lines"
 export { normalizeText } from "./normalize-text"

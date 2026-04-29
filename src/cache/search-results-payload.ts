@@ -1,4 +1,4 @@
-import type { WebSearchResult } from "./search-result"
+import type { WebSearchResult } from "./web-search-result"
 
 /**
  * Cached wire shape for a web search, stored in the TTLCache.

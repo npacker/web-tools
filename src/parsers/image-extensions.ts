@@ -1,12 +1,13 @@
 /**
- * Parsing utilities for DuckDuckGo image-search JSON results and image URLs.
+ * Image-extension utilities shared by the search-result parser, the image downloader, and the
+ * page-image scraper. Resolves an image's canonical extension from any of three sources — the
+ * URL pathname, an HTTP `content-type` header, or a sniffed file signature — and normalises
+ * the result to one of the formats the plugin actually handles.
  */
 
 import path from "node:path"
 
 import { extension as mimeExtension } from "mime-types"
-
-import type { DuckDuckGoImageResult } from "../duckduckgo/search-images"
 
 /**
  * Image file extensions recognized as supported download targets.
@@ -22,31 +23,6 @@ const SUPPORTED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "svg"] 
  * @default
  */
 const FALLBACK_EXTENSION = "jpg"
-
-/**
- * Extract and validate image URLs from search results.
- *
- * @param results Raw image search result entries returned by DuckDuckGo.
- * @param maxResults Upper bound on the number of URLs to return.
- * @returns Deduplicated list of valid image URLs, capped at `maxResults`.
- */
-export function extractImageUrls(results: DuckDuckGoImageResult[], maxResults: number): string[] {
-  const seenUrls = new Set<string>()
-
-  return results
-    .slice(0, maxResults)
-    .map(result => result.image)
-    .filter(url => hasSupportedImageExtension(url))
-    .filter(url => {
-      if (seenUrls.has(url)) {
-        return false
-      }
-
-      seenUrls.add(url)
-
-      return true
-    })
-}
 
 /**
  * Determine the image file extension from a content-type header, falling back to the URL pathname.

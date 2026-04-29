@@ -5,6 +5,7 @@
 import { VqdTokenError } from "../duckduckgo/vqd-token-error"
 import { FetchError } from "../http/fetch-error"
 
+import { errorMessage, isAbortError } from "./inspect-error"
 import { NoResultsError } from "./no-results-error"
 import { UnsupportedContentTypeError } from "./unsupported-content-type-error"
 
@@ -158,33 +159,4 @@ function appendCause(line: string, cause: unknown): string {
   }
 
   return `${line} (cause: ${cause.message})`
-}
-
-/**
- * Determine whether a thrown value represents an abort signal firing.
- *
- * @param error Thrown value to inspect.
- * @returns `true` when the value is a DOM abort error.
- */
-export function isAbortError(error: unknown): boolean {
-  return error instanceof DOMException && error.name === "AbortError"
-}
-
-/**
- * Extract a human-readable message from an arbitrary thrown value.
- *
- * @param error Thrown value to stringify.
- * @returns The error message when the value is an `Error`, otherwise the stringified value.
- */
-export function errorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message
-  }
-
-  // Avoid exposing [object Object] for plain objects; attempt JSON serialization as a fallback.
-  try {
-    return JSON.stringify(error)
-  } catch {
-    return String(error)
-  }
 }

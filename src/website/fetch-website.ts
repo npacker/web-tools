@@ -5,7 +5,7 @@
  */
 
 import { decodeBytes, fetchOk, readLimitedBytes } from "../http"
-import { extractPdfContent } from "../parsers/page/pdf-text"
+import { extractPdfContent } from "../parsers"
 
 import { classifyPage, type PageKind } from "./page-kind"
 

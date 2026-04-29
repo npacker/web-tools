@@ -13,7 +13,7 @@
 import pdf2md from "@opendocsg/pdf2md"
 import { getMeta } from "unpdf"
 
-import { normalizeBlankLines } from "../../text/normalize-blank-lines"
+import { normalizeBlankLines } from "../../text"
 
 /**
  * Result of extracting text and metadata from a PDF buffer.
