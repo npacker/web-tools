@@ -60,9 +60,11 @@ const DESCRIPTION_OPTIONS = { truncateLength: 500 } as const
 const ENRICHMENT_KEYS = ["date", "type", "description"] as const
 
 /**
- * Build the shared metascraper instance used for search-result enrichment. The wrapper
- * filters out keys whose values are `undefined` so the returned object can be merged via
- * spread without polluting the target with `undefined` properties.
+ * Build the shared metascraper instance used for search-result enrichment. Metascraper
+ * normalizes failed extractions to `null` (see `metascraper/src/get-data.js`), so the
+ * wrapper drops both `null` and `undefined` values before returning — otherwise spread
+ * merging would pollute each result with `null` keys and waste tokens in the model
+ * payload.
  *
  * @returns A scrape function that extracts the three enrichment fields from a page.
  */
@@ -74,9 +76,9 @@ export function createMetascraper(): ScrapeEnrichmentMetadata {
     const enrichment: EnrichmentMetadata = {}
 
     for (const key of ENRICHMENT_KEYS) {
-      const value = metadata[key]
+      const value = metadata[key] as string | null | undefined
 
-      if (value !== undefined) {
+      if (value !== undefined && value !== null) {
         enrichment[key] = value
       }
     }
