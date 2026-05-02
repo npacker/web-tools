@@ -126,12 +126,13 @@ const DEFAULT_REQUEST_INTERVAL_SECONDS = 5
 const DEFAULT_IMAGE_SEARCH_REQUEST_DELAY_SECONDS = 2
 
 /**
- * Default number of retry attempts, including the first try, applied to every outbound request.
+ * Default number of retries after the initial attempt, applied to every outbound request.
+ * Combined with the first try this yields three total attempts, the configured ceiling.
  *
  * @const {number}
  * @default
  */
-const DEFAULT_MAX_RETRIES = 3
+const DEFAULT_MAX_RETRIES = 2
 
 /**
  * Default base backoff before the first retry, in seconds.

@@ -142,7 +142,7 @@ All fields are exposed in the LM Studio plugin UI. The Safe Search field accepts
 | --- | --- | --- | --- |
 | Min Interval Between Requests (s) | 0–30 | 5 | Minimum gap between outbound DuckDuckGo requests; `0` disables. |
 | Image Search: Request Delay (s) | 0–10 | 2 | Delay inserted before the image-search API call (after the VQD scrape). `0` disables. |
-| Max Retries Per Request | 0–10 | 3 | Retry attempts after the first try; `0` disables. |
+| Max Retries Per Request | 0–4 | 2 | Retry attempts after the first try; `0` disables. |
 | Retry Initial Backoff (s) | 0–30 | 1 | Base backoff before the first retry. |
 | Retry Max Backoff (s) | 0–300 | 30 | Upper bound on exponential-backoff delay. |
 

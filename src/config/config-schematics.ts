@@ -215,17 +215,17 @@ export const configSchematics = createConfigSchematics()
     "numeric",
     {
       displayName: "Max Retries Per Request",
-      subtitle: "0 to 10. Set to 0 to disable retries.",
+      subtitle: "0 to 4 retries after the initial attempt. Set to 0 to disable retries.",
       min: 0,
-      max: 10,
+      max: 4,
       int: true,
       slider: {
         step: 1,
         min: 0,
-        max: 10,
+        max: 4,
       },
     },
-    3
+    2
   )
   .field(
     "retryInitialBackoffSeconds",
