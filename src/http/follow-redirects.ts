@@ -4,7 +4,10 @@
  * used to bypass the destination allowlist.
  */
 
+import { errorMessage, isAbortError } from "../errors"
+
 import { FetchError } from "./fetch-error"
+import { translateImpitError } from "./translate-impit-error"
 import { assertPublicUrl } from "./url-guard"
 
 import type { Impit, ImpitResponse } from "impit"
@@ -194,6 +197,9 @@ async function performHop(
 /**
  * Map a transport-level error from `impit.fetch` into either a propagated abort, a `FetchError`
  * representing a chain-wide timeout, or a `FetchError` describing the underlying transport failure.
+ * Known impit/reqwest debug-repr shapes are translated into short human-readable summaries via
+ * `translateImpitError`; when translation matches, the original cryptic error is dropped from
+ * `cause` so it cannot be reintroduced by the tool-error formatter's cause suffix.
  *
  * @param error Thrown value caught from the `impit.fetch` call.
  * @param originalUrl URL originally requested by the caller, attached to timeout errors.
@@ -207,7 +213,7 @@ function translateTransportError(
   currentUrl: string,
   options: FollowRedirectsOptions
 ): unknown {
-  if (error instanceof DOMException && error.name === "AbortError") {
+  if (isAbortError(error)) {
     if (options.timeoutMessage !== undefined && !options.signal.aborted) {
       return new FetchError(options.timeoutMessage, undefined, originalUrl, { cause: error })
     }
@@ -215,9 +221,14 @@ function translateTransportError(
     return error
   }
 
-  const message = error instanceof Error ? error.message : String(error)
+  const translated = translateImpitError(error)
+  const message = translated?.summary ?? errorMessage(error)
+  const cause = translated === undefined ? error : undefined
 
-  return new FetchError(`Request failed: ${message}`, undefined, currentUrl, { cause: error })
+  return new FetchError(`Request failed: ${message}`, undefined, currentUrl, {
+    cause,
+    retryable: translated?.retryable,
+  })
 }
 
 /**

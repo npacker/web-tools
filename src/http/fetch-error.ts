@@ -3,9 +3,23 @@
  */
 
 /**
+ * Optional fields layered onto the standard `ErrorOptions` for `FetchError`.
+ */
+interface FetchErrorOptions extends ErrorOptions {
+  /** Explicit retry-eligibility override; `false` skips the retry predicate, unset uses status-code defaults. */
+  retryable?: boolean
+}
+
+/**
  * Raised when an HTTP request fails or returns a non-success status.
  */
 export class FetchError extends Error {
+  /**
+   * Explicit retry-eligibility override; `undefined` falls through to the status-code defaults
+   * in `isRetryableFetchError`.
+   */
+  public readonly retryable?: boolean
+
   /**
    * Create a fetch error carrying an optional HTTP status code, URL, and underlying cause.
    *
@@ -14,14 +28,16 @@ export class FetchError extends Error {
    * @param url Optional URL that failed to fetch.
    * @param options Optional error options.
    * @param options.cause Optional underlying error to chain for diagnostics.
+   * @param options.retryable Optional explicit retry-eligibility override.
    */
   public constructor(
     message: string,
     public readonly statusCode?: number,
     public readonly url?: string,
-    options?: ErrorOptions
+    options?: FetchErrorOptions
   ) {
     super(message, options)
     this.name = "FetchError"
+    this.retryable = options?.retryable
   }
 }

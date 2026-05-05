@@ -37,6 +37,10 @@ export function isRetryableFetchError(error: unknown): boolean {
     return false
   }
 
+  if (error.retryable !== undefined) {
+    return error.retryable
+  }
+
   if (error.statusCode === undefined) {
     return true
   }
