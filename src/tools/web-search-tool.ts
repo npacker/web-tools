@@ -124,7 +124,7 @@ export function createWebSearchTool(
           context.status(`Found ${results.length} web pages. Enriching metadata...`)
           results = await enrichSearchResults(results, scraper, impit, websiteCache, hostLimiter, {
             signal: context.signal,
-            retry,
+            retry: { ...retry, retries: 0 },
             status: context.status,
             maxBytes: maxResponseBytes,
           })
