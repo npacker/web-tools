@@ -11,11 +11,14 @@
 
 import { Impit } from "impit"
 
+import type { Browser } from "impit"
+
 /**
- * Create a new `impit` client configured with Chrome fingerprints and manual redirect handling.
+ * Create a new `impit` client configured with the given browser fingerprint and manual redirect handling.
  *
+ * @param browser Browser fingerprint impit should impersonate.
  * @returns A fresh `Impit` instance.
  */
-export function createImpit(): Impit {
-  return new Impit({ browser: "chrome", followRedirects: false, maxRedirects: 0 })
+export function createImpit(browser: Browser): Impit {
+  return new Impit({ browser, followRedirects: false, maxRedirects: 0 })
 }

@@ -6,7 +6,7 @@
 import path from "node:path"
 
 import { TTLCache } from "./cache"
-import { resolveTimingConfig } from "./config/resolve-config"
+import { resolveBrowser, resolveTimingConfig } from "./config/resolve-config"
 import { createMetascraper } from "./enrichment"
 import { findLMStudioHome } from "./fs"
 import { createImpit } from "./http"
@@ -99,7 +99,7 @@ const MAX_IMAGE_CONCURRENCY = 6
  */
 export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[]> {
   const timing = resolveTimingConfig(ctl)
-  const impit = createImpit()
+  const impit = createImpit(resolveBrowser(ctl))
   const cacheRoot = path.join(findLMStudioHome(), "plugin-data", CACHE_DIRECTORY_NAME)
   const rateLimiter = new RateLimiter({ minIntervalMs: timing.requestIntervalMs })
   const hostLimiter = new PerHostRateLimiter({ minIntervalMs: timing.requestIntervalMs })

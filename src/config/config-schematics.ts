@@ -10,6 +10,21 @@ import { AUTO_CONFIG_VALUE } from "./auto-sentinel"
  */
 export const configSchematics = createConfigSchematics()
   .field(
+    "browser",
+    "select",
+    {
+      options: [
+        { value: "firefox", displayName: "Firefox (latest)" },
+        { value: "firefox144", displayName: "Firefox 144" },
+        { value: "chrome", displayName: "Chrome (latest)" },
+        { value: "chrome131", displayName: "Chrome 131" },
+      ],
+      displayName: "Browser Fingerprint",
+      subtitle: "TLS and header fingerprint to impersonate.",
+    },
+    "firefox"
+  )
+  .field(
     "safeSearch",
     "select",
     {

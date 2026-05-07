@@ -8,6 +8,7 @@ import { configSchematics } from "./config-schematics"
 import type { SafeSearch } from "../duckduckgo/safe-search"
 import type { RetryOptions } from "../http/retry"
 import type { ToolsProviderController } from "@lmstudio/sdk"
+import type { Browser } from "impit"
 
 /**
  * Web-search page stride used when the results cap is disabled. Matches the ~30 results
@@ -167,6 +168,14 @@ const DEFAULT_MAX_RESPONSE_MB = 5
 const DEFAULT_MAX_IMAGE_MB = 10
 
 /**
+ * Default browser fingerprint impit impersonates when no value is configured.
+ *
+ * @const {Browser}
+ * @default
+ */
+const DEFAULT_BROWSER: Browser = "firefox"
+
+/**
  * Conversion factor from seconds to milliseconds.
  *
  * @const {number}
@@ -318,6 +327,22 @@ export function resolveTimingConfig(ctl: ToolsProviderController): ResolvedTimin
       randomize: true,
     },
   }
+}
+
+/**
+ * Resolve the browser fingerprint impit should impersonate.
+ *
+ * Read once at tools-provider initialization since the Impit instance is constructed up front
+ * and shared across tools; changing the value requires a plugin reload.
+ *
+ * @param ctl Tools provider controller exposing plugin configuration.
+ * @returns The configured browser fingerprint, or the default when unset.
+ */
+export function resolveBrowser(ctl: ToolsProviderController): Browser {
+  const pluginConfig = ctl.getPluginConfig(configSchematics)
+  const pluginBrowser = pluginConfig.get("browser") as Browser | null
+
+  return pluginBrowser ?? DEFAULT_BROWSER
 }
 
 /**

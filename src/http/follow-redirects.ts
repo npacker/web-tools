@@ -45,6 +45,27 @@ const HTTP_REDIRECT_MAX_EXCLUSIVE = 400
 const HTTP_NOT_MODIFIED = 304
 
 /**
+ * Response header Cloudflare sets when its WAF takes mitigation action on a request.
+ * `cf-mitigated: challenge` accompanies a `403` whose body is a JS challenge page
+ * ("Just a moment..."); these are non-deterministic and worth retrying since the same
+ * fingerprint may pass on a subsequent attempt.
+ *
+ * @const {string}
+ * @default
+ */
+const CF_MITIGATED_HEADER = "cf-mitigated"
+
+/**
+ * Value of the `cf-mitigated` header indicating a transient JS challenge — the only
+ * mitigation kind we treat as retryable. Other values (`block`, `dns_filtering`) reflect
+ * deliberate site rules and should fail fast.
+ *
+ * @const {string}
+ * @default
+ */
+const CF_MITIGATED_CHALLENGE_VALUE = "challenge"
+
+/**
  * Options controlling a single redirect-following GET chain.
  */
 export interface FollowRedirectsOptions {
@@ -188,10 +209,26 @@ async function performHop(
   }
 
   if (!response.ok) {
-    throw new FetchError(`HTTP ${response.status} ${response.statusText}`, response.status, currentUrl)
+    throw new FetchError(`HTTP ${response.status} ${response.statusText}`, response.status, currentUrl, {
+      retryable: isCloudflareChallenge(response) ? true : undefined,
+    })
   }
 
   return { kind: "done", response }
+}
+
+/**
+ * Detect a Cloudflare JS-challenge response, identified by the `cf-mitigated: challenge`
+ * header Cloudflare sets alongside the `403`. The challenge is non-deterministic — the
+ * same fingerprint that gets challenged once may pass on retry — so the underlying
+ * `FetchError` is flagged retryable and `withRetry` will give it another attempt under
+ * the configured backoff.
+ *
+ * @param response Response to inspect.
+ * @returns `true` when the response is a Cloudflare JS challenge.
+ */
+function isCloudflareChallenge(response: ImpitResponse): boolean {
+  return response.headers.get(CF_MITIGATED_HEADER) === CF_MITIGATED_CHALLENGE_VALUE
 }
 
 /**
