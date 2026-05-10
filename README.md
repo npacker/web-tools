@@ -23,18 +23,18 @@ Runs a query-string search against DuckDuckGo and returns the matching pages —
 | Parameter | Type      | Notes                                        |
 | --------- | --------- | -------------------------------------------- |
 | `query`   | string    | Required.                                    |
-| `page`    | int 1–100 | Optional, defaults to 1. Enables pagination. |
+| `page`    | int 1–100 | Optional. Defaults to 1. Enables pagination. |
 
 Returns an array of records:
 
-| Field         | Type   | Notes                                                                                                            |
-| ------------- | ------ | ---------------------------------------------------------------------------------------------------------------- |
-| `title`       | string | Always present.                                                                                                  |
-| `url`         | string | Always present.                                                                                                  |
-| `snippet`     | string | Omitted when `Web Search: Include Result Snippets` is off.                                                       |
-| `date`        | string | ISO 8601 publication or modification date; omitted when extraction yields nothing or enrichment is off.          |
-| `type`        | string | OpenGraph `og:type`; omitted when extraction yields nothing or enrichment is off.                                |
-| `description` | string | Page meta description (clamped to ~500 characters); omitted when extraction yields nothing or enrichment is off. |
+| Field         | Type   | Notes                                                                                                           |
+| ------------- | ------ | --------------------------------------------------------------------------------------------------------------- |
+| `title`       | string |                                                                                                                 |
+| `url`         | string |                                                                                                                 |
+| `snippet`     | string | Omitted when `Web Search: Include Result Snippets` is off.                                                      |
+| `date`        | string | ISO 8601 publication or modification date. Omitted when extraction yields nothing or enrichment is off.         |
+| `type`        | string | OpenGraph `og:type`. Omitted when extraction yields nothing or enrichment is off.                               |
+| `description` | string | Page meta description, clamped to ~500 characters. Omitted when extraction yields nothing or enrichment is off. |
 
 ### Image Search
 
@@ -43,15 +43,15 @@ Runs a query-string search against Bing's image index and returns candidate imag
 | Parameter | Type      | Notes                    |
 | --------- | --------- | ------------------------ |
 | `query`   | string    | Required.                |
-| `page`    | int 1–100 | Optional, defaults to 1. |
+| `page`    | int 1–100 | Optional. Defaults to 1. |
 
 Returns an array of records:
 
 | Field        | Type   | Notes                                                          |
 | ------------ | ------ | -------------------------------------------------------------- |
-| `image`      | string | Full-resolution remote URL of the image. Always present.       |
-| `title`      | string | Title surfaced for the image; omitted when not available.      |
-| `sourcePage` | string | URL of the page hosting the image; omitted when not available. |
+| `image`      | string | Full-resolution remote URL.                                    |
+| `title`      | string | Image title. Omitted when not available.                       |
+| `sourcePage` | string | URL of the page hosting the image. Omitted when not available. |
 
 ### Visit Website
 
@@ -59,43 +59,43 @@ Fetches a URL and returns its title, top-level headings, and a readable-content 
 
 When a page is longer than the configured character budget, supply the optional `findInPage` parameter — a list of search terms — to bias which slices of the page are returned. This is the primary tool for getting useful answers out of large pages.
 
-| Parameter    | Type     | Notes                                                                                                                                              |
-| ------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `url`        | URL      | Required.                                                                                                                                          |
-| `findInPage` | string[] | Optional search terms that bias which content slices are returned when the page exceeds the character budget. Strongly recommended on large pages. |
+| Parameter    | Type     | Notes                                                                                                                                    |
+| ------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `url`        | URL      | Required.                                                                                                                                |
+| `findInPage` | string[] | Optional. Search terms biasing which content slices are returned when the page exceeds the character budget. Recommended on large pages. |
 
 Returns a single record:
 
-| Field           | Type   | Notes                                                                                                                                                                                                                                         |
-| --------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `url`           | string | The URL that was visited, echoed back. Always present.                                                                                                                                                                                        |
-| `kind`          | string | Classified page kind (`html`, `pdf`, `text`, or `json`). Always present.                                                                                                                                                                      |
-| `mimeType`      | string | Effective MIME type reported by the server or sniffed from the payload. Always present.                                                                                                                                                       |
-| `title`         | string | Page title; omitted when not available.                                                                                                                                                                                                       |
-| `h1`            | string | First `<h1>` of an HTML page; omitted for non-HTML kinds or when none is present.                                                                                                                                                             |
-| `h2`            | string | First `<h2>` of an HTML page; omitted for non-HTML kinds or when none is present.                                                                                                                                                             |
-| `content`       | string | Excerpt of the page content, truncated to the configured character budget. Always present.                                                                                                                                                    |
-| `contentLength` | number | Character count of the full extracted content before truncation. When `contentLength > content.length` the content was truncated — refine `findInPage` and re-call, or raise `Visit Website: Content Character Limit` in the plugin settings. |
+| Field           | Type   | Notes                                                                                                                                                      |
+| --------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `url`           | string | Echoed back from input.                                                                                                                                    |
+| `kind`          | string | One of `html`, `pdf`, `text`, or `json`.                                                                                                                   |
+| `mimeType`      | string | MIME type from the server or sniffed from the payload.                                                                                                     |
+| `title`         | string | Page title. Omitted when not available.                                                                                                                    |
+| `h1`            | string | First `<h1>` element. Omitted for non-HTML kinds or when none is present.                                                                                  |
+| `h2`            | string | First `<h2>` element. Omitted for non-HTML kinds or when none is present.                                                                                  |
+| `content`       | string | Page content excerpt, truncated to the configured character budget.                                                                                        |
+| `contentLength` | number | Pre-truncation character count. When `contentLength > content.length`, refine `findInPage` and re-call, or raise `Visit Website: Content Character Limit`. |
 
 ### Fetch Images
 
 Downloads images into the chat's working directory and returns a Markdown reference per image so the assistant can embed them inline. Inputs are HTTP(S) URLs — picks from Image Search, links seen in a Visit Website excerpt, or scraped automatically from a page when `websiteURL` is supplied.
 
-| Parameter    | Type      | Notes                                                                                   |
-| ------------ | --------- | --------------------------------------------------------------------------------------- |
-| `imageURLs`  | URL[]     | Optional explicit list of HTTP(S) URLs to download.                                     |
-| `websiteURL` | URL       | Optional page to scrape for `<img>` tags and download.                                  |
-| `maxImages`  | int 1–200 | Optional per-call override for the cap on scraped images when `websiteURL` is supplied. |
+| Parameter    | Type      | Notes                                                                                    |
+| ------------ | --------- | ---------------------------------------------------------------------------------------- |
+| `imageURLs`  | URL[]     | Optional. Explicit list of HTTP(S) URLs to download.                                     |
+| `websiteURL` | URL       | Optional. Page to scrape for `<img>` tags.                                               |
+| `maxImages`  | int 1–200 | Optional. Per-call override for the cap on scraped images when `websiteURL` is supplied. |
 
 Returns an array of records:
 
-| Field      | Type   | Notes                                                                                                                             |
-| ---------- | ------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `filename` | string | Filename derived from the image's URL. Always present.                                                                            |
-| `alt`      | string | Alt text from the source page's `<img>` tag when scraped via `websiteURL`; empty for explicit `imageURLs`. Always present.        |
-| `title`    | string | Title attribute from the source page's `<img>` tag when scraped via `websiteURL`; empty for explicit `imageURLs`. Always present. |
-| `image`    | string | Markdown image reference (`![alt](localPath)`) ready to embed in the reply. Present on success.                                   |
-| `error`    | string | Failure message; present in place of `image` when the download failed.                                                            |
+| Field      | Type   | Notes                                                                                                             |
+| ---------- | ------ | ----------------------------------------------------------------------------------------------------------------- |
+| `filename` | string | Derived from the image's URL.                                                                                     |
+| `alt`      | string | Alt text from the source page's `<img>` tag when scraped via `websiteURL`. Empty for explicit `imageURLs`.        |
+| `title`    | string | Title attribute from the source page's `<img>` tag when scraped via `websiteURL`. Empty for explicit `imageURLs`. |
+| `image`    | string | Markdown image reference (`![alt](localPath)`). Present on success.                                               |
+| `error`    | string | Failure message, in place of `image` on download failure.                                                         |
 
 ## Installation
 
@@ -107,7 +107,7 @@ Install via the [LM Studio CLI](https://lmstudio.ai/docs/cli):
 lms get npacker/web-tools
 ```
 
-Or browse to the plugin at on the [LM Studio Hub](https://lmstudio.ai/npacker/web-tools) and click "Run in LM Studio." Once enabled, the four tools become available to any model that supports tool calls.
+Or browse to the plugin on the [LM Studio Hub](https://lmstudio.ai/npacker/web-tools) and click "Run in LM Studio." Once enabled, the four tools become available to any model that supports tool calls.
 
 ### Local development
 
@@ -147,7 +147,7 @@ All fields are exposed in the LM Studio plugin UI.
 | Field                       | Range  | Default | Purpose                                                                  |
 | --------------------------- | ------ | ------- | ------------------------------------------------------------------------ |
 | Image Search: Limit Results | on/off | on      | When off, every image on the requested page is included (≈35 from Bing). |
-| Image Search: Max Results   | 1–35   | 10      | Cap when limiting is on. Tops out at Bing's natural page size of 35.     |
+| Image Search: Max Results   | 1–35   | 10      | Cap when limiting is on. Max of Bing's natural page size of 35.          |
 
 ### Visit Website
 
@@ -155,7 +155,7 @@ All fields are exposed in the LM Studio plugin UI.
 | -------------------------------------- | --------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Visit Website: Content Format          | Markdown / Plain text | Markdown | Output format of the `content` field. Markdown retains headings, lists, and inline links; Plain text strips syntax and preserves only line breaks. |
 | Visit Website: Content Character Limit | 1000–100 000          | 10 000   | Visible-text character budget for the page excerpt.                                                                                                |
-| Visit Website: Max Response Size (MB)  | 1–100                 | 5        | Caps the HTML payload fetched. Also caps the page fetch when Fetch Images scrapes images from a `websiteURL`.                                      |
+| Visit Website: Max Response Size (MB)  | 1–100                 | 5        | Caps fetched HTML payload and the page fetch when Fetch Images scrapes images from a `websiteURL`.                                                 |
 
 ### Fetch Images
 
