@@ -38,7 +38,7 @@ const DEFAULT_MAX_RESULTS = 10
 const DEFAULT_SAFE_SEARCH = "moderate" as const
 
 /**
- * Default number of images scraped by the View Images tool when no value is provided.
+ * Default number of images scraped by the Fetch Images tool when no value is provided.
  *
  * @const {number}
  * @default
@@ -135,7 +135,7 @@ const DEFAULT_RETRY_MAX_BACKOFF_SECONDS = 30
 const DEFAULT_MAX_RESPONSE_MB = 5
 
 /**
- * Default upper bound on the per-image payload downloaded by Image Search and View Images, in megabytes.
+ * Default upper bound on the per-image payload downloaded by Fetch Images, in megabytes.
  *
  * @const {number}
  * @default
@@ -187,7 +187,7 @@ interface ResolvedConfig {
   includeSnippets: boolean
   /** Whether web search results should be enriched via the per-result metascraper fan-out. */
   enrichResults: boolean
-  /** Maximum number of images scraped by the View Images tool. */
+  /** Maximum number of images scraped by the Fetch Images tool. */
   maxImages: number
   /** Visible-text character budget for the Visit Website tool. */
   contentLimit: number
@@ -195,7 +195,7 @@ interface ResolvedConfig {
   contentFormat: ContentFormat
   /** Hard upper bound on the HTML payload fetched by Visit Website, in bytes. */
   maxResponseBytes: number
-  /** Hard upper bound on the per-image payload downloaded by Image Search and View Images, in bytes. */
+  /** Hard upper bound on the per-image payload downloaded by Fetch Images, in bytes. */
   maxImageBytes: number
 }
 

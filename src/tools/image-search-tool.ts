@@ -9,7 +9,6 @@ import { searchImages } from "../bing"
 import { resolveConfig } from "../config/resolve-config"
 import { formatToolError, NoImageResultsError } from "../errors"
 import { createRetryNotifier } from "../http"
-import { downloadImages } from "../images"
 
 import type { RetryOptions } from "../http"
 import type { RateLimiter } from "../timing"
@@ -43,9 +42,8 @@ const DEFAULT_PAGE_NUMBER = 1
  * Create the Image Search tool.
  *
  * @param ctl Tools provider controller supplied by the LM Studio SDK.
- * @param impit Shared HTTP client used for outbound requests and image downloads.
+ * @param impit Shared HTTP client used for outbound requests.
  * @param rateLimiter Shared limiter enforcing the minimum gap between requests.
- * @param imageLimiter Shared limiter capping the number of image downloads in flight concurrently.
  * @param retry Retry policy applied to every outbound request.
  * @returns The configured image search tool.
  */
@@ -53,12 +51,12 @@ export function createImageSearchTool(
   ctl: ToolsProviderController,
   impit: Impit,
   rateLimiter: RateLimiter,
-  imageLimiter: RateLimiter,
   retry: RetryOptions
 ): Tool {
   return tool({
     name: "Image Search",
-    description: "Search for images using a query string and return a list of image records.",
+    description:
+      "Search for images by query and return remote image URLs with the title and source-page link Bing surfaced for each tile. Pass URLs of interest to Fetch Images to save them locally before embedding them in a reply.",
     parameters: {
       query: z.string().describe("The search query for finding images."),
       page: z
@@ -72,13 +70,13 @@ export function createImageSearchTool(
     },
 
     /**
-     * Executes an image search, downloading any matching images to the working directory.
+     * Executes an image search and returns the matching image records.
      *
      * @param arguments_ Validated tool parameters.
      * @param arguments_.query Search query string.
      * @param arguments_.page Page number being requested.
      * @param context Runtime tool context supplied by the SDK.
-     * @returns Per-image records pairing each downloaded path (or remote URL on download failure) with the source's title and page metadata, or a user-facing error string.
+     * @returns Per-image records pairing each remote image URL with the source's title and page metadata, or a user-facing error string.
      */
     implementation: async (arguments_, context) => {
       const { query, page } = arguments_
@@ -86,7 +84,7 @@ export function createImageSearchTool(
       await rateLimiter.wait()
 
       try {
-        const { imageMaxResults, safeSearch, maxImageBytes } = resolveConfig(ctl)
+        const { imageMaxResults, safeSearch } = resolveConfig(ctl)
         const results = await searchImages(impit, { query, safeSearch, page }, imageMaxResults, {
           signal: context.signal,
           retry,
@@ -97,35 +95,9 @@ export function createImageSearchTool(
           throw new NoImageResultsError(query)
         }
 
-        context.status(`Found ${results.length} images. Fetching...`)
-        const batch = await downloadImages(
-          results.map(result => result.image),
-          impit,
-          { workingDirectory: ctl.getWorkingDirectory(), timestamp: Date.now(), maxBytes: maxImageBytes },
-          {
-            warn: context.warn,
-            signal: context.signal,
-            limiter: imageLimiter,
-            retry,
-            onFailedAttempt: createRetryNotifier(context.status, "image download"),
-          }
-        )
-        const rendered = results.map((result, index) => {
-          const outcome = batch[index]
+        context.status(`Found ${results.length} images.`)
 
-          return { ...result, image: outcome.ok ? outcome.localPath : outcome.url }
-        })
-        const failed = batch.length - batch.filter(result => result.ok).length
-
-        if (failed === batch.length) {
-          context.warn(`Failed to download any of ${batch.length} images; returning remote URLs instead.`)
-        } else if (failed > 0) {
-          context.warn(`Failed to download ${failed} of ${batch.length} images; returning remote URLs for those slots.`)
-        } else {
-          context.status(`Downloaded ${batch.length} images successfully.`)
-        }
-
-        return rendered
+        return results
       } catch (error) {
         return formatToolError(error, context, "image-search")
       }

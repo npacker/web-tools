@@ -1,7 +1,7 @@
 /**
  * Shape of a fetched page after classification and per-kind decoding/extraction. Cached
  * and consumed by the Visit Website tool (which narrows on `kind` to select between the
- * HTML-readability pipeline and the pre-extracted-text pipeline) and by the View Images
+ * HTML-readability pipeline and the pre-extracted-text pipeline) and by the Fetch Images
  * tool (which accepts only `kind === "html"`).
  *
  * Modelled as a discriminated union so the HTML variant carries no stray `title` field:

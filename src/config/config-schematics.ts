@@ -161,8 +161,8 @@ export const configSchematics = createConfigSchematics()
     "maxImages",
     "numeric",
     {
-      displayName: "View Images: Max Images",
-      subtitle: "1 to 200. Maximum images scraped when View Images receives a websiteURL.",
+      displayName: "Fetch Images: Max Images",
+      subtitle: "1 to 200. Maximum images scraped when Fetch Images receives a websiteURL.",
       min: 1,
       max: 200,
       int: true,
@@ -179,7 +179,7 @@ export const configSchematics = createConfigSchematics()
     "numeric",
     {
       displayName: "Max Image Size (MB)",
-      subtitle: "1 to 100. Caps per-image payload for Image Search and View Images.",
+      subtitle: "1 to 100. Caps per-image payload downloaded by Fetch Images.",
       min: 1,
       max: 100,
       int: true,

@@ -11,8 +11,8 @@ import { createMetascraper } from "./enrichment"
 import { findLMStudioHome } from "./fs"
 import { createImpit } from "./http"
 import { PerHostRateLimiter, RateLimiter } from "./timing"
+import { createFetchImagesTool } from "./tools/fetch-images-tool"
 import { createImageSearchTool } from "./tools/image-search-tool"
-import { createViewImagesTool } from "./tools/view-images-tool"
 import { createVisitWebsiteTool } from "./tools/visit-website-tool"
 import { createWebSearchTool } from "./tools/web-search-tool"
 
@@ -79,7 +79,7 @@ const MAX_IMAGE_CONCURRENCY = 6
  * intervals from plugin settings take effect on plugin reload.
  *
  * @param ctl Tools provider controller supplied by the LM Studio SDK.
- * @returns The registered Web Search, Image Search, Visit Website, and View Images tools.
+ * @returns The registered Web Search, Image Search, Visit Website, and Fetch Images tools.
  */
 export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[]> {
   const timing = resolveTimingConfig(ctl)
@@ -103,8 +103,8 @@ export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[
 
   return [
     createWebSearchTool(ctl, impit, searchCache, websiteCache, rateLimiter, hostLimiter, scraper, retry),
-    createImageSearchTool(ctl, impit, rateLimiter, imageLimiter, retry),
+    createImageSearchTool(ctl, impit, rateLimiter, retry),
     createVisitWebsiteTool(ctl, impit, websiteCache, rateLimiter, retry),
-    createViewImagesTool(ctl, impit, websiteCache, rateLimiter, imageLimiter, retry),
+    createFetchImagesTool(ctl, impit, websiteCache, rateLimiter, imageLimiter, retry),
   ]
 }

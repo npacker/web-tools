@@ -5,9 +5,9 @@
 **`lms-plugin-web-tools`** is an LM Studio plugin that exposes four web-oriented tools to local LLMs:
 
 - **Web Search** — DuckDuckGo web search returning ranked `[title, url]` pairs (with optional snippet/date/type/description enrichment).
-- **Image Search** — Bing image search; matching images are downloaded to the working directory so the assistant can display them, returned as records with the file path or remote URL plus Bing's title and source-page metadata.
+- **Image Search** — Bing image search; discovery-only, returning per-image records with the full-resolution remote URL plus Bing's title and source-page metadata. No files are written to disk.
 - **Visit Website** — fetches a URL and returns its title, first-level headings, and a search-term-aware slice of its readable content as Markdown (default) or plain text.
-- **View Images** — downloads images from a list of URLs and/or scraped from a page so the assistant can display them; each record carries filename, alt, and title metadata.
+- **Fetch Images** — downloads images from a list of HTTP(S) URLs and/or scraped from a page into the chat's working directory so the assistant can embed them in a reply; each record carries filename, alt, and title metadata plus a Markdown image reference.
 
 Built on `@lmstudio/sdk`, it requires **Node.js >= 22** and targets **ES2023 / CommonJS**. The project is licensed under MIT. It descends from Daniel Sig's original `lms-plugin-duckduckgo` and `lms-plugin-visit-website` plugins, merged and extended by Nigel Packer. The plugin is at **revision 5** (see `manifest.json`).
 
@@ -24,7 +24,7 @@ src/
 │   ├── web-search-tool.ts
 │   ├── image-search-tool.ts
 │   ├── visit-website-tool.ts
-│   └── view-images-tool.ts
+│   └── fetch-images-tool.ts
 │
 ├── duckduckgo/                       # DuckDuckGo web search
 │   ├── index.ts
@@ -71,7 +71,7 @@ src/
 │   ├── search-results.ts             # Web search: HTML via jsdom, .result__a
 │   ├── image-extensions.ts           # Supported-image-extension predicates (URL, content-type)
 │   └── page/                         # Page-level extraction
-│       ├── page-images.ts            # Scrapes <img> tags for View Images
+│       ├── page-images.ts            # Scrapes <img> tags for Fetch Images
 │       └── page-text.ts              # Feeds HTML to @mozilla/readability
 │
 ├── text/                             # Text scraping utilities
@@ -101,7 +101,7 @@ src/
 
 ## Request Flow
 
-1. **Tool invocation** — `tools-provider.ts` registers four Zod-validated tools (`createWebSearchTool`, `createImageSearchTool`, `createVisitWebsiteTool`, `createViewImagesTool`). Per-call config resolves via `resolveConfig`, merging plugin UI settings from `config/config-schematics.ts` with per-call overrides (runtime override > plugin config > default).
+1. **Tool invocation** — `tools-provider.ts` registers four Zod-validated tools (`createWebSearchTool`, `createImageSearchTool`, `createVisitWebsiteTool`, `createFetchImagesTool`). Per-call config resolves via `resolveConfig`, merging plugin UI settings from `config/config-schematics.ts` with per-call overrides (runtime override > plugin config > default).
 2. **Rate limiting** — a shared `RateLimiter` (`src/timing/rate-limiter.ts`, backed by `bottleneck`) enforces a `requestIntervalSeconds` gap (default 5s) between outbound requests.
 3. **HTTP + retry** — requests go through a shared `impit` client (`src/http/impit-client.ts`) wrapped by `withRetry` in `src/http/retry.ts` (configurable `maxRetries`, `retryInitialBackoffSeconds`, `retryMaxBackoffSeconds`). **Do not replace `impit` with `fetch`** — it applies browser TLS fingerprints and headers required by DuckDuckGo's and Bing's anti-bot layers (DDG outright blocks bare `fetch`; Bing degrades the response to a mobile shell).
 4. **Parsing** — DuckDuckGo web-search HTML through jsdom (`.result__a`); Bing image-search HTML through jsdom reading the JSON-encoded `m` attribute on `<a class="iusc">` tiles; article text through `@mozilla/readability`; Markdown conversion via `turndown`.
@@ -195,7 +195,7 @@ All config fields default to `0` or `"Auto"`, meaning the LLM assistant decides 
 | `limitImageResults` | boolean | true | true/false | When enabled, caps image-search results at `imageMaxResults`; when disabled, returns the full Bing page (~35). |
 | `imageMaxResults` | numeric | 10 | 1–35 | Max image-search results per page; hidden when `limitImageResults` is off (plugin-only, not exposed as tool parameter). Tops out at Bing's native page size of 35. |
 | `safeSearch` | select | Auto | strict/moderate/off | Safe-search mode applied to both DDG web search and Bing image search. |
-| `maxImages` | numeric | -1 (auto) | -1–200 | View Images: max images scraped when a `websiteURL` is provided |
+| `maxImages` | numeric | -1 (auto) | -1–200 | Fetch Images: max images scraped when a `websiteURL` is provided |
 | `contentLimit` | numeric | 0 (auto) | 0–100000 | Visit Website: max characters of text (plugin-only, not exposed as tool parameter) |
 | `contentFormat` | select | markdown | markdown / text | Visit Website: output format of the content field (plugin-only, not exposed as tool parameter) |
 | `searchCacheTtlSeconds` | numeric | 0 (auto) | 0–3600 | Web-search result cache duration (default 15 min) |
@@ -215,9 +215,9 @@ Both paths share `src/text/normalize-blank-lines.ts` for trailing-whitespace and
 
 ---
 
-## Image Extraction (View Images)
+## Image Extraction (Fetch Images)
 
-`src/parsers/page/page-images.ts` scrapes `<img>` tags in document order, resolves relative `src` against the page URL, deduplicates, and returns `{ src, alt, title }` tuples (up to `maxImages`). View Images then downloads each via `downloadImages` and returns `{ filename, alt, title, image }` on success or `{ filename, alt, title, error }` on failure. `filename` is derived from the URL's last path segment via `src/fs/url-filename.ts`.
+`src/parsers/page/page-images.ts` scrapes `<img>` tags in document order, resolves relative `src` against the page URL, deduplicates, and returns `{ src, alt, title }` tuples (up to `maxImages`). Fetch Images then downloads each via `downloadImages` and returns `{ filename, alt, title, image }` on success or `{ filename, alt, title, error }` on failure. `filename` is derived from the URL's last path segment via `src/fs/url-filename.ts`. The intended workflow is **Image Search → Fetch Images → embed the returned Markdown in the reply**; Image Search itself does not write to disk.
 
 ---
 

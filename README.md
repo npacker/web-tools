@@ -1,6 +1,6 @@
 # Web Tools Plugin for LM Studio
 
-An LM Studio plugin that gives local LLMs four web-oriented tools built on `@lmstudio/sdk`. Web search is backed by DuckDuckGo and image search by Bing (both fetched via the browser-fingerprinting [`impit`](https://www.npmjs.com/package/impit) HTTP client), website visits use [`@mozilla/readability`](https://www.npmjs.com/package/@mozilla/readability) for article extraction plus [`turndown`](https://www.npmjs.com/package/turndown) for clean Markdown output, and images referenced by the image-oriented tools are downloaded into the chat's working directory so the assistant can display them inline.
+An LM Studio plugin that gives local LLMs four web-oriented tools built on `@lmstudio/sdk`. Web search is backed by DuckDuckGo and image search by Bing (both fetched via the browser-fingerprinting [`impit`](https://www.npmjs.com/package/impit) HTTP client), website visits use [`@mozilla/readability`](https://www.npmjs.com/package/@mozilla/readability) for article extraction plus [`turndown`](https://www.npmjs.com/package/turndown) for clean Markdown output, and the Fetch Images tool downloads images into the chat's working directory so the assistant can embed them inline.
 
 ## Tools
 
@@ -30,28 +30,28 @@ Cache key: `(query, safeSearch, page, enrichResults)`. Results-per-page cap, sni
 
 ### Image Search
 
-Bing image search. Returns per-image records with the source URL plus Bing's title and source-page metadata.
+Bing image search. **Discovery-only** — returns per-image records with the full-resolution remote URL plus Bing's title and source-page metadata. No files are written to disk; pass URLs of interest to Fetch Images to download them.
 
 | Parameter | Type | Notes |
 | --- | --- | --- |
 | `query` | string | Required. |
 | `page` | int 1–100 | Optional, defaults to 1. |
 
-Matching images are downloaded into the chat's working directory and returned as records:
+Returns records of the form:
 
 ```json
 {
-  "image": "path/to/download",
+  "image": "https://images.pexels.com/photos/.../red-vintage-car.jpg",
   "title": "Red Vintage Car Driving on the Road · Free Stock Photo",
   "sourcePage": "https://www.pexels.com/photo/red-vintage-car-..."
 }
 ```
 
-`title` and `sourcePage` are omitted when Bing did not surface them. If a download fails, the remote image URL is returned in `image` for that slot instead so the assistant always gets something displayable. The results-per-page cap is controlled by the plugin's `limitImageResults` toggle and `imageMaxResults` slider (default 10, max 35 — Bing's native page size) — these are plugin-only settings and are not exposed as tool parameters. Disabling `limitImageResults` returns every image on the requested page (~35 from Bing). Safe-search mode is plugin-only (default moderate).
+`title` and `sourcePage` are omitted when Bing did not surface them. The results-per-page cap is controlled by the plugin's `limitImageResults` toggle and `imageMaxResults` slider (default 10, max 35 — Bing's native page size) — these are plugin-only settings and are not exposed as tool parameters. Disabling `limitImageResults` returns every image on the requested page (~35 from Bing). Safe-search mode is plugin-only (default moderate).
 
 ### Visit Website
 
-Fetches a URL and returns its title, first-level headings (`h1`/`h2`/`h3`), and a readable content excerpt produced by `@mozilla/readability`. The content is returned as Markdown by default — headings, lists, inline links, and inline images are preserved — or as plain text when the plugin's `contentFormat` setting is switched to `"text"`. Use the View Images tool to download any images of interest.
+Fetches a URL and returns its title, first-level headings (`h1`/`h2`/`h3`), and a readable content excerpt produced by `@mozilla/readability`. The content is returned as Markdown by default — headings, lists, inline links, and inline images are preserved — or as plain text when the plugin's `contentFormat` setting is switched to `"text"`. Use the Fetch Images tool to download any images of interest.
 
 | Parameter | Type | Notes |
 | --- | --- | --- |
@@ -60,14 +60,14 @@ Fetches a URL and returns its title, first-level headings (`h1`/`h2`/`h3`), and 
 
 The visible-text character budget (`contentLimit`), the output format (`contentFormat`), and the maximum HTML payload size (`maxResponseMb`) are all plugin-only settings — they are not exposed as tool parameters so the model cannot override the user-set or default values. The response includes `contentLength`, the character count of the full extracted content prior to truncation. When `contentLength > content.length` the content was truncated — refine `findInPage` and re-call, or raise `contentLimit` in the plugin settings.
 
-### View Images
+### Fetch Images
 
-Downloads images from an explicit URL list, from images scraped off a page, or both. Provide at least one of `imageURLs` or `websiteURL`.
+Downloads images into the chat's working directory. Inputs are HTTP(S) URLs the assistant has already obtained — picks from Image Search, links seen in a Visit Website excerpt, or scraped automatically from a page via `websiteURL`. Provide at least one of `imageURLs` or `websiteURL`. Local file paths are rejected.
 
 | Parameter | Type | Notes |
 | --- | --- | --- |
-| `imageURLs` | URL[] | Optional explicit list to download. |
-| `websiteURL` | URL | Optional page to scrape for images. |
+| `imageURLs` | URL[] | Optional explicit list of HTTP(S) URLs to download. |
+| `websiteURL` | URL | Optional page to scrape for `<img>` tags and download. |
 | `maxImages` | int 1–200 | Optional; caps how many scraped images are downloaded when `websiteURL` is supplied. |
 
 Returns an array of per-image records:
@@ -81,7 +81,7 @@ Returns an array of per-image records:
 }
 ```
 
-When a download fails, the record carries an `error` field in place of `image`. `alt` and `title` are populated from the source page's `<img>` attributes when images are scraped via `websiteURL`; explicit `imageURLs` arrive without that metadata and surface both fields as empty strings.
+The `image` field holds a Markdown image reference ready to drop into the assistant's reply. When a download fails, the record carries an `error` field in place of `image`. `alt` and `title` are populated from the source page's `<img>` attributes when images are scraped via `websiteURL`; explicit `imageURLs` arrive without that metadata and surface both fields as empty strings.
 
 ## Installation
 
@@ -122,7 +122,7 @@ All fields are exposed in the LM Studio plugin UI. The Safe Search field accepts
 | Web Search: Max Results | 1–30 | 10 | Cap when limiting is on. |
 | Image Search: Limit Results | on/off | on | When off, every image on the requested page is included (≈35 from Bing). |
 | Image Search: Max Results | 1–35 | 10 | Cap when limiting is on. Tops out at Bing's native page size of 35. |
-| View Images: Max Images | 1–200 | 10 | Maximum images scraped when View Images receives a `websiteURL`. |
+| Fetch Images: Max Images | 1–200 | 10 | Maximum images scraped when Fetch Images receives a `websiteURL`. |
 
 ### Visit Website content
 
@@ -136,7 +136,7 @@ All fields are exposed in the LM Studio plugin UI. The Safe Search field accepts
 
 | Field | Range | Default | Purpose |
 | --- | --- | --- | --- |
-| Max Image Size (MB) | 1–100 | 10 | Caps per-image payload for Image Search and View Images. |
+| Max Image Size (MB) | 1–100 | 10 | Caps per-image payload downloaded by Fetch Images. |
 
 ### Cache TTLs
 
@@ -159,7 +159,7 @@ All fields are exposed in the LM Studio plugin UI. The Safe Search field accepts
 Two disk-backed [`cacache`](https://www.npmjs.com/package/cacache) stores, persisted under `~/.lmstudio/plugin-data/lms-plugin-duckduckgo-cache/`:
 
 - **Web-search results** (subdir `search-enriched`) — up to 100 entries, default TTL 15 minutes (`searchCacheTtlSeconds`). Stores the post-enrichment payload, so warm queries skip both the DuckDuckGo fetch and the per-result fan-out.
-- **Website HTML** (subdir `website`) — up to 50 entries, default TTL 10 minutes (`websiteCacheTtlSeconds`). Shared by Visit Website, View Images, and the Web Search enrichment pass.
+- **Website HTML** (subdir `website`) — up to 50 entries, default TTL 10 minutes (`websiteCacheTtlSeconds`). Shared by Visit Website, Fetch Images, and the Web Search enrichment pass.
 
 Image search is not cached — Bing's response is small and the rate limiter alone caps fetch rate.
 
@@ -167,13 +167,13 @@ Caches survive plugin reloads. To fully clear them, stop LM Studio and delete th
 
 ## Rate limiting and retry
 
-A shared [`bottleneck`](https://www.npmjs.com/package/bottleneck)-backed rate limiter enforces a 5-second minimum gap between outbound search requests by default for the single-target flows (DuckDuckGo web search, Bing image search, Visit Website, image downloads). The Web Search enrichment fan-out instead uses a per-host limiter keyed on URL host, so requests to distinct domains run in parallel while same-host requests still observe the interval — a 10-result enrichment pass costs roughly one fetch's wall-time rather than ten.
+A shared [`bottleneck`](https://www.npmjs.com/package/bottleneck)-backed rate limiter enforces a 5-second minimum gap between outbound search requests by default for the single-target flows (DuckDuckGo web search, Bing image search, Visit Website, Fetch Images downloads). The Web Search enrichment fan-out instead uses a per-host limiter keyed on URL host, so requests to distinct domains run in parallel while same-host requests still observe the interval — a 10-result enrichment pass costs roughly one fetch's wall-time rather than ten.
 
 Every outbound HTTP request is wrapped by [`p-retry`](https://www.npmjs.com/package/p-retry) with randomized exponential backoff (factor 2) — 3 retry attempts (after the first try) with a 1-second base and 30-second cap by default. Set the interval or retry count to `0` to disable either behavior.
 
 ## Usage
 
-With the plugin enabled you can explicitly ask the assistant to search the web, fetch images, visit a page, or view images, but you can also just ask a question whose answer requires the web and the assistant will pick the right tool on its own.
+With the plugin enabled you can explicitly ask the assistant to search the web, search for images, visit a page, or fetch images, but you can also just ask a question whose answer requires the web and the assistant will pick the right tool on its own. Image displays follow the natural pipeline: Image Search surfaces candidate URLs, Fetch Images downloads the picks into the chat's working directory, and the assistant embeds the returned Markdown references in its reply.
 
 ## Development scripts
 
@@ -192,7 +192,7 @@ No test suite is configured.
 Built on top of Daniel Sig's original
 [lms-plugin-duckduckgo](https://github.com/danielsig/lms-plugin-duckduckgo) and
 [lms-plugin-visit-website](https://github.com/danielsig/lms-plugin-visit-website) plugins, now
-merged into a single tool suite and extended with the View Images tool, Markdown-formatted
+merged into a single tool suite and extended with the Fetch Images tool, Markdown-formatted
 website content, `findInPage`-biased content slicing, configurable rate limiting and retry,
 and a persistent `cacache`-backed store for web-search results and fetched HTML.
 

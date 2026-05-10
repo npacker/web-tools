@@ -1,5 +1,5 @@
 /**
- * View Images tool factory.
+ * Fetch Images tool factory.
  */
 
 import { tool, type Tool, type ToolsProviderController } from "@lmstudio/sdk"
@@ -27,7 +27,7 @@ import type { Impit } from "impit"
  * @const {number}
  * @default
  */
-const MIN_VIEW_IMAGES_COUNT = 1
+const MIN_FETCH_IMAGES_COUNT = 1
 
 /**
  * Upper bound on the image count when a website URL is provided.
@@ -35,7 +35,7 @@ const MIN_VIEW_IMAGES_COUNT = 1
  * @const {number}
  * @default
  */
-const MAX_VIEW_IMAGES_COUNT = 200
+const MAX_FETCH_IMAGES_COUNT = 200
 
 /**
  * Per-image record accumulated before downloading: the source URL plus any alt/title metadata
@@ -54,7 +54,7 @@ interface ImageSubject {
  * Shape returned per image to the caller. Successful downloads include a markdown reference
  * pointing at the saved file; failures include an `error` message instead.
  */
-interface ViewedImage {
+interface FetchedImage {
   /** Filename segment of the source URL, percent-decoded when possible. */
   filename: string
   /** Alternative text from the source page's `<img>` `alt` attribute, or an empty string. */
@@ -68,7 +68,7 @@ interface ViewedImage {
 }
 
 /**
- * Create the View Images tool.
+ * Create the Fetch Images tool.
  *
  * @param ctl Tools provider controller supplied by the LM Studio SDK.
  * @param impit Shared HTTP client used for HTML fetches and image downloads.
@@ -76,9 +76,9 @@ interface ViewedImage {
  * @param rateLimiter Shared limiter enforcing the minimum gap between outbound requests.
  * @param imageLimiter Shared limiter capping the number of image downloads in flight concurrently.
  * @param retry Retry policy applied to every outbound request.
- * @returns The configured View Images tool.
+ * @returns The configured Fetch Images tool.
  */
-export function createViewImagesTool(
+export function createFetchImagesTool(
   ctl: ToolsProviderController,
   impit: Impit,
   websiteCache: TTLCache<FetchedPage>,
@@ -87,16 +87,20 @@ export function createViewImagesTool(
   retry: RetryOptions
 ): Tool {
   return tool({
-    name: "View Images",
-    description: "Download images from a web page or view a list of individual image URLs.",
+    name: "Fetch Images",
+    description:
+      "Download images to the chat's local working directory. Returns one record per image with a markdown reference (`![alt](localPath)`). Embed the markdown directly in your reply to display the image to the user.",
     parameters: {
-      imageURLs: z.array(httpUrlSchema).optional().describe("A list of image URLs to view."),
-      websiteURL: httpUrlSchema.optional().describe("A URL of a page page to extract images from."),
+      imageURLs: z
+        .array(httpUrlSchema)
+        .optional()
+        .describe("HTTP(S) URLs of images to download. Local file paths are rejected."),
+      websiteURL: httpUrlSchema.optional().describe("URL of a page to scrape <img> tags from and download."),
       maxImages: z
         .number()
         .int()
-        .min(MIN_VIEW_IMAGES_COUNT)
-        .max(MAX_VIEW_IMAGES_COUNT)
+        .min(MIN_FETCH_IMAGES_COUNT)
+        .max(MAX_FETCH_IMAGES_COUNT)
         .optional()
         .describe("The maximum number of images to extract when websiteURL is provided."),
     },
@@ -169,7 +173,7 @@ export function createViewImagesTool(
             onFailedAttempt: createRetryNotifier(context.status, "image download"),
           }
         )
-        const rendered: ViewedImage[] = subjects.map((subject, index) => {
+        const rendered: FetchedImage[] = subjects.map((subject, index) => {
           const base = {
             filename: filenameFromUrl(subject.src),
             alt: subject.alt,
