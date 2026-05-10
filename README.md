@@ -1,93 +1,113 @@
 # Web Tools Plugin for LM Studio
 
-An LM Studio plugin that gives local LLMs four web-oriented tools built on `@lmstudio/sdk`. Web search is backed by DuckDuckGo and image search by Bing (both fetched via the browser-fingerprinting [`impit`](https://www.npmjs.com/package/impit) HTTP client), website visits use [`@mozilla/readability`](https://www.npmjs.com/package/@mozilla/readability) for article extraction plus [`turndown`](https://www.npmjs.com/package/turndown) for clean Markdown output, and the Fetch Images tool downloads images into the chat's working directory so the assistant can embed them inline.
+An LM Studio plugin that gives local LLMs four web-oriented capabilities: searching the web, searching for images, visiting a page and reading its content, and downloading images into the chat's working directory so the assistant can embed them inline.
+
+## Key features
+
+- **Bot-resistant HTTP** — outbound requests go through [`impit`](https://www.npmjs.com/package/impit), which applies real-browser TLS fingerprints and request headers for improved bot-detection evasion without the weight or security implications of a full browser stack.
+- **SSRF protection** — every outbound URL is validated by [`dssrf`](https://www.npmjs.com/package/dssrf) before the request is issued, rejecting non-HTTP schemes, malformed URLs, and addresses that resolve to private or reserved IP ranges. A randomized double DNS resolution mitigates DNS rebinding.
+- **Resilient request pipeline** — disk-backed [`cacache`](https://www.npmjs.com/package/cacache) caching for search results and fetched HTML, a [`bottleneck`](https://www.npmjs.com/package/bottleneck)-backed rate limiter paces outbound requests, and [`p-retry`](https://www.npmjs.com/package/p-retry) wraps every request in randomized exponential backoff.
+- **Hard payload caps** — separate per-image and per-page byte limits keep memory exposure bounded when fetching arbitrarily large remote content.
+- **Search result enrichment** — web results can be optionally run through [`metascraper`](https://www.npmjs.com/package/metascraper) to surface publication date, OpenGraph type, and description alongside the title and URL, providing useful detail without needing to load the full page into context.
+- **Intelligent content extraction** — Visit Website routes HTML through [`@mozilla/readability`](https://www.npmjs.com/package/@mozilla/readability), stripping navigation, sidebars, ads, so the model only sees relevant content.
+- **Markdown or plain-text rendering** — Render content as Markdown to strip to plain text, configurable in plugin settings.
+- **PDF-to-Markdown** — Visit Website transparently handles PDFs via [`@opendocsg/pdf2md`](https://www.npmjs.com/package/@opendocsg/pdf2md).
+- **`findInPage` fuzzy slicing** — when a page is larger than the configured content length, Visit Website slices and returns content based on fuzzy-matched search terms, letting context-constrained models extract useful information from long pages.
 
 ## Tools
 
 ### Web Search
 
-DuckDuckGo web search with per-result metadata enrichment.
+Runs a query-string search against DuckDuckGo and returns the matching pages — title, URL, and a short snippet for each. Optionally enriches each result with publication date, OpenGraph type, and description pulled from the result page itself; enrichment is on by default but can be disabled in the plugin settings.
 
-| Parameter | Type | Notes |
-| --- | --- | --- |
-| `query` | string | Required. |
-| `page` | int 1–100 | Optional, defaults to 1. Enables pagination. |
+| Parameter | Type      | Notes                                        |
+| --------- | --------- | -------------------------------------------- |
+| `query`   | string    | Required.                                    |
+| `page`    | int 1–100 | Optional, defaults to 1. Enables pagination. |
 
 Returns an array of records:
 
-| Field | Type | Notes |
-| --- | --- | --- |
-| `title` | string | Always present. |
-| `url` | string | Always present. |
-| `snippet` | string | Omitted when the plugin's `includeSnippets` toggle is off. |
-| `date` | string | ISO 8601 publication/modification date extracted from the result page (prefers `article:modified_time` over `article:published_time`); omitted when extraction yields nothing. |
-| `type` | string | OpenGraph `og:type` from the result page; omitted when extraction yields nothing. |
-| `description` | string | Page meta description (clamped to ~500 chars); omitted when extraction yields nothing. |
-
-Each fresh result page is fetched again through the website cache and run through `metascraper` to populate `date`, `type`, and `description`. The per-result fan-out runs concurrently across distinct hosts via a per-host rate limiter, so a 10-result enrichment pass costs roughly one fetch's wall-time rather than ten. Per-result failures silently fall back to the unenriched shape rather than aborting the search; non-HTML pages (PDF, plain text, JSON) come back without metadata. The post-enrichment payload is what gets cached under the `search-enriched` cache subdir, so warm queries skip both the DuckDuckGo fetch and the fan-out.
-
-Cache key: `(query, safeSearch, page, enrichResults)`. Results-per-page cap, snippet inclusion, enrichment, and safe-search mode are all plugin-only settings — none are exposed as tool parameters so the model cannot override the user-set values.
+| Field         | Type   | Notes                                                                                                            |
+| ------------- | ------ | ---------------------------------------------------------------------------------------------------------------- |
+| `title`       | string | Always present.                                                                                                  |
+| `url`         | string | Always present.                                                                                                  |
+| `snippet`     | string | Omitted when `Web Search: Include Result Snippets` is off.                                                       |
+| `date`        | string | ISO 8601 publication or modification date; omitted when extraction yields nothing or enrichment is off.          |
+| `type`        | string | OpenGraph `og:type`; omitted when extraction yields nothing or enrichment is off.                                |
+| `description` | string | Page meta description (clamped to ~500 characters); omitted when extraction yields nothing or enrichment is off. |
 
 ### Image Search
 
-Bing image search. **Discovery-only** — returns per-image records with the full-resolution remote URL plus Bing's title and source-page metadata. No files are written to disk; pass URLs of interest to Fetch Images to download them.
+Runs a query-string search against Bing's image index and returns candidate image URLs along with the page each one was found on. Pair with Fetch Images when the assistant wants to download and embed an image in its reply.
 
-| Parameter | Type | Notes |
-| --- | --- | --- |
-| `query` | string | Required. |
-| `page` | int 1–100 | Optional, defaults to 1. |
+| Parameter | Type      | Notes                    |
+| --------- | --------- | ------------------------ |
+| `query`   | string    | Required.                |
+| `page`    | int 1–100 | Optional, defaults to 1. |
 
-Returns records of the form:
+Returns an array of records:
 
-```json
-{
-  "image": "https://images.pexels.com/photos/.../red-vintage-car.jpg",
-  "title": "Red Vintage Car Driving on the Road · Free Stock Photo",
-  "sourcePage": "https://www.pexels.com/photo/red-vintage-car-..."
-}
-```
-
-`title` and `sourcePage` are omitted when Bing did not surface them. The results-per-page cap is controlled by the plugin's `limitImageResults` toggle and `imageMaxResults` slider (default 10, max 35 — Bing's native page size) — these are plugin-only settings and are not exposed as tool parameters. Disabling `limitImageResults` returns every image on the requested page (~35 from Bing). Safe-search mode is plugin-only (default moderate).
+| Field        | Type   | Notes                                                          |
+| ------------ | ------ | -------------------------------------------------------------- |
+| `image`      | string | Full-resolution remote URL of the image. Always present.       |
+| `title`      | string | Title surfaced for the image; omitted when not available.      |
+| `sourcePage` | string | URL of the page hosting the image; omitted when not available. |
 
 ### Visit Website
 
-Fetches a URL and returns its title, first-level headings (`h1`/`h2`/`h3`), and a readable content excerpt produced by `@mozilla/readability`. The content is returned as Markdown by default — headings, lists, inline links, and inline images are preserved — or as plain text when the plugin's `contentFormat` setting is switched to `"text"`. Use the Fetch Images tool to download any images of interest.
+Fetches a URL and returns its title, top-level headings, and a readable-content excerpt. Handles HTML pages and PDFs (and surfaces plain-text and JSON responses too); the `kind` field on the result tells the assistant which one it got. Content is returned as Markdown by default, or as plain text when `Visit Website: Content Format` is set to plain text.
 
-| Parameter | Type | Notes |
-| --- | --- | --- |
-| `url` | URL | Required. |
-| `findInPage` | string[] | Optional search terms that bias which content slices are returned when the page exceeds the character budget. Strongly recommended. |
+When a page is longer than the configured character budget, supply the optional `findInPage` parameter — a list of search terms — to bias which slices of the page are returned. This is the primary tool for getting useful answers out of large pages.
 
-The visible-text character budget (`contentLimit`), the output format (`contentFormat`), and the maximum HTML payload size (`maxResponseMb`) are all plugin-only settings — they are not exposed as tool parameters so the model cannot override the user-set or default values. The response includes `contentLength`, the character count of the full extracted content prior to truncation. When `contentLength > content.length` the content was truncated — refine `findInPage` and re-call, or raise `contentLimit` in the plugin settings.
+| Parameter    | Type     | Notes                                                                                                                                              |
+| ------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `url`        | URL      | Required.                                                                                                                                          |
+| `findInPage` | string[] | Optional search terms that bias which content slices are returned when the page exceeds the character budget. Strongly recommended on large pages. |
+
+Returns a single record:
+
+| Field           | Type   | Notes                                                                                                                                                                                                                                         |
+| --------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `url`           | string | The URL that was visited, echoed back. Always present.                                                                                                                                                                                        |
+| `kind`          | string | Classified page kind (`html`, `pdf`, `text`, or `json`). Always present.                                                                                                                                                                      |
+| `mimeType`      | string | Effective MIME type reported by the server or sniffed from the payload. Always present.                                                                                                                                                       |
+| `title`         | string | Page title; omitted when not available.                                                                                                                                                                                                       |
+| `h1`            | string | First `<h1>` of an HTML page; omitted for non-HTML kinds or when none is present.                                                                                                                                                             |
+| `h2`            | string | First `<h2>` of an HTML page; omitted for non-HTML kinds or when none is present.                                                                                                                                                             |
+| `content`       | string | Excerpt of the page content, truncated to the configured character budget. Always present.                                                                                                                                                    |
+| `contentLength` | number | Character count of the full extracted content before truncation. When `contentLength > content.length` the content was truncated — refine `findInPage` and re-call, or raise `Visit Website: Content Character Limit` in the plugin settings. |
 
 ### Fetch Images
 
-Downloads images into the chat's working directory. Inputs are HTTP(S) URLs the assistant has already obtained — picks from Image Search, links seen in a Visit Website excerpt, or scraped automatically from a page via `websiteURL`. Provide at least one of `imageURLs` or `websiteURL`. Local file paths are rejected.
+Downloads images into the chat's working directory and returns a Markdown reference per image so the assistant can embed them inline. Inputs are HTTP(S) URLs — picks from Image Search, links seen in a Visit Website excerpt, or scraped automatically from a page when `websiteURL` is supplied.
 
-| Parameter | Type | Notes |
-| --- | --- | --- |
-| `imageURLs` | URL[] | Optional explicit list of HTTP(S) URLs to download. |
-| `websiteURL` | URL | Optional page to scrape for `<img>` tags and download. |
-| `maxImages` | int 1–200 | Optional; caps how many scraped images are downloaded when `websiteURL` is supplied. |
+| Parameter    | Type      | Notes                                                                                   |
+| ------------ | --------- | --------------------------------------------------------------------------------------- |
+| `imageURLs`  | URL[]     | Optional explicit list of HTTP(S) URLs to download.                                     |
+| `websiteURL` | URL       | Optional page to scrape for `<img>` tags and download.                                  |
+| `maxImages`  | int 1–200 | Optional per-call override for the cap on scraped images when `websiteURL` is supplied. |
 
-Returns an array of per-image records:
+Returns an array of records:
 
-```json
-{
-  "filename": "typescript.svg",
-  "alt": "TypeScript logo",
-  "title": "Click to enlarge",
-  "image": "![TypeScript logo](path/to/download)"
-}
-```
-
-The `image` field holds a Markdown image reference ready to drop into the assistant's reply. When a download fails, the record carries an `error` field in place of `image`. `alt` and `title` are populated from the source page's `<img>` attributes when images are scraped via `websiteURL`; explicit `imageURLs` arrive without that metadata and surface both fields as empty strings.
+| Field      | Type   | Notes                                                                                                                             |
+| ---------- | ------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `filename` | string | Filename derived from the image's URL. Always present.                                                                            |
+| `alt`      | string | Alt text from the source page's `<img>` tag when scraped via `websiteURL`; empty for explicit `imageURLs`. Always present.        |
+| `title`    | string | Title attribute from the source page's `<img>` tag when scraped via `websiteURL`; empty for explicit `imageURLs`. Always present. |
+| `image`    | string | Markdown image reference (`![alt](localPath)`) ready to embed in the reply. Present on success.                                   |
+| `error`    | string | Failure message; present in place of `image` when the download failed.                                                            |
 
 ## Installation
 
 ### From the LM Studio Hub
 
-Install the plugin through LM Studio's plugin browser. Once enabled, the four tools become available to any model that supports tool calls.
+Install via the [LM Studio CLI](https://lmstudio.ai/docs/cli):
+
+```bash
+lms get npacker/web-tools
+```
+
+Or browse to the plugin at on the [LM Studio Hub](https://lmstudio.ai/npacker/web-tools) and click "Run in LM Studio." Once enabled, the four tools become available to any model that supports tool calls.
 
 ### Local development
 
@@ -104,62 +124,68 @@ npm run dev    # runs `lms dev`
 
 ## Configuration
 
-All fields are exposed in the LM Studio plugin UI. The Safe Search field accepts an **Auto** sentinel that resolves to `moderate`. For numeric fields where "disabled" is meaningful (cache TTLs, request interval, retry count, request delay), **`0` disables the behavior** — see the Notes column.
+All fields are exposed in the LM Studio plugin UI.
 
-### Safe search and result shape
+### General
 
-| Field | Range | Default | Purpose |
-| --- | --- | --- | --- |
-| Safe Search | strict / moderate / off / Auto | Auto → `moderate` | Safe-search mode applied to both DuckDuckGo web search (encoded as the `p` parameter) and Bing image search (encoded as the `adlt` parameter). |
-| Web Search: Include Result Snippets | on/off | on | Include the short DuckDuckGo-rendered preview snippet alongside title and URL. |
-| Web Search: Enrich Results | on/off | on | Fetch each result page and extract publication date, OpenGraph type, and description. Disable to skip the per-result fan-out and return only title, URL, and snippet. |
+| Field               | Range                                                         | Default           | Purpose                                                                                                                                                                                                       |
+| ------------------- | ------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Browser Fingerprint | Firefox (latest) / Firefox 144 / Chrome (latest) / Chrome 131 | Firefox (latest)  | TLS and header fingerprint impersonated by outbound HTTP requests. The anti-bot layers on DuckDuckGo and Bing require a real browser fingerprint, so this should not be disabled or spoofed to a non-browser. |
+| Safe Search         | strict / moderate / off / Auto                                | Auto → `moderate` | Safe-search mode applied to both DuckDuckGo web search and Bing image search.                                                                                                                                 |
 
-### Result counts
+### Web Search
 
-| Field | Range | Default | Purpose |
-| --- | --- | --- | --- |
-| Web Search: Limit Results | on/off | on | When off, every result on the requested page is included (≈30 from DuckDuckGo). |
-| Web Search: Max Results | 1–30 | 10 | Cap when limiting is on. |
-| Image Search: Limit Results | on/off | on | When off, every image on the requested page is included (≈35 from Bing). |
-| Image Search: Max Results | 1–35 | 10 | Cap when limiting is on. Tops out at Bing's native page size of 35. |
-| Fetch Images: Max Images | 1–200 | 10 | Maximum images scraped when Fetch Images receives a `websiteURL`. |
+| Field                               | Range  | Default | Purpose                                                                                                                                                               |
+| ----------------------------------- | ------ | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web Search: Include Result Snippets | on/off | on      | Include the short DuckDuckGo-rendered preview snippet alongside title and URL.                                                                                        |
+| Web Search: Enrich Results          | on/off | on      | Fetch each result page and extract publication date, OpenGraph type, and description. Disable to skip the per-result fan-out and return only title, URL, and snippet. |
+| Web Search: Limit Results           | on/off | on      | When off, every result on the requested page is included (≈30 from DuckDuckGo).                                                                                       |
+| Web Search: Max Results             | 1–30   | 10      | Cap when limiting is on.                                                                                                                                              |
 
-### Visit Website content
+### Image Search
 
-| Field | Range | Default | Purpose |
-| --- | --- | --- | --- |
-| Visit Website: Content Format | Markdown / Plain text | Markdown | Output format of the `content` field. Markdown retains headings, lists, and inline links; Plain text strips syntax and preserves only line breaks. |
-| Visit Website: Content Character Limit | 1000–100 000 | 10 000 | Visible-text character budget for the page excerpt. |
-| Visit Website: Max Response Size (MB) | 1–100 | 5 | Caps the HTML payload fetched. |
+| Field                       | Range  | Default | Purpose                                                                  |
+| --------------------------- | ------ | ------- | ------------------------------------------------------------------------ |
+| Image Search: Limit Results | on/off | on      | When off, every image on the requested page is included (≈35 from Bing). |
+| Image Search: Max Results   | 1–35   | 10      | Cap when limiting is on. Tops out at Bing's natural page size of 35.     |
 
-### Image payloads
+### Visit Website
 
-| Field | Range | Default | Purpose |
-| --- | --- | --- | --- |
-| Max Image Size (MB) | 1–100 | 10 | Caps per-image payload downloaded by Fetch Images. |
+| Field                                  | Range                 | Default  | Purpose                                                                                                                                            |
+| -------------------------------------- | --------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Visit Website: Content Format          | Markdown / Plain text | Markdown | Output format of the `content` field. Markdown retains headings, lists, and inline links; Plain text strips syntax and preserves only line breaks. |
+| Visit Website: Content Character Limit | 1000–100 000          | 10 000   | Visible-text character budget for the page excerpt.                                                                                                |
+| Visit Website: Max Response Size (MB)  | 1–100                 | 5        | Caps the HTML payload fetched. Also caps the page fetch when Fetch Images scrapes images from a `websiteURL`.                                      |
+
+### Fetch Images
+
+| Field                    | Range | Default | Purpose                                                                                                               |
+| ------------------------ | ----- | ------- | --------------------------------------------------------------------------------------------------------------------- |
+| Fetch Images: Max Images | 1–200 | 10      | Maximum images scraped when Fetch Images receives a `websiteURL`. Overridable per call via the `maxImages` parameter. |
+| Max Image Size (MB)      | 1–100 | 10      | Caps per-image payload downloaded by Fetch Images.                                                                    |
 
 ### Cache TTLs
 
-| Field | Range | Default | Purpose |
-| --- | --- | --- | --- |
-| Search Cache TTL (s) | 0–3600 | 900 (15 min) | How long enriched web-search payloads stay cached. `0` disables. |
-| Website Cache TTL (s) | 0–3600 | 600 (10 min) | How long fetched HTML stays cached. `0` disables. |
+| Field                 | Range  | Default      | Purpose                                                                                                                                                     |
+| --------------------- | ------ | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Search Cache TTL (s)  | 0–3600 | 900 (15 min) | How long enriched web-search payloads stay cached. `0` disables.                                                                                            |
+| Website Cache TTL (s) | 0–3600 | 600 (10 min) | How long fetched HTML stays cached. Shared by Visit Website, Fetch Images (when scraping a `websiteURL`), and the Web Search enrichment pass. `0` disables. |
 
 ### Request pacing and retry
 
-| Field | Range | Default | Purpose |
-| --- | --- | --- | --- |
-| Min Interval Between Requests (s) | 0–30 | 5 | Minimum gap between outbound search requests; `0` disables. |
-| Max Retries Per Request | 0–4 | 2 | Retry attempts after the first try; `0` disables. |
-| Retry Initial Backoff (s) | 0–30 | 1 | Base backoff before the first retry. |
-| Retry Max Backoff (s) | 0–300 | 30 | Upper bound on exponential-backoff delay. |
+| Field                             | Range | Default | Purpose                                                                                                                                          |
+| --------------------------------- | ----- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Min Interval Between Requests (s) | 0–30  | 5       | Minimum gap between any two outbound HTTP requests (search queries, page fetches, image downloads, per-result enrichment fetches). `0` disables. |
+| Max Retries Per Request           | 0–4   | 2       | Retry attempts after the first try, applied to every outbound HTTP request. `0` disables.                                                        |
+| Retry Initial Backoff (s)         | 0–30  | 1       | Base backoff before the first retry.                                                                                                             |
+| Retry Max Backoff (s)             | 0–300 | 30      | Upper bound on exponential-backoff delay.                                                                                                        |
 
 ## Caching
 
 Two disk-backed [`cacache`](https://www.npmjs.com/package/cacache) stores, persisted under `~/.lmstudio/plugin-data/lms-plugin-duckduckgo-cache/`:
 
-- **Web-search results** (subdir `search-enriched`) — up to 100 entries, default TTL 15 minutes (`searchCacheTtlSeconds`). Stores the post-enrichment payload, so warm queries skip both the DuckDuckGo fetch and the per-result fan-out.
-- **Website HTML** (subdir `website`) — up to 50 entries, default TTL 10 minutes (`websiteCacheTtlSeconds`). Shared by Visit Website, Fetch Images, and the Web Search enrichment pass.
+- **Web-search results** — up to 100 entries, default TTL 15 minutes (`searchCacheTtlSeconds`). Stores the post-enrichment payload, so warm queries skip both the DuckDuckGo fetch and the per-result fan-out.
+- **Website HTML** — up to 50 entries, default TTL 10 minutes (`websiteCacheTtlSeconds`). Shared by Visit Website, Fetch Images, and the Web Search enrichment pass.
 
 Image search is not cached — Bing's response is small and the rate limiter alone caps fetch rate.
 
@@ -167,9 +193,9 @@ Caches survive plugin reloads. To fully clear them, stop LM Studio and delete th
 
 ## Rate limiting and retry
 
-A shared [`bottleneck`](https://www.npmjs.com/package/bottleneck)-backed rate limiter enforces a 5-second minimum gap between outbound search requests by default for the single-target flows (DuckDuckGo web search, Bing image search, Visit Website, Fetch Images downloads). The Web Search enrichment fan-out instead uses a per-host limiter keyed on URL host, so requests to distinct domains run in parallel while same-host requests still observe the interval — a 10-result enrichment pass costs roughly one fetch's wall-time rather than ten.
+A shared [`bottleneck`](https://www.npmjs.com/package/bottleneck)-backed rate limiter enforces a 5-second minimum gap between outbound requests by default for the single-target flows (DuckDuckGo web search, Bing image search, Visit Website, Fetch Images downloads). The Web Search enrichment fan-out instead uses a per-host limiter keyed on URL host, so requests to distinct domains run in parallel while same-host requests still observe the interval — a 10-result enrichment pass costs roughly one fetch's wall-time rather than ten.
 
-Every outbound HTTP request is wrapped by [`p-retry`](https://www.npmjs.com/package/p-retry) with randomized exponential backoff (factor 2) — 3 retry attempts (after the first try) with a 1-second base and 30-second cap by default. Set the interval or retry count to `0` to disable either behavior.
+Every outbound HTTP request is wrapped by [`p-retry`](https://www.npmjs.com/package/p-retry) with randomized exponential backoff (factor 2) — 2 retry attempts (after the first try) with a 1-second base and 30-second cap by default. Set the interval or retry count to `0` to disable either behavior.
 
 ## Usage
 
