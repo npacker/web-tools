@@ -4,8 +4,8 @@
 
 **`lms-plugin-web-tools`** is an LM Studio plugin that exposes four web-oriented tools to local LLMs:
 
-- **Web Search** — DuckDuckGo web search returning ranked `[title, url]` pairs.
-- **Image Search** — DuckDuckGo image search; matching images are downloaded to the working directory so the assistant can display them.
+- **Web Search** — DuckDuckGo web search returning ranked `[title, url]` pairs (with optional snippet/date/type/description enrichment).
+- **Image Search** — Bing image search; matching images are downloaded to the working directory so the assistant can display them, returned as records with the file path or remote URL plus Bing's title and source-page metadata.
 - **Visit Website** — fetches a URL and returns its title, first-level headings, and a search-term-aware slice of its readable content as Markdown (default) or plain text.
 - **View Images** — downloads images from a list of URLs and/or scraped from a page so the assistant can display them; each record carries filename, alt, and title metadata.
 
@@ -26,14 +26,17 @@ src/
 │   ├── visit-website-tool.ts
 │   └── view-images-tool.ts
 │
-├── duckduckgo/                       # DuckDuckGo API logic
+├── duckduckgo/                       # DuckDuckGo web search
 │   ├── index.ts
 │   ├── search-web.ts                 # Web search request + response handling
-│   ├── search-images.ts              # Image search request + response handling
-│   ├── fetch-vqd-token.ts            # Scrape VQD token from DuckDuckGo homepage
-│   ├── vqd-token-error.ts
-│   ├── safe-search.ts                # Encodes safe-search setting to DuckDuckGo `p` param
-│   └── build-urls.ts                 # URL construction for search requests
+│   ├── safe-search.ts                # SafeSearch type + DuckDuckGo `p` param encoding
+│   └── build-urls.ts                 # URL construction for web-search requests
+│
+├── bing/                             # Bing image search
+│   ├── index.ts
+│   ├── search-images.ts              # Fetches Bing's image-search HTML page
+│   ├── parse-results.ts              # Extracts image tiles from `<a class="iusc" m="...">`
+│   └── build-urls.ts                 # URL construction (q, first, adlt)
 │
 ├── config/                           # Configuration resolution
 │   ├── auto-sentinel.ts              # Special value (0/Auto) meaning "let the LLM decide"
@@ -63,11 +66,10 @@ src/
 │   ├── download-image.ts             # Single image download
 │   └── download-images.ts            # Batch image download
 │
-├── parsers/                          # HTML/JSON parsing
+├── parsers/                          # Generic HTML parsing
 │   ├── index.ts
-│   ├── search-results-parser.ts      # Web search: HTML via jsdom, .result__a
-│   ├── image-results-parser.ts       # Image search: JSON parsing
-│   ├── vqd-parser.ts                 # VQD token: homepage input[name="vqd"]
+│   ├── search-results.ts             # Web search: HTML via jsdom, .result__a
+│   ├── image-extensions.ts           # Supported-image-extension predicates (URL, content-type)
 │   └── page/                         # Page-level extraction
 │       ├── page-images.ts            # Scrapes <img> tags for View Images
 │       └── page-text.ts              # Feeds HTML to @mozilla/readability
@@ -79,10 +81,10 @@ src/
 │   ├── normalize-text.ts             # Text normalization utilities
 │   └── normalize-blank-lines.ts      # Trailing-whitespace and blank-line collapsing
 │
-├── timing/                           # Rate limiting and delay utilities
+├── timing/                           # Rate limiting
 │   ├── index.ts
 │   ├── rate-limiter.ts               # Shared RateLimiter (backed by bottleneck)
-│   └── sleep.ts                      # Async delay utility
+│   └── per-host-rate-limiter.ts      # Per-host limiter for the web-search enrichment fan-out
 │
 ├── fs/                               # Filesystem utilities
 │   ├── index.ts
@@ -101,9 +103,9 @@ src/
 
 1. **Tool invocation** — `tools-provider.ts` registers four Zod-validated tools (`createWebSearchTool`, `createImageSearchTool`, `createVisitWebsiteTool`, `createViewImagesTool`). Per-call config resolves via `resolveConfig`, merging plugin UI settings from `config/config-schematics.ts` with per-call overrides (runtime override > plugin config > default).
 2. **Rate limiting** — a shared `RateLimiter` (`src/timing/rate-limiter.ts`, backed by `bottleneck`) enforces a `requestIntervalSeconds` gap (default 5s) between outbound requests.
-3. **HTTP + retry** — requests go through a shared `impit` client (`src/http/impit-client.ts`) wrapped by `withRetry` in `src/http/retry.ts` (configurable `maxRetries`, `retryInitialBackoffSeconds`, `retryMaxBackoffSeconds`). **Do not replace `impit` with `fetch`** — it applies browser TLS fingerprints and headers required by DuckDuckGo's anti-bot layer.
-4. **Parsing** — HTML results go through jsdom; image JSON through a dedicated parser; VQD tokens scraped from DuckDuckGo homepage; article text through `@mozilla/readability`; Markdown conversion via `turndown`.
-5. **Caching** — three **disk-backed** TTL caches (via `cacache`) persist across plugin reloads. Cache directory: `~/.lmstudio/plugin-data/lms-plugin-duckduckgo-cache`.
+3. **HTTP + retry** — requests go through a shared `impit` client (`src/http/impit-client.ts`) wrapped by `withRetry` in `src/http/retry.ts` (configurable `maxRetries`, `retryInitialBackoffSeconds`, `retryMaxBackoffSeconds`). **Do not replace `impit` with `fetch`** — it applies browser TLS fingerprints and headers required by DuckDuckGo's and Bing's anti-bot layers (DDG outright blocks bare `fetch`; Bing degrades the response to a mobile shell).
+4. **Parsing** — DuckDuckGo web-search HTML through jsdom (`.result__a`); Bing image-search HTML through jsdom reading the JSON-encoded `m` attribute on `<a class="iusc">` tiles; article text through `@mozilla/readability`; Markdown conversion via `turndown`.
+5. **Caching** — two **disk-backed** TTL caches (via `cacache`) persist across plugin reloads — one for enriched web-search payloads, one for fetched website HTML. Cache directory: `~/.lmstudio/plugin-data/lms-plugin-duckduckgo-cache`. Image search is not cached.
 
 ---
 
@@ -112,7 +114,7 @@ src/
 | Dependency | Purpose |
 |---|---|
 | `@lmstudio/sdk` | Plugin/tool registration with LM Studio |
-| `impit` | HTTP client with TLS + header fingerprinting (required to bypass DuckDuckGo anti-bot) |
+| `impit` | HTTP client with TLS + header fingerprinting (required to bypass DuckDuckGo and Bing anti-bot) |
 | `jsdom` | HTML parsing for web search results and website content |
 | `@mozilla/readability` | Article text extraction for Visit Website (boilerplate removal) |
 | `turndown` | HTML → Markdown conversion for Visit Website's content field |
@@ -190,17 +192,15 @@ All config fields default to `0` or `"Auto"`, meaning the LLM assistant decides 
 |---|---|---|---|---|
 | `limitWebResults` | boolean | true | true/false | When enabled, caps web-search results at `webMaxResults`; when disabled, returns the full DDG page (~30). |
 | `webMaxResults` | numeric | 10 | 1–30 | Max web-search results per page; hidden when `limitWebResults` is off (plugin-only, not exposed as tool parameter). |
-| `limitImageResults` | boolean | true | true/false | When enabled, caps image-search results at `imageMaxResults`; when disabled, returns the full DDG page (~100). |
-| `imageMaxResults` | numeric | 10 | 1–100 | Max image-search results per page; hidden when `limitImageResults` is off (plugin-only, not exposed as tool parameter). |
-| `safeSearch` | select | Auto | strict/moderate/off | DuckDuckGo safe search level |
+| `limitImageResults` | boolean | true | true/false | When enabled, caps image-search results at `imageMaxResults`; when disabled, returns the full Bing page (~35). |
+| `imageMaxResults` | numeric | 10 | 1–35 | Max image-search results per page; hidden when `limitImageResults` is off (plugin-only, not exposed as tool parameter). Tops out at Bing's native page size of 35. |
+| `safeSearch` | select | Auto | strict/moderate/off | Safe-search mode applied to both DDG web search and Bing image search. |
 | `maxImages` | numeric | -1 (auto) | -1–200 | View Images: max images scraped when a `websiteURL` is provided |
 | `contentLimit` | numeric | 0 (auto) | 0–100000 | Visit Website: max characters of text (plugin-only, not exposed as tool parameter) |
 | `contentFormat` | select | markdown | markdown / text | Visit Website: output format of the content field (plugin-only, not exposed as tool parameter) |
-| `searchCacheTtlSeconds` | numeric | 0 (auto) | 0–3600 | Search result cache duration (default 15 min) |
-| `vqdCacheTtlSeconds` | numeric | 0 (auto) | 0–3600 | VQD token cache duration (default 10 min) |
+| `searchCacheTtlSeconds` | numeric | 0 (auto) | 0–3600 | Web-search result cache duration (default 15 min) |
 | `websiteCacheTtlSeconds` | numeric | 0 (auto) | 0–3600 | Website content cache duration (default 10 min) |
-| `requestIntervalSeconds` | numeric | 0 (auto) | 0–30 | Minimum gap between requests (default 5s) |
-| `vqdImageDelaySeconds` | numeric | 0 (auto) | 0–10 | Delay between VQD fetch and image API call (default 2s) |
+| `requestIntervalSeconds` | numeric | 0 (auto) | 0–30 | Minimum gap between outbound search requests (default 5s) |
 
 ---
 
@@ -223,13 +223,14 @@ Both paths share `src/text/normalize-blank-lines.ts` for trailing-whitespace and
 
 ## Caches
 
-Three **disk-backed** TTL caches (via `cacache`) are constructed once in `toolsProvider` and shared across tools. They persist across plugin reloads — clearing requires removing the cacache directory at `~/.lmstudio/plugin-data/lms-plugin-duckduckgo-cache`:
+Two **disk-backed** TTL caches (via `cacache`) are constructed once in `toolsProvider` and shared across tools. They persist across plugin reloads — clearing requires removing the cacache directory at `~/.lmstudio/plugin-data/lms-plugin-duckduckgo-cache`:
 
 | Cache | Max entries | TTL config | Default |
 |---|---|---|---|
-| Search results | 100 | `searchCacheTtlSeconds` | 15 min |
-| VQD token | 50 | `vqdCacheTtlSeconds` | 10 min |
-| Website HTML | 50 | `websiteCacheTtlSeconds` | 10 min |
+| Search results (subdir `search-enriched`) | 100 | `searchCacheTtlSeconds` | 15 min |
+| Website HTML (subdir `website`) | 50 | `websiteCacheTtlSeconds` | 10 min |
+
+Image search is not cached — Bing's metadata payload is small and the rate limiter alone caps fetch rate.
 
 Cache sizes and subdirs are defined in `src/tools-provider.ts`; the `TTLCache` implementation is in `src/cache/ttl-cache.ts`. TTL defaults live in `src/config/resolve-config.ts`.
 
@@ -237,10 +238,9 @@ Cache sizes and subdirs are defined in `src/tools-provider.ts`; the `TTLCache` i
 
 ## Error Hierarchies
 
-Three error hierarchies are load-bearing:
+Two error hierarchies are load-bearing:
 
 - **`FetchError`** (`src/http/fetch-error.ts`) — HTTP/network failures, carries `url` and optional `cause`.
-- **`VqdTokenError`** (`src/duckduckgo/vqd-token-error.ts`) — token acquisition failures with `VqdTokenFailureReason` of `token_not_found` or `fetch_failed`.
 - **`NoResultsError`** base with `NoWebResultsError` / `NoImageResultsError` (`src/errors/no-results-error.ts`).
 
 `formatToolError` in `src/errors/tool-error.ts` converts these into user-facing strings per tool kind (`web-search`, `image-search`, `website`, `image-download`), including abort-detection via `DOMException.name === "AbortError"`.
@@ -249,10 +249,10 @@ Three error hierarchies are load-bearing:
 
 ## Important Implementation Notes
 
-- **Never replace `impit` with `fetch`.** DuckDuckGo's anti-bot layer requires the specific TLS fingerprint and headers that `impit` provides.
-- **Safe search encoding is non-obvious:** `strict → "1"`, `moderate → ""`, `off → "-1"`. This is centralized in `src/duckduckgo/safe-search.ts`.
-- **VQD tokens** are scraped from the DuckDuckGo homepage (`input[name="vqd"]`). Image endpoints require them. A configurable delay (`vqdImageDelaySeconds`, default 2s) is inserted between VQD fetch and image API call. Token acquisition failures raise `VqdTokenError`.
+- **Never replace `impit` with `fetch`.** Both DuckDuckGo's and Bing's anti-bot layers require the specific TLS fingerprint and headers that `impit` provides.
+- **DuckDuckGo safe-search encoding is non-obvious:** `strict → "1"`, `moderate → ""`, `off → "-1"`. Centralized in `src/duckduckgo/safe-search.ts`. Bing accepts the literal mode strings on its `adlt` parameter, so `src/bing/build-urls.ts` passes `SafeSearch` through unchanged.
+- **Image search via Bing:** Each `<a class="iusc">` tile carries a JSON-encoded `m` attribute with `murl` (full image URL), `purl` (source page), and `t` (title). jsdom returns the attribute already entity-decoded, so the parser feeds it straight to `JSON.parse`; malformed tiles are swallowed individually. Bing returns ~35 tiles per page; pagination advances by 35 via the `first` query parameter.
 - **All caches are disk-backed** via `cacache` — they persist across plugin reloads. Clearing requires removing `~/.lmstudio/plugin-data/lms-plugin-duckduckgo-cache`.
-- **Shared state:** `TTLCache` instances (3), `RateLimiter`, and `impit` client are created once in `toolsProvider` and shared across all tools.
+- **Shared state:** `TTLCache` instances (2), `RateLimiter`, `PerHostRateLimiter`, and `impit` client are created once in `toolsProvider` and shared across all tools.
 - **Working directory:** `ctl.getWorkingDirectory()` is called inside each tool's `implementation` (not at `toolsProvider` setup), since the SDK only attaches a working directory when a tool is actually invoked from a chat.
 - **Graceful image download:** On per-image download failure, tools fall back to the remote URL rather than throwing.

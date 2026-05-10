@@ -98,14 +98,14 @@ export const configSchematics = createConfigSchematics()
     "numeric",
     {
       displayName: "Image Search: Max Results",
-      subtitle: "1 to 100. Maximum image search results to return from the requested page.",
+      subtitle: "1 to 35. Maximum image search results to return from the requested page.",
       min: 1,
-      max: 100,
+      max: 35,
       int: true,
       slider: {
         step: 1,
         min: 1,
-        max: 100,
+        max: 35,
       },
       dependencies: [{ key: "limitImageResults", condition: { type: "equals", value: true } }],
     },
@@ -209,23 +209,6 @@ export const configSchematics = createConfigSchematics()
     5
   )
   .field(
-    "imageSearchRequestDelaySeconds",
-    "numeric",
-    {
-      displayName: "Image Search: Request Delay (seconds)",
-      subtitle: "0 to 10 seconds. Delay inserted before the image search API call.",
-      min: 0,
-      max: 10,
-      int: true,
-      slider: {
-        step: 1,
-        min: 0,
-        max: 10,
-      },
-    },
-    2
-  )
-  .field(
     "maxRetries",
     "numeric",
     {
@@ -292,23 +275,6 @@ export const configSchematics = createConfigSchematics()
       },
     },
     900
-  )
-  .field(
-    "imageSearchTokenCacheTtlSeconds",
-    "numeric",
-    {
-      displayName: "Image Search Token Cache TTL (seconds)",
-      subtitle: "0 to 3600 seconds. Set to 0 to disable caching.",
-      min: 0,
-      max: 3600,
-      int: true,
-      slider: {
-        step: 60,
-        min: 0,
-        max: 3600,
-      },
-    },
-    600
   )
   .field(
     "websiteCacheTtlSeconds",

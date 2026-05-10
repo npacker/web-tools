@@ -2,7 +2,6 @@
  * User-facing error formatting for tool invocations.
  */
 
-import { VqdTokenError } from "../duckduckgo/vqd-token-error"
 import { FetchError } from "../http/fetch-error"
 
 import { errorMessage, isAbortError } from "./inspect-error"
@@ -83,10 +82,6 @@ export function formatToolError(error: unknown, context: ToolErrorContext, kind:
 
   if (error instanceof UnsupportedContentTypeError) {
     return formatUnsupportedContentType(error, kind)
-  }
-
-  if (error instanceof VqdTokenError) {
-    return `Error: ${appendCause(error.message, error.cause)}`
   }
 
   if (error instanceof FetchError) {

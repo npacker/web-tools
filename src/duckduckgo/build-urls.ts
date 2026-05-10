@@ -1,11 +1,11 @@
 /**
- * Pure URL builders and parameter encoders for DuckDuckGo endpoints.
+ * Pure URL builders and parameter encoders for DuckDuckGo web search.
  */
 
 import type { SafeSearch } from "./safe-search"
 
 /**
- * Input parameters shared by web and image search requests.
+ * Input parameters for a DuckDuckGo web search request.
  */
 export interface SearchParameters {
   /** Raw search query string. */
@@ -35,22 +35,6 @@ const DUCKDUCKGO_BASE_URL = "https://duckduckgo.com"
 const WEB_SEARCH_PATH = "/html/"
 
 /**
- * Path of the DuckDuckGo JSON image search endpoint.
- *
- * @const {string}
- * @default
- */
-const IMAGE_SEARCH_PATH = "/i.js"
-
-/**
- * Path of the DuckDuckGo homepage used to scrape VQD tokens.
- *
- * @const {string}
- * @default
- */
-const VQD_FETCH_PATH = "/"
-
-/**
  * Build the URL for a DuckDuckGo web search.
  *
  * @param parameters Query and pagination parameters for the search.
@@ -59,44 +43,6 @@ const VQD_FETCH_PATH = "/"
 export function buildWebSearchUrl(parameters: SearchParameters): URL {
   const url = new URL(WEB_SEARCH_PATH, DUCKDUCKGO_BASE_URL)
   url.searchParams.append("q", parameters.query)
-  url.searchParams.append("p", encodeSafeSearchParameter(parameters.safeSearch))
-
-  if (parameters.page > 1) {
-    url.searchParams.append("s", pageOffset(parameters.pageStride, parameters.page).toString())
-  }
-
-  return url
-}
-
-/**
- * Build the URL for the DuckDuckGo homepage used to scrape the VQD token.
- *
- * @param query Search query associated with the VQD token request.
- * @returns Fully constructed VQD-scrape URL.
- */
-export function buildVqdUrl(query: string): URL {
-  const url = new URL(VQD_FETCH_PATH, DUCKDUCKGO_BASE_URL)
-  url.searchParams.append("q", query)
-  url.searchParams.append("iax", "images")
-  url.searchParams.append("ia", "images")
-
-  return url
-}
-
-/**
- * Build the URL for the DuckDuckGo image search JSON endpoint.
- *
- * @param parameters Query and pagination parameters for the search.
- * @param vqd VQD token previously obtained via `fetchVqdToken`.
- * @returns Fully constructed image-search URL.
- */
-export function buildImageSearchUrl(parameters: SearchParameters, vqd: string): URL {
-  const url = new URL(IMAGE_SEARCH_PATH, DUCKDUCKGO_BASE_URL)
-  url.searchParams.append("q", parameters.query)
-  url.searchParams.append("o", "json")
-  url.searchParams.append("l", "us-en")
-  url.searchParams.append("vqd", vqd)
-  url.searchParams.append("f", ",,,,,")
   url.searchParams.append("p", encodeSafeSearchParameter(parameters.safeSearch))
 
   if (parameters.page > 1) {

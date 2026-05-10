@@ -21,15 +21,6 @@ import type { Browser } from "impit"
 const WEB_NATIVE_PAGE_SIZE = 30
 
 /**
- * Image-search page stride used when the results cap is disabled. Matches the ~100 results
- * DuckDuckGo's image JSON endpoint returns per page.
- *
- * @const {number}
- * @default
- */
-const IMAGE_NATIVE_PAGE_SIZE = 100
-
-/**
  * Fallback cap used when a results-per-page field reads `null` before the UI has committed the
  * schematic default.
  *
@@ -95,14 +86,6 @@ const DEFAULT_ENRICH_RESULTS = true
 const DEFAULT_SEARCH_CACHE_TTL_SECONDS = 15 * 60
 
 /**
- * Default TTL for the image search token cache, in seconds.
- *
- * @const {number}
- * @default
- */
-const DEFAULT_IMAGE_SEARCH_TOKEN_CACHE_TTL_SECONDS = 10 * 60
-
-/**
  * Default TTL for the website HTML cache, in seconds.
  *
  * @const {number}
@@ -117,14 +100,6 @@ const DEFAULT_WEBSITE_CACHE_TTL_SECONDS = 10 * 60
  * @default
  */
 const DEFAULT_REQUEST_INTERVAL_SECONDS = 5
-
-/**
- * Default delay inserted before the image search API call, in seconds.
- *
- * @const {number}
- * @default
- */
-const DEFAULT_IMAGE_SEARCH_REQUEST_DELAY_SECONDS = 2
 
 /**
  * Default number of retries after the initial attempt, applied to every outbound request.
@@ -206,8 +181,6 @@ interface ResolvedConfig {
   webPageStride: number
   /** Upper bound on image-search results returned per page; `Infinity` when the cap is disabled. */
   imageMaxResults: number
-  /** Stride used to compute the `s=` offset for image-search pagination. */
-  imagePageStride: number
   /** Safe-search mode to apply to the request. */
   safeSearch: SafeSearch
   /** Whether web search results should include preview snippets. */
@@ -220,8 +193,6 @@ interface ResolvedConfig {
   contentLimit: number
   /** Output format for the Visit Website tool's `content` field. */
   contentFormat: ContentFormat
-  /** Delay before the image search API call, in milliseconds. */
-  imageSearchRequestDelayMs: number
   /** Hard upper bound on the HTML payload fetched by Visit Website, in bytes. */
   maxResponseBytes: number
   /** Hard upper bound on the per-image payload downloaded by Image Search and View Images, in bytes. */
@@ -234,8 +205,6 @@ interface ResolvedConfig {
 export interface ResolvedTimingConfig {
   /** TTL for the search result cache, in milliseconds. */
   searchCacheTtlMs: number
-  /** TTL for the image search token cache, in milliseconds. */
-  imageSearchTokenCacheTtlMs: number
   /** TTL for the website HTML cache, in milliseconds. */
   websiteCacheTtlMs: number
   /** Minimum interval between outbound requests, in milliseconds. */
@@ -272,7 +241,6 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
   const pluginMaxImages = pluginConfig.get("maxImages") as number | null
   const pluginContentLimit = pluginConfig.get("contentLimit") as number | null
   const pluginContentFormat = pluginConfig.get("contentFormat") as ContentFormat | null
-  const pluginImageSearchRequestDelaySeconds = pluginConfig.get("imageSearchRequestDelaySeconds") as number | null
   const pluginMaxResponseMb = pluginConfig.get("maxResponseMb") as number | null
   const pluginMaxImageMb = pluginConfig.get("maxImageMb") as number | null
   const webLimited = pluginLimitWeb ?? true
@@ -282,15 +250,12 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
     webMaxResults: webLimited ? (pluginWebMax ?? DEFAULT_MAX_RESULTS) : Number.POSITIVE_INFINITY,
     webPageStride: webLimited ? (pluginWebMax ?? DEFAULT_MAX_RESULTS) : WEB_NATIVE_PAGE_SIZE,
     imageMaxResults: imageLimited ? (pluginImageMax ?? DEFAULT_MAX_RESULTS) : Number.POSITIVE_INFINITY,
-    imagePageStride: imageLimited ? (pluginImageMax ?? DEFAULT_MAX_RESULTS) : IMAGE_NATIVE_PAGE_SIZE,
     safeSearch: resolveSafeSearch(pluginSafeSearch),
     includeSnippets: pluginIncludeSnippets ?? DEFAULT_INCLUDE_SNIPPETS,
     enrichResults: pluginEnrichResults ?? DEFAULT_ENRICH_RESULTS,
     maxImages: pluginMaxImages ?? overrides.maxImages ?? DEFAULT_MAX_IMAGES,
     contentLimit: pluginContentLimit ?? DEFAULT_CONTENT_LIMIT,
     contentFormat: pluginContentFormat ?? DEFAULT_CONTENT_FORMAT,
-    imageSearchRequestDelayMs:
-      (pluginImageSearchRequestDelaySeconds ?? DEFAULT_IMAGE_SEARCH_REQUEST_DELAY_SECONDS) * MS_PER_SECOND,
     maxResponseBytes: (pluginMaxResponseMb ?? DEFAULT_MAX_RESPONSE_MB) * BYTES_PER_MB,
     maxImageBytes: (pluginMaxImageMb ?? DEFAULT_MAX_IMAGE_MB) * BYTES_PER_MB,
   }
@@ -307,7 +272,6 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
 export function resolveTimingConfig(ctl: ToolsProviderController): ResolvedTimingConfig {
   const pluginConfig = ctl.getPluginConfig(configSchematics)
   const searchTtlSeconds = pluginConfig.get("searchCacheTtlSeconds") as number | null
-  const tokenTtlSeconds = pluginConfig.get("imageSearchTokenCacheTtlSeconds") as number | null
   const websiteTtlSeconds = pluginConfig.get("websiteCacheTtlSeconds") as number | null
   const intervalSeconds = pluginConfig.get("requestIntervalSeconds") as number | null
   const maxRetries = pluginConfig.get("maxRetries") as number | null
@@ -316,7 +280,6 @@ export function resolveTimingConfig(ctl: ToolsProviderController): ResolvedTimin
 
   return {
     searchCacheTtlMs: (searchTtlSeconds ?? DEFAULT_SEARCH_CACHE_TTL_SECONDS) * MS_PER_SECOND,
-    imageSearchTokenCacheTtlMs: (tokenTtlSeconds ?? DEFAULT_IMAGE_SEARCH_TOKEN_CACHE_TTL_SECONDS) * MS_PER_SECOND,
     websiteCacheTtlMs: (websiteTtlSeconds ?? DEFAULT_WEBSITE_CACHE_TTL_SECONDS) * MS_PER_SECOND,
     requestIntervalMs: (intervalSeconds ?? DEFAULT_REQUEST_INTERVAL_SECONDS) * MS_PER_SECOND,
     retryPolicy: {

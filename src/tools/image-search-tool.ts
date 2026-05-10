@@ -5,25 +5,15 @@
 import { tool, type Tool, type ToolsProviderController } from "@lmstudio/sdk"
 import { z } from "zod"
 
+import { searchImages } from "../bing"
 import { resolveConfig } from "../config/resolve-config"
-import { fetchVqdToken, searchImages } from "../duckduckgo"
 import { formatToolError, NoImageResultsError } from "../errors"
-import { createRetryNotifier, FetchError } from "../http"
+import { createRetryNotifier } from "../http"
 import { downloadImages } from "../images"
-import { extractImageUrls } from "../parsers"
-import { type RateLimiter, sleep } from "../timing"
 
-import type { TTLCache } from "../cache"
 import type { RetryOptions } from "../http"
+import type { RateLimiter } from "../timing"
 import type { Impit } from "impit"
-
-/**
- * HTTP status codes DuckDuckGo uses to reject a stale or invalid VQD token.
- * Encountering one triggers a single-shot token refresh + retry.
- *
- * @const {ReadonlySet<number>}
- */
-const STALE_VQD_STATUS_CODES: ReadonlySet<number> = new Set([400, 401, 403, 418])
 
 /**
  * Lower bound on the requested page number.
@@ -54,7 +44,6 @@ const DEFAULT_PAGE_NUMBER = 1
  *
  * @param ctl Tools provider controller supplied by the LM Studio SDK.
  * @param impit Shared HTTP client used for outbound requests and image downloads.
- * @param vqdCache Cache holding VQD tokens keyed by query.
  * @param rateLimiter Shared limiter enforcing the minimum gap between requests.
  * @param imageLimiter Shared limiter capping the number of image downloads in flight concurrently.
  * @param retry Retry policy applied to every outbound request.
@@ -63,14 +52,13 @@ const DEFAULT_PAGE_NUMBER = 1
 export function createImageSearchTool(
   ctl: ToolsProviderController,
   impit: Impit,
-  vqdCache: TTLCache<string>,
   rateLimiter: RateLimiter,
   imageLimiter: RateLimiter,
   retry: RetryOptions
 ): Tool {
   return tool({
     name: "Image Search",
-    description: "Search for images on DuckDuckGo using a query string and return a list of image URLs.",
+    description: "Search for images using a query string and return a list of image records.",
     parameters: {
       query: z.string().describe("The search query for finding images."),
       page: z
@@ -90,66 +78,28 @@ export function createImageSearchTool(
      * @param arguments_.query Search query string.
      * @param arguments_.page Page number being requested.
      * @param context Runtime tool context supplied by the SDK.
-     * @returns Either the downloaded file paths, the remote URLs on download failure, or a user-facing error string.
+     * @returns Per-image records pairing each downloaded path (or remote URL on download failure) with the source's title and page metadata, or a user-facing error string.
      */
     implementation: async (arguments_, context) => {
       const { query, page } = arguments_
-      context.status("Initiating DuckDuckGo image search...")
+      context.status("Initiating image search...")
       await rateLimiter.wait()
 
       try {
-        const { imageMaxResults, imagePageStride, safeSearch, imageSearchRequestDelayMs, maxImageBytes } =
-          resolveConfig(ctl)
-        let vqd = await fetchVqdToken(impit, vqdCache, query, {
-          signal: context.signal,
-          retry,
-          onFailedAttempt: createRetryNotifier(context.status, "VQD token fetch"),
-        })
-        await sleep(imageSearchRequestDelayMs)
-        const parameters = { query, pageStride: imagePageStride, safeSearch, page }
-        const searchOptions = {
+        const { imageMaxResults, safeSearch, maxImageBytes } = resolveConfig(ctl)
+        const results = await searchImages(impit, { query, safeSearch, page }, imageMaxResults, {
           signal: context.signal,
           retry,
           onFailedAttempt: createRetryNotifier(context.status, "image search"),
-        }
-        let imageResults: Awaited<ReturnType<typeof searchImages>>
+        })
 
-        try {
-          imageResults = await searchImages(impit, parameters, vqd, searchOptions)
-        } catch (error) {
-          if (
-            !(error instanceof FetchError) ||
-            error.statusCode === undefined ||
-            !STALE_VQD_STATUS_CODES.has(error.statusCode)
-          ) {
-            throw error
-          }
-
-          context.status("VQD token rejected; refreshing and retrying image search...")
-          vqd = await fetchVqdToken(
-            impit,
-            vqdCache,
-            query,
-            {
-              signal: context.signal,
-              retry,
-              onFailedAttempt: createRetryNotifier(context.status, "VQD token refresh"),
-            },
-            { forceRefresh: true }
-          )
-          await sleep(imageSearchRequestDelayMs)
-          imageResults = await searchImages(impit, parameters, vqd, searchOptions)
-        }
-
-        const imageUrls = extractImageUrls(imageResults, imageMaxResults)
-
-        if (imageUrls.length === 0) {
+        if (results.length === 0) {
           throw new NoImageResultsError(query)
         }
 
-        context.status(`Found ${imageUrls.length} images. Fetching...`)
+        context.status(`Found ${results.length} images. Fetching...`)
         const batch = await downloadImages(
-          imageUrls,
+          results.map(result => result.image),
           impit,
           { workingDirectory: ctl.getWorkingDirectory(), timestamp: Date.now(), maxBytes: maxImageBytes },
           {
@@ -160,7 +110,11 @@ export function createImageSearchTool(
             onFailedAttempt: createRetryNotifier(context.status, "image download"),
           }
         )
-        const results = batch.map(result => (result.ok ? result.localPath : result.url))
+        const rendered = results.map((result, index) => {
+          const outcome = batch[index]
+
+          return { ...result, image: outcome.ok ? outcome.localPath : outcome.url }
+        })
         const failed = batch.length - batch.filter(result => result.ok).length
 
         if (failed === batch.length) {
@@ -171,7 +125,7 @@ export function createImageSearchTool(
           context.status(`Downloaded ${batch.length} images successfully.`)
         }
 
-        return results
+        return rendered
       } catch (error) {
         return formatToolError(error, context, "image-search")
       }

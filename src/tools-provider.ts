@@ -47,22 +47,6 @@ const SEARCH_CACHE_SUBDIR = "search-enriched"
 const SEARCH_CACHE_MAX_SIZE = 100
 
 /**
- * Subdirectory under the cache root dedicated to VQD tokens.
- *
- * @const {string}
- * @default
- */
-const VQD_CACHE_SUBDIR = "vqd"
-
-/**
- * Maximum number of VQD tokens retained in the VQD cache.
- *
- * @const {number}
- * @default
- */
-const VQD_CACHE_MAX_SIZE = 50
-
-/**
  * Subdirectory under the cache root dedicated to fetched website HTML payloads.
  *
  * @const {string}
@@ -104,11 +88,6 @@ export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[
   const rateLimiter = new RateLimiter({ minIntervalMs: timing.requestIntervalMs })
   const hostLimiter = new PerHostRateLimiter({ minIntervalMs: timing.requestIntervalMs })
   const imageLimiter = new RateLimiter({ maxConcurrent: MAX_IMAGE_CONCURRENCY })
-  const vqdCache = new TTLCache<string>(
-    path.join(cacheRoot, VQD_CACHE_SUBDIR),
-    timing.imageSearchTokenCacheTtlMs,
-    VQD_CACHE_MAX_SIZE
-  )
   const searchCache = new TTLCache<SearchResultsPayload>(
     path.join(cacheRoot, SEARCH_CACHE_SUBDIR),
     timing.searchCacheTtlMs,
@@ -124,7 +103,7 @@ export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[
 
   return [
     createWebSearchTool(ctl, impit, searchCache, websiteCache, rateLimiter, hostLimiter, scraper, retry),
-    createImageSearchTool(ctl, impit, vqdCache, rateLimiter, imageLimiter, retry),
+    createImageSearchTool(ctl, impit, rateLimiter, imageLimiter, retry),
     createVisitWebsiteTool(ctl, impit, websiteCache, rateLimiter, retry),
     createViewImagesTool(ctl, impit, websiteCache, rateLimiter, imageLimiter, retry),
   ]

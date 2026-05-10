@@ -1,6 +1,6 @@
 # Web Tools Plugin for LM Studio
 
-An LM Studio plugin that gives local LLMs four web-oriented tools built on `@lmstudio/sdk`. Web and image search are backed by DuckDuckGo (via the browser-fingerprinting [`impit`](https://www.npmjs.com/package/impit) HTTP client), website visits use [`@mozilla/readability`](https://www.npmjs.com/package/@mozilla/readability) for article extraction plus [`turndown`](https://www.npmjs.com/package/turndown) for clean Markdown output, and images referenced by the image-oriented tools are downloaded into the chat's working directory so the assistant can display them inline.
+An LM Studio plugin that gives local LLMs four web-oriented tools built on `@lmstudio/sdk`. Web search is backed by DuckDuckGo and image search by Bing (both fetched via the browser-fingerprinting [`impit`](https://www.npmjs.com/package/impit) HTTP client), website visits use [`@mozilla/readability`](https://www.npmjs.com/package/@mozilla/readability) for article extraction plus [`turndown`](https://www.npmjs.com/package/turndown) for clean Markdown output, and images referenced by the image-oriented tools are downloaded into the chat's working directory so the assistant can display them inline.
 
 ## Tools
 
@@ -30,14 +30,24 @@ Cache key: `(query, safeSearch, page, enrichResults)`. Results-per-page cap, sni
 
 ### Image Search
 
-DuckDuckGo image search. Requires a VQD token scraped from the DuckDuckGo homepage.
+Bing image search. Returns per-image records with the source URL plus Bing's title and source-page metadata.
 
 | Parameter | Type | Notes |
 | --- | --- | --- |
 | `query` | string | Required. |
 | `page` | int 1–100 | Optional, defaults to 1. |
 
-Matching images are downloaded into the chat's working directory and returned as local file paths. If a download fails, the remote URL is returned for that slot instead so the assistant always gets something displayable. The results-per-page cap is controlled by the plugin's `limitImageResults` toggle and `imageMaxResults` slider (default 10, max 100) — these are plugin-only settings and are not exposed as tool parameters. Disabling `limitImageResults` returns every image DuckDuckGo includes on the page. Safe-search mode is plugin-only (default moderate).
+Matching images are downloaded into the chat's working directory and returned as records:
+
+```json
+{
+  "image": "path/to/download",
+  "title": "Red Vintage Car Driving on the Road · Free Stock Photo",
+  "sourcePage": "https://www.pexels.com/photo/red-vintage-car-..."
+}
+```
+
+`title` and `sourcePage` are omitted when Bing did not surface them. If a download fails, the remote image URL is returned in `image` for that slot instead so the assistant always gets something displayable. The results-per-page cap is controlled by the plugin's `limitImageResults` toggle and `imageMaxResults` slider (default 10, max 35 — Bing's native page size) — these are plugin-only settings and are not exposed as tool parameters. Disabling `limitImageResults` returns every image on the requested page (~35 from Bing). Safe-search mode is plugin-only (default moderate).
 
 ### Visit Website
 
@@ -100,7 +110,7 @@ All fields are exposed in the LM Studio plugin UI. The Safe Search field accepts
 
 | Field | Range | Default | Purpose |
 | --- | --- | --- | --- |
-| Safe Search | strict / moderate / off / Auto | Auto → `moderate` | DuckDuckGo safe-search mode applied to web and image search. |
+| Safe Search | strict / moderate / off / Auto | Auto → `moderate` | Safe-search mode applied to both DuckDuckGo web search (encoded as the `p` parameter) and Bing image search (encoded as the `adlt` parameter). |
 | Web Search: Include Result Snippets | on/off | on | Include the short DuckDuckGo-rendered preview snippet alongside title and URL. |
 | Web Search: Enrich Results | on/off | on | Fetch each result page and extract publication date, OpenGraph type, and description. Disable to skip the per-result fan-out and return only title, URL, and snippet. |
 
@@ -110,8 +120,8 @@ All fields are exposed in the LM Studio plugin UI. The Safe Search field accepts
 | --- | --- | --- | --- |
 | Web Search: Limit Results | on/off | on | When off, every result on the requested page is included (≈30 from DuckDuckGo). |
 | Web Search: Max Results | 1–30 | 10 | Cap when limiting is on. |
-| Image Search: Limit Results | on/off | on | When off, every image on the requested page is included (≈100 from DuckDuckGo). |
-| Image Search: Max Results | 1–100 | 10 | Cap when limiting is on. |
+| Image Search: Limit Results | on/off | on | When off, every image on the requested page is included (≈35 from Bing). |
+| Image Search: Max Results | 1–35 | 10 | Cap when limiting is on. Tops out at Bing's native page size of 35. |
 | View Images: Max Images | 1–200 | 10 | Maximum images scraped when View Images receives a `websiteURL`. |
 
 ### Visit Website content
@@ -132,33 +142,32 @@ All fields are exposed in the LM Studio plugin UI. The Safe Search field accepts
 
 | Field | Range | Default | Purpose |
 | --- | --- | --- | --- |
-| Search Cache TTL (s) | 0–3600 | 900 (15 min) | How long enriched search payloads stay cached. `0` disables. |
-| Image Search Token Cache TTL (s) | 0–3600 | 600 (10 min) | How long DuckDuckGo VQD tokens stay cached. `0` disables. |
+| Search Cache TTL (s) | 0–3600 | 900 (15 min) | How long enriched web-search payloads stay cached. `0` disables. |
 | Website Cache TTL (s) | 0–3600 | 600 (10 min) | How long fetched HTML stays cached. `0` disables. |
 
 ### Request pacing and retry
 
 | Field | Range | Default | Purpose |
 | --- | --- | --- | --- |
-| Min Interval Between Requests (s) | 0–30 | 5 | Minimum gap between outbound DuckDuckGo requests; `0` disables. |
-| Image Search: Request Delay (s) | 0–10 | 2 | Delay inserted before the image-search API call (after the VQD scrape). `0` disables. |
+| Min Interval Between Requests (s) | 0–30 | 5 | Minimum gap between outbound search requests; `0` disables. |
 | Max Retries Per Request | 0–4 | 2 | Retry attempts after the first try; `0` disables. |
 | Retry Initial Backoff (s) | 0–30 | 1 | Base backoff before the first retry. |
 | Retry Max Backoff (s) | 0–300 | 30 | Upper bound on exponential-backoff delay. |
 
 ## Caching
 
-Three disk-backed [`cacache`](https://www.npmjs.com/package/cacache) stores, all persisted under `~/.lmstudio/plugin-data/lms-plugin-duckduckgo-cache/`:
+Two disk-backed [`cacache`](https://www.npmjs.com/package/cacache) stores, persisted under `~/.lmstudio/plugin-data/lms-plugin-duckduckgo-cache/`:
 
-- **Search results** (subdir `search-enriched`) — up to 100 entries, default TTL 15 minutes (`searchCacheTtlSeconds`). Stores the post-enrichment payload, so warm queries skip both the DuckDuckGo fetch and the per-result fan-out.
-- **Image-search VQD tokens** (subdir `vqd`) — up to 50 entries, default TTL 10 minutes (`imageSearchTokenCacheTtlSeconds`).
+- **Web-search results** (subdir `search-enriched`) — up to 100 entries, default TTL 15 minutes (`searchCacheTtlSeconds`). Stores the post-enrichment payload, so warm queries skip both the DuckDuckGo fetch and the per-result fan-out.
 - **Website HTML** (subdir `website`) — up to 50 entries, default TTL 10 minutes (`websiteCacheTtlSeconds`). Shared by Visit Website, View Images, and the Web Search enrichment pass.
+
+Image search is not cached — Bing's response is small and the rate limiter alone caps fetch rate.
 
 Caches survive plugin reloads. To fully clear them, stop LM Studio and delete the cache directory above.
 
 ## Rate limiting and retry
 
-A shared [`bottleneck`](https://www.npmjs.com/package/bottleneck)-backed rate limiter enforces a 5-second minimum gap between outbound DuckDuckGo requests by default for the single-target flows (web search itself, Visit Website, image downloads). The Web Search enrichment fan-out instead uses a per-host limiter keyed on URL host, so requests to distinct domains run in parallel while same-host requests still observe the interval — a 10-result enrichment pass costs roughly one fetch's wall-time rather than ten.
+A shared [`bottleneck`](https://www.npmjs.com/package/bottleneck)-backed rate limiter enforces a 5-second minimum gap between outbound search requests by default for the single-target flows (DuckDuckGo web search, Bing image search, Visit Website, image downloads). The Web Search enrichment fan-out instead uses a per-host limiter keyed on URL host, so requests to distinct domains run in parallel while same-host requests still observe the interval — a 10-result enrichment pass costs roughly one fetch's wall-time rather than ten.
 
 Every outbound HTTP request is wrapped by [`p-retry`](https://www.npmjs.com/package/p-retry) with randomized exponential backoff (factor 2) — 3 retry attempts (after the first try) with a 1-second base and 30-second cap by default. Set the interval or retry count to `0` to disable either behavior.
 
@@ -185,7 +194,7 @@ Built on top of Daniel Sig's original
 [lms-plugin-visit-website](https://github.com/danielsig/lms-plugin-visit-website) plugins, now
 merged into a single tool suite and extended with the View Images tool, Markdown-formatted
 website content, `findInPage`-biased content slicing, configurable rate limiting and retry,
-and a persistent `cacache`-backed store for VQD tokens, search results, and fetched HTML.
+and a persistent `cacache`-backed store for web-search results and fetched HTML.
 
 ## License
 
