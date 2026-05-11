@@ -16,7 +16,7 @@ import { createImageSearchTool } from "./tools/image-search-tool"
 import { createVisitWebsiteTool } from "./tools/visit-website-tool"
 import { createWebSearchTool } from "./tools/web-search-tool"
 
-import type { SearchResultsPayload } from "./cache"
+import type { ImageSearchResultsPayload, SearchResultsPayload } from "./cache"
 import type { FetchedPage } from "./website"
 import type { Tool, ToolsProviderController } from "@lmstudio/sdk"
 
@@ -29,7 +29,7 @@ import type { Tool, ToolsProviderController } from "@lmstudio/sdk"
 const CACHE_DIRECTORY_NAME = "lms-plugin-duckduckgo-cache"
 
 /**
- * Subdirectory under the cache root dedicated to web/image search results. Bumped from
+ * Subdirectory under the cache root dedicated to web search results. Bumped from
  * `search` when the cached payload shape gained per-result enrichment metadata; old entries
  * under the legacy directory are orphaned and may be deleted by hand.
  *
@@ -39,12 +39,30 @@ const CACHE_DIRECTORY_NAME = "lms-plugin-duckduckgo-cache"
 const SEARCH_CACHE_SUBDIR = "search-enriched"
 
 /**
- * Maximum number of search result entries retained in the search cache.
+ * Maximum number of web search result entries retained in the search cache.
  *
  * @const {number}
  * @default
  */
 const SEARCH_CACHE_MAX_SIZE = 100
+
+/**
+ * Subdirectory under the cache root dedicated to image search results. Kept separate from the
+ * web search subdir so web and image entries do not compete for the same eviction slots and
+ * the payload shapes stay typed independently on their respective TTLCache instances.
+ *
+ * @const {string}
+ * @default
+ */
+const IMAGE_SEARCH_CACHE_SUBDIR = "image-search"
+
+/**
+ * Maximum number of image search result entries retained in the image search cache.
+ *
+ * @const {number}
+ * @default
+ */
+const IMAGE_SEARCH_CACHE_MAX_SIZE = 100
 
 /**
  * Subdirectory under the cache root dedicated to fetched website HTML payloads.
@@ -93,6 +111,11 @@ export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[
     timing.searchCacheTtlMs,
     SEARCH_CACHE_MAX_SIZE
   )
+  const imageSearchCache = new TTLCache<ImageSearchResultsPayload>(
+    path.join(cacheRoot, IMAGE_SEARCH_CACHE_SUBDIR),
+    timing.searchCacheTtlMs,
+    IMAGE_SEARCH_CACHE_MAX_SIZE
+  )
   const websiteCache = new TTLCache<FetchedPage>(
     path.join(cacheRoot, WEBSITE_CACHE_SUBDIR),
     timing.websiteCacheTtlMs,
@@ -103,7 +126,7 @@ export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[
 
   return [
     createWebSearchTool(ctl, impit, searchCache, websiteCache, rateLimiter, hostLimiter, scraper, retry),
-    createImageSearchTool(ctl, impit, rateLimiter, retry),
+    createImageSearchTool(ctl, impit, imageSearchCache, rateLimiter, retry),
     createVisitWebsiteTool(ctl, impit, websiteCache, rateLimiter, retry),
     createFetchImagesTool(ctl, impit, websiteCache, rateLimiter, imageLimiter, retry),
   ]

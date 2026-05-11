@@ -6,6 +6,7 @@ import { tool, type Tool, type ToolsProviderController } from "@lmstudio/sdk"
 import { z } from "zod"
 
 import { searchImages } from "../bing"
+import { searchCacheKey, type ImageSearchResultsPayload, type TTLCache } from "../cache"
 import { resolveConfig } from "../config/resolve-config"
 import { formatToolError, NoImageResultsError } from "../errors"
 import { createRetryNotifier } from "../http"
@@ -43,6 +44,7 @@ const DEFAULT_PAGE_NUMBER = 1
  *
  * @param ctl Tools provider controller supplied by the LM Studio SDK.
  * @param impit Shared HTTP client used for outbound requests.
+ * @param imageSearchCache Cache holding prior image search results, keyed by query/safe-search/page.
  * @param rateLimiter Shared limiter enforcing the minimum gap between requests.
  * @param retry Retry policy applied to every outbound request.
  * @returns The configured image search tool.
@@ -50,6 +52,7 @@ const DEFAULT_PAGE_NUMBER = 1
 export function createImageSearchTool(
   ctl: ToolsProviderController,
   impit: Impit,
+  imageSearchCache: TTLCache<ImageSearchResultsPayload>,
   rateLimiter: RateLimiter,
   retry: RetryOptions
 ): Tool {
@@ -70,7 +73,8 @@ export function createImageSearchTool(
     },
 
     /**
-     * Executes an image search and returns the matching image records.
+     * Executes an image search, honouring cached results when available before falling back
+     * to a fresh Bing fetch.
      *
      * @param arguments_ Validated tool parameters.
      * @param arguments_.query Search query string.
@@ -81,10 +85,19 @@ export function createImageSearchTool(
     implementation: async (arguments_, context) => {
       const { query, page } = arguments_
       context.status("Initiating image search...")
-      await rateLimiter.wait()
 
       try {
         const { imageMaxResults, safeSearch } = resolveConfig(ctl)
+        const cacheKey = searchCacheKey("image", query, safeSearch, page, false)
+        const cached = await imageSearchCache.get(cacheKey)
+
+        if (cached !== undefined) {
+          context.status(`Found ${cached.count} images (cached).`)
+
+          return cached.results
+        }
+
+        await rateLimiter.wait()
         const results = await searchImages(impit, { query, safeSearch, page }, imageMaxResults, {
           signal: context.signal,
           retry,
@@ -95,6 +108,7 @@ export function createImageSearchTool(
           throw new NoImageResultsError(query)
         }
 
+        await imageSearchCache.set(cacheKey, { results, count: results.length })
         context.status(`Found ${results.length} images.`)
 
         return results
