@@ -9,8 +9,8 @@ export abstract class NoResultsError extends Error {
   /**
    * Create a no-results error with a pre-rendered message and the originating query.
    *
-   * @param message Human-readable, already-rendered error description.
-   * @param query The search query that produced no results.
+   * @param message - Human-readable, already-rendered error description.
+   * @param query - The search query that produced no results.
    */
   protected constructor(
     message: string,
@@ -28,7 +28,7 @@ export class NoWebResultsError extends NoResultsError {
   /**
    * Create a no-web-results error for the given query.
    *
-   * @param query The search query that produced no results.
+   * @param query - The search query that produced no results.
    */
   public constructor(query: string) {
     super(`No web pages found for your search: "${query}".`, query)
@@ -43,7 +43,7 @@ export class NoImageResultsError extends NoResultsError {
   /**
    * Create a no-image-results error for the given query.
    *
-   * @param query The search query that produced no results.
+   * @param query - The search query that produced no results.
    */
   public constructor(query: string) {
     super(`No images found for your search: "${query}".`, query)

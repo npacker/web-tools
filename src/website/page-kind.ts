@@ -30,17 +30,12 @@ export interface PageClassification {
 
 /**
  * Default MIME type applied when the response omits a `Content-Type` header entirely.
- *
- * @const {string}
- * @default
  */
 const DEFAULT_MIME = "text/html"
 
 /**
  * Generic MIME labels treated as uninformative — servers use these for file downloads or
  * when the type is genuinely unknown, so magic-number sniffing is more reliable.
- *
- * @const {ReadonlySet<string>}
  */
 const GENERIC_MIME_TYPES: ReadonlySet<string> = new Set(["application/octet-stream", "binary/octet-stream"])
 
@@ -48,9 +43,6 @@ const GENERIC_MIME_TYPES: ReadonlySet<string> = new Set(["application/octet-stre
  * Number of bytes passed to `file-type` for magic-number sniffing. 4 KiB is comfortably more
  * than every format's longest signature while remaining small enough that sniffing does not
  * meaningfully compete with the byte budget used for downstream extraction.
- *
- * @const {number}
- * @default
  */
 const SNIFF_BYTES = 4096
 
@@ -60,11 +52,11 @@ const SNIFF_BYTES = 4096
  * sniffing, because `file-type` only recognises binary formats and text-based payloads
  * (HTML, plain text, JSON) produce no signature to sniff.
  *
- * @param bytes Raw response body buffered in memory.
- * @param contentTypeHeader Raw `content-type` header value, or `null` when absent.
- * @param url Target URL carried on the resulting error for diagnostics.
+ * @param bytes - Raw response body buffered in memory.
+ * @param contentTypeHeader - Raw `content-type` header value, or `null` when absent.
+ * @param url - Target URL carried on the resulting error for diagnostics.
  * @returns The classified kind and the MIME type the classification is based on.
- * @throws {UnsupportedContentTypeError} When the effective MIME type maps to no supported kind.
+ * @throws Whenthe effective MIME type maps to no supported kind.
  */
 export async function classifyPage(
   bytes: Buffer,
@@ -93,10 +85,10 @@ export async function classifyPage(
 /**
  * Map a MIME type to a supported page kind, throwing when the type is outside the whitelist.
  *
- * @param mimeType Normalised MIME type to resolve.
- * @param url Target URL carried on the resulting error for diagnostics.
+ * @param mimeType - Normalised MIME type to resolve.
+ * @param url - Target URL carried on the resulting error for diagnostics.
  * @returns The kind-and-MIME pair.
- * @throws {UnsupportedContentTypeError} When the MIME type maps to no supported kind.
+ * @throws Whenthe MIME type maps to no supported kind.
  */
 function resolveKind(mimeType: string, url: string): PageClassification {
   const kind = mimeToKind(mimeType)
@@ -111,7 +103,7 @@ function resolveKind(mimeType: string, url: string): PageClassification {
 /**
  * Map a MIME type to a supported page kind, covering the common spellings for each shape.
  *
- * @param mimeType Lower-cased MIME type.
+ * @param mimeType - Lower-cased MIME type.
  * @returns The matching kind, or `undefined` when the type is not supported.
  */
 function mimeToKind(mimeType: string): PageKind | undefined {

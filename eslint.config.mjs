@@ -1,3 +1,4 @@
+/* eslint-disable n/no-unpublished-import */
 import eslint from "@eslint/js";
 import stylistic from "@stylistic/eslint-plugin";
 import tseslint from "@typescript-eslint/eslint-plugin";
@@ -8,6 +9,7 @@ import sonarjs from "eslint-plugin-sonarjs";
 import importX from "eslint-plugin-import-x";
 import jsdoc from "eslint-plugin-jsdoc";
 import nodePlugin from "eslint-plugin-n";
+import tsdoc from "eslint-plugin-tsdoc";
 import regexpPlugin from "eslint-plugin-regexp";
 import securityPlugin from "eslint-plugin-security";
 import unicorn from "eslint-plugin-unicorn";
@@ -41,6 +43,7 @@ export default [
       "@stylistic": stylistic,
       prettier: prettierPlugin,
       "unused-imports": unusedImports,
+      tsdoc,
     },
     settings: {
       "import-x/resolver": {
@@ -51,7 +54,11 @@ export default [
       },
       jsdoc: {
         tagNamePreference: {
-          constant: "const",
+          const: false,
+          constant: false,
+          default: false,
+          augments: false,
+          extends: "extends",
         },
       },
     },
@@ -219,23 +226,29 @@ export default [
         {
           contexts: [
             {
-              context: "VariableDeclaration[kind='const']",
-              comment: 'JsdocBlock:not(:has(JsdocTag[tag="const"][rawType!=""]))',
-              message: "Constants must include a @const tag with a type, e.g. /** @const {number} */.",
+              comment: 'JsdocBlock:has(JsdocTag[tag="const"])',
+              message:
+                "Do not use @const. TSDoc has no @const tag; the TypeScript const declaration and its type annotation already convey what @const would. Use the description to explain meaning instead.",
             },
             {
-              context: "VariableDeclaration[kind='const']:has(VariableDeclarator[init.type='Literal'])",
-              comment: 'JsdocBlock:not(:has(JsdocTag[tag="default"]))',
-              message: "Constants with a literal value must include a @default tag.",
+              comment: 'JsdocBlock:has(JsdocTag[tag="default"])',
+              message:
+                "Do not use @default. The literal initializer (`const X = 5`) already shows the default value, so the tag adds nothing. If you genuinely need to document a default on a type property where the literal cannot live with the declaration, use the TSDoc @defaultValue tag instead.",
             },
           ],
         },
       ],
+      "jsdoc/informative-docs": "warn",
+      "tsdoc/syntax": "error",
       "jsdoc/require-description": ["error", { checkConstructors: false }],
       "jsdoc/require-description-complete-sentence": "error",
-      "jsdoc/require-hyphen-before-param-description": ["error", "never"],
+      "jsdoc/require-hyphen-before-param-description": ["error", "always"],
       "jsdoc/require-throws": "error",
       "jsdoc/require-asterisk-prefix": "error",
+      "jsdoc/require-yields-type": "off",
+      "jsdoc/require-throws-type": "off",
+      "jsdoc/check-param-names": ["error", { checkDestructured: false }],
+      "jsdoc/require-param": ["error", { checkDestructured: false }],
       "jsdoc/check-alignment": "error",
       "jsdoc/check-indentation": "error",
       "jsdoc/check-line-alignment": "error",
@@ -244,6 +257,25 @@ export default [
       "jsdoc/no-blank-block-descriptions": "error",
       "jsdoc/no-multi-asterisks": "error",
       "jsdoc/tag-lines": ["error", "any", { startLines: 1 }],
+      "jsdoc/sort-tags": [
+        "error",
+        {
+          tagSequence: [
+            { tags: ["remarks"] },
+            { tags: ["typeParam"] },
+            { tags: ["param"] },
+            { tags: ["returns"] },
+            { tags: ["throws"] },
+            { tags: ["yields"] },
+            { tags: ["example"] },
+            { tags: ["defaultValue"] },
+            { tags: ["see"] },
+            { tags: ["deprecated"] },
+          ],
+          linesBetween: 0,
+          reportTagGroupSpacing: false,
+        },
+      ],
 
       "@stylistic/padding-line-between-statements": [
         "error",
@@ -270,7 +302,7 @@ export default [
           allowClassStart: true,
           allowObjectStart: true,
           allowArrayStart: true,
-          ignorePattern: "^[^\\n]*$",
+          ignorePattern: String.raw`^[^\n]*$`,
         },
       ],
     },

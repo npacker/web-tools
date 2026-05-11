@@ -40,7 +40,7 @@ export class PerHostRateLimiter {
   /**
    * Create a per-host limiter configured with the given interval and concurrency cap.
    *
-   * @param options Limiter configuration. `maxConcurrentPerHost` defaults to `1` so calls to a single host serialise; configure higher when downstream tolerates parallel access.
+   * @param options - Limiter configuration. `maxConcurrentPerHost` defaults to `1` so calls to a single host serialise; configure higher when downstream tolerates parallel access.
    */
   public constructor(options: PerHostRateLimiterOptions) {
     this.group = new Bottleneck.Group({
@@ -54,7 +54,7 @@ export class PerHostRateLimiter {
    * caller is cleared to issue an outbound request to that host. Calls to different hosts
    * resolve independently and may proceed concurrently.
    *
-   * @param url URL whose host scopes the wait.
+   * @param url - URL whose host scopes the wait.
    * @returns A promise that resolves once the caller is cleared to proceed.
    */
   public async wait(url: string): Promise<void> {
@@ -65,8 +65,8 @@ export class PerHostRateLimiter {
    * Schedule an async task on the limiter for the host extracted from `url`. The returned
    * promise settles with the task's result, unchanged.
    *
-   * @param url URL whose host scopes the schedule.
-   * @param task Async task to execute once the per-host limiter admits it.
+   * @param url - URL whose host scopes the schedule.
+   * @param task - Async task to execute once the per-host limiter admits it.
    * @returns The task's resolved value.
    */
   public async schedule<T>(url: string, task: () => Promise<T>): Promise<T> {
@@ -79,7 +79,7 @@ export class PerHostRateLimiter {
  * URL is unparseable. The fallback is namespaced so a malformed URL cannot collide with a
  * legitimate host name.
  *
- * @param url URL string to derive the key from.
+ * @param url - URL string to derive the key from.
  * @returns A stable key suitable for `Bottleneck.Group.key`.
  */
 function hostKey(url: string): string {

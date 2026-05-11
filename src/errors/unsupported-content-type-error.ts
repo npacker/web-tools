@@ -10,8 +10,8 @@ export class UnsupportedContentTypeError extends Error {
   /**
    * Create an unsupported-content-type error carrying the offending MIME type and URL.
    *
-   * @param mimeType The MIME type that was detected on the response.
-   * @param url Optional URL that produced the unsupported response.
+   * @param mimeType - The MIME type that was detected on the response.
+   * @param url - Optional URL that produced the unsupported response.
    */
   public constructor(
     public readonly mimeType: string,

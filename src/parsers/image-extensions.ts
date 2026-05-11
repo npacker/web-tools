@@ -11,24 +11,19 @@ import { extension as mimeExtension } from "mime-types"
 
 /**
  * Image file extensions recognized as supported download targets.
- *
- * @const {readonly string[]}
  */
 const SUPPORTED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "svg"] as const
 
 /**
  * Fallback extension used when neither content-type nor URL yields a recognised image format.
- *
- * @const {string}
- * @default
  */
 const FALLBACK_EXTENSION = "jpg"
 
 /**
  * Determine the image file extension from a content-type header, falling back to the URL pathname.
  *
- * @param contentType HTTP `content-type` header value, or `null` when absent.
- * @param url Source URL used as a fallback when the content type is missing.
+ * @param contentType - HTTP `content-type` header value, or `null` when absent.
+ * @param url - Source URL used as a fallback when the content type is missing.
  * @returns Normalized image extension, defaulting to `"jpg"` when neither source is conclusive.
  */
 export function imageExtensionFromHeaders(contentType: string | null, url: string): string {
@@ -38,7 +33,7 @@ export function imageExtensionFromHeaders(contentType: string | null, url: strin
 /**
  * Report whether a URL's path ends in a supported image extension.
  *
- * @param url URL to test.
+ * @param url - URL to test.
  * @returns `true` when the URL's path ends with a recognised image extension.
  */
 export function hasSupportedImageExtension(url: string): boolean {
@@ -48,7 +43,7 @@ export function hasSupportedImageExtension(url: string): boolean {
 /**
  * Normalise an image extension to its canonical short form.
  *
- * @param extension Raw extension string.
+ * @param extension - Raw extension string.
  * @returns The canonical extension form (`jpeg` to `jpg`, `svg+xml` to `svg`).
  */
 export function normalizeImageExtension(extension: string): string {
@@ -68,7 +63,7 @@ export function normalizeImageExtension(extension: string): string {
 /**
  * Type-guard reporting whether an extension is one of the supported image formats.
  *
- * @param extension Extension string to test.
+ * @param extension - Extension string to test.
  * @returns `true` when the extension is listed in `SUPPORTED_IMAGE_EXTENSIONS`.
  */
 export function isSupportedImageExtension(extension: string): extension is (typeof SUPPORTED_IMAGE_EXTENSIONS)[number] {
@@ -78,7 +73,7 @@ export function isSupportedImageExtension(extension: string): extension is (type
 /**
  * Extract a supported image extension from a content-type header.
  *
- * @param contentType HTTP `content-type` header value, or `null` when absent.
+ * @param contentType - HTTP `content-type` header value, or `null` when absent.
  * @returns The canonical extension when the header names a supported image type, otherwise `undefined`.
  */
 function extensionFromContentType(contentType: string | null): string | undefined {
@@ -100,7 +95,7 @@ function extensionFromContentType(contentType: string | null): string | undefine
 /**
  * Extract a supported image extension from a URL's pathname.
  *
- * @param url URL to inspect.
+ * @param url - URL to inspect.
  * @returns The canonical extension when the path ends with a supported image extension, otherwise `undefined`.
  */
 function extensionFromUrl(url: string): string | undefined {

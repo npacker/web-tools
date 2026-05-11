@@ -8,9 +8,6 @@ import { errorMessage } from "../errors"
 
 /**
  * Prefix `impit` prepends to the underlying `reqwest::Error` debug repr.
- *
- * @const {string}
- * @default
  */
 const IMPIT_PREFIX = "The internal HTTP library has thrown an error: "
 
@@ -42,8 +39,6 @@ export type TranslatedImpitError = Pick<SummaryRule, "summary" | "retryable">
  * Pattern → summary mappings checked in order. The first match wins, so list more specific
  * patterns before broader fallbacks. Rules whose match indicates a malformed server response
  * are flagged `retryable: false` so the retry predicate skips them.
- *
- * @const {readonly SummaryRule[]}
  */
 const SUMMARY_RULES: readonly SummaryRule[] = [
   {
@@ -74,7 +69,7 @@ const SUMMARY_RULES: readonly SummaryRule[] = [
  * Translate the Rust debug repr that `impit` surfaces from a transport failure into a
  * concise human-readable summary plus an optional retry-eligibility hint.
  *
- * @param error Thrown value caught from a call into the `impit` client.
+ * @param error - Thrown value caught from a call into the `impit` client.
  * @returns Translation result, or `undefined` when no rule matched.
  */
 export function translateImpitError(error: unknown): TranslatedImpitError | undefined {

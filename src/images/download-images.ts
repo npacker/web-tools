@@ -63,10 +63,10 @@ type DownloadedImage =
  * URLs that already reside inside the working directory, or that are not remote HTTP(S) URLs,
  * are passed through without being refetched.
  *
- * @param urls URLs to download.
- * @param impit Shared HTTP client used for the downloads.
- * @param options Options controlling file placement and naming.
- * @param context Logging and cancellation hooks provided by the caller.
+ * @param urls - URLs to download.
+ * @param impit - Shared HTTP client used for the downloads.
+ * @param options - Options controlling file placement and naming.
+ * @param context - Logging and cancellation hooks provided by the caller.
  * @returns A parallel array of per-URL outcomes.
  */
 export async function downloadImages(
@@ -86,11 +86,11 @@ export async function downloadImages(
  * Resolve a single slot of the batch, either passing through a local URL or delegating to
  * `downloadImage` for remote fetches.
  *
- * @param url URL for this slot.
- * @param position Zero-based index of this slot within the batch.
- * @param impit Shared HTTP client used for the download.
- * @param options Options controlling file placement and naming.
- * @param context Logging and cancellation hooks provided by the caller.
+ * @param url - URL for this slot.
+ * @param position - Zero-based index of this slot within the batch.
+ * @param impit - Shared HTTP client used for the download.
+ * @param options - Options controlling file placement and naming.
+ * @param context - Logging and cancellation hooks provided by the caller.
  * @returns The outcome for this slot.
  */
 async function downloadOne(
@@ -131,8 +131,8 @@ async function downloadOne(
  * and uses a directory-boundary prefix test, so sibling directories sharing a name prefix
  * (for example `/tmp/foo-evil` against a working directory of `/tmp/foo`) do not match.
  *
- * @param url URL to inspect.
- * @param workingDirectory Directory treated as local to the plugin session.
+ * @param url - URL to inspect.
+ * @param workingDirectory - Directory treated as local to the plugin session.
  * @returns `true` when the URL should bypass the HTTP download path.
  */
 function isLocalOrNonHttpUrl(url: string, workingDirectory: string): boolean {

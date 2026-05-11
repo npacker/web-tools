@@ -22,9 +22,9 @@ export interface PageImage {
 /**
  * Extract up to `maxImages` images from the document in document order, deduped by src.
  *
- * @param dom Parsed website DOM.
- * @param baseUrl Absolute URL used to resolve relative image sources.
- * @param maxImages Upper bound on the number of images to return.
+ * @param dom - Parsed website DOM.
+ * @param baseUrl - Absolute URL used to resolve relative image sources.
+ * @param maxImages - Upper bound on the number of images to return.
  * @returns Image descriptors in original document order, deduped by src.
  */
 export function extractPageImages(dom: JSDOM, baseUrl: string, maxImages: number): PageImage[] {
@@ -71,8 +71,8 @@ export function extractPageImages(dom: JSDOM, baseUrl: string, maxImages: number
 /**
  * Resolve a possibly-relative URL against a base URL, returning `undefined` when either is invalid.
  *
- * @param rawUrl URL to resolve; may be absolute or relative.
- * @param baseUrl Absolute URL used as the resolution base.
+ * @param rawUrl - URL to resolve; may be absolute or relative.
+ * @param baseUrl - Absolute URL used as the resolution base.
  * @returns The absolute href, or `undefined` when resolution fails.
  */
 function resolveUrl(rawUrl: string, baseUrl: string): string | undefined {

@@ -16,7 +16,7 @@ import type { Browser } from "impit"
 /**
  * Create a new `impit` client configured with the given browser fingerprint and manual redirect handling.
  *
- * @param browser Browser fingerprint impit should impersonate.
+ * @param browser - Browser fingerprint impit should impersonate.
  * @returns A fresh `Impit` instance.
  */
 export function createImpit(browser: Browser): Impit {

@@ -6,7 +6,7 @@
  * Extract the filename segment of a URL, percent-decoded. Returns an empty string when the URL
  * is malformed or the path has no trailing segment (e.g. `https://example.com/`).
  *
- * @param url Absolute URL whose path's last segment is the source filename.
+ * @param url - Absolute URL whose path's last segment is the source filename.
  * @returns The decoded filename, or an empty string when none can be derived.
  */
 export function filenameFromUrl(url: string): string {

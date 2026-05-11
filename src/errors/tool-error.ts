@@ -35,8 +35,6 @@ interface ToolErrorTemplates {
 
 /**
  * Static mapping from tool kind to its user-facing message templates.
- *
- * @const {Record<ToolErrorKind, ToolErrorTemplates>}
  */
 const TOOL_ERROR_TEMPLATES: Record<ToolErrorKind, ToolErrorTemplates> = {
   "web-search": {
@@ -64,9 +62,9 @@ const TOOL_ERROR_TEMPLATES: Record<ToolErrorKind, ToolErrorTemplates> = {
 /**
  * Map a tool error to a user-facing string, warning on unexpected failures.
  *
- * @param error Error caught during tool execution.
- * @param context Minimal context surface used to emit warnings.
- * @param kind Tool flow the error originated from, controlling message phrasing.
+ * @param error - Error caught during tool execution.
+ * @param context - Minimal context surface used to emit warnings.
+ * @param kind - Tool flow the error originated from, controlling message phrasing.
  * @returns A user-facing error string.
  */
 export function formatToolError(error: unknown, context: ToolErrorContext, kind: ToolErrorKind): string {
@@ -104,8 +102,8 @@ export function formatToolError(error: unknown, context: ToolErrorContext, kind:
  * by a defensive fallback that preserves diagnostic fidelity if that invariant is ever
  * broken.
  *
- * @param error The unsupported-content-type error to render.
- * @param kind Tool flow the error originated from, controlling message phrasing.
+ * @param error - The unsupported-content-type error to render.
+ * @param kind - Tool flow the error originated from, controlling message phrasing.
  * @returns The formatted user-facing error string.
  */
 function formatUnsupportedContentType(error: UnsupportedContentTypeError, kind: ToolErrorKind): string {
@@ -123,8 +121,8 @@ function formatUnsupportedContentType(error: UnsupportedContentTypeError, kind: 
 /**
  * Render a `FetchError` into a single user-facing line built from its structured fields.
  *
- * @param error The fetch error to render.
- * @param prefix Tool-kind prefix applied to the line.
+ * @param error - The fetch error to render.
+ * @param prefix - Tool-kind prefix applied to the line.
  * @returns The formatted line, including status, URL, and any cause.
  */
 function formatFetchError(error: FetchError, prefix: string): string {
@@ -140,8 +138,8 @@ function formatFetchError(error: FetchError, prefix: string): string {
 /**
  * Append a `(cause: …)` suffix when a distinct underlying cause message is available.
  *
- * @param line Base message line.
- * @param cause Underlying error attached to the outer error, if any.
+ * @param line - Base message line.
+ * @param cause - Underlying error attached to the outer error, if any.
  * @returns The line with a cause suffix appended when the cause adds new information.
  */
 function appendCause(line: string, cause: unknown): string {

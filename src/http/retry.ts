@@ -13,23 +13,18 @@ export type RetryOptions = Pick<PRetryOptions, "retries" | "factor" | "minTimeou
 
 /**
  * HTTP status codes that should trigger a retry when returned by the server.
- *
- * @const {Set<number>}
  */
 const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504])
 
 /**
  * Conversion factor from milliseconds to seconds, used when rendering retry delays.
- *
- * @const {number}
- * @default
  */
 const MS_PER_SECOND = 1000
 
 /**
  * Determine whether a thrown value represents a transient fetch failure that warrants another attempt.
  *
- * @param error Thrown value caught from a request attempt.
+ * @param error - Thrown value caught from a request attempt.
  * @returns `true` when the error is a `FetchError` with either a network-level cause or a retryable HTTP status.
  */
 export function isRetryableFetchError(error: unknown): boolean {
@@ -56,8 +51,8 @@ export function isRetryableFetchError(error: unknown): boolean {
  * Call sites passing `retries: 0` (such as web-search enrichment) would otherwise see a
  * misleading status line announcing a retry that never happens.
  *
- * @param status Status-line callback supplied by the SDK tool context.
- * @param label Phase name interpolated into the status message, e.g. `"website fetch"`.
+ * @param status - Status-line callback supplied by the SDK tool context.
+ * @param label - Phase name interpolated into the status message, e.g. `"website fetch"`.
  * @returns A `p-retry` `onFailedAttempt` callback bound to the given status line and phase label.
  */
 export function createRetryNotifier(
@@ -67,10 +62,7 @@ export function createRetryNotifier(
   /**
    * Render the retry message for the next attempt.
    *
-   * @param context Retry context supplied by `p-retry`.
-   * @param context.attemptNumber 1-based index of the attempt that just failed.
-   * @param context.retriesLeft Number of attempts remaining after this failure; 0 marks the terminal failure.
-   * @param context.retryDelay Upcoming backoff delay in milliseconds.
+   * @param context - Retry context supplied by `p-retry`.
    */
   return ({ attemptNumber, retriesLeft, retryDelay }: RetryContext): void => {
     if (retriesLeft <= 0) {

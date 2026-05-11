@@ -9,8 +9,6 @@ import { normalizeBlankLines } from "./normalize-blank-lines"
 /**
  * Shared, lazily-initialized Turndown service. Building it once avoids the
  * per-call cost of re-registering rules on every website visit.
- *
- * @const {TurndownService}
  */
 const service = createService()
 
@@ -18,7 +16,7 @@ const service = createService()
  * Convert an HTML fragment to Markdown, preserving headings, lists, code blocks,
  * emphasis, inline links, and inline images.
  *
- * @param html HTML fragment to convert.
+ * @param html - HTML fragment to convert.
  * @returns The markdown representation, with runs of blank lines collapsed and trailing whitespace trimmed.
  */
 export function htmlToMarkdown(html: string): string {

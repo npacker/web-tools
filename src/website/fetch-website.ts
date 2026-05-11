@@ -27,13 +27,13 @@ interface FetchWebsiteOptions extends RequestOptions {
  * is buffered as bytes, classified by declared or sniffed MIME type, and decoded into the
  * kind-specific variant of `FetchedPage`.
  *
- * @param impit Shared HTTP client used for the request.
- * @param cache Cache holding recent fetched pages keyed by URL.
- * @param url Target URL to fetch.
- * @param options Options controlling the outbound request.
+ * @param impit - Shared HTTP client used for the request.
+ * @param cache - Cache holding recent fetched pages keyed by URL.
+ * @param url - Target URL to fetch.
+ * @param options - Options controlling the outbound request.
  * @returns The structured, classified page payload.
- * @throws {FetchError} When the response carries a non-2xx status or exceeds the size cap.
- * @throws {UnsupportedContentTypeError} When the response's content type is outside the whitelist.
+ * @throws Whenthe response carries a non-2xx status or exceeds the size cap.
+ * @throws Whenthe response's content type is outside the whitelist.
  */
 export async function fetchWebsite(
   impit: Impit,
@@ -63,10 +63,10 @@ export async function fetchWebsite(
  * pdfjs to pull both text and metadata title, and text/JSON fall through a shared
  * charset-aware decode path.
  *
- * @param kind Resolved page kind.
- * @param mimeType Effective MIME type that informed the kind.
- * @param bytes Raw response body.
- * @param contentTypeHeader Raw `content-type` header value, or `null` when absent.
+ * @param kind - Resolved page kind.
+ * @param mimeType - Effective MIME type that informed the kind.
+ * @param bytes - Raw response body.
+ * @param contentTypeHeader - Raw `content-type` header value, or `null` when absent.
  * @returns The kind-specific fetched-page record.
  */
 async function materializeFetchedPage(

@@ -11,7 +11,7 @@ import { parse as parseContentTypeRaw, type ParsedMediaType } from "content-type
  * lets the MIME classifier and the charset decoder share one syntax parse instead of
  * each running `parseContentTypeRaw` independently.
  *
- * @param header Raw header value, or `null` when absent.
+ * @param header - Raw header value, or `null` when absent.
  * @returns The parsed media type, or `undefined` when the header cannot be parsed.
  */
 export function parseContentTypeSafe(header: string | null): ParsedMediaType | undefined {

@@ -12,8 +12,8 @@ import type { WebSearchResult } from "../cache"
  * stores the snippet so toggling the setting takes effect on the next read without
  * re-running the search.
  *
- * @param results Result records being prepared for the tool response.
- * @param includeSnippets Resolved plugin setting controlling snippet inclusion.
+ * @param results - Result records being prepared for the tool response.
+ * @param includeSnippets - Resolved plugin setting controlling snippet inclusion.
  * @returns Records with `snippet` removed when `includeSnippets` is `false`, otherwise unchanged.
  */
 export function shapeWebSearchResults(results: WebSearchResult[], includeSnippets: boolean): WebSearchResult[] {

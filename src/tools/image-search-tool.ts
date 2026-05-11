@@ -17,36 +17,28 @@ import type { Impit } from "impit"
 
 /**
  * Lower bound on the requested page number.
- *
- * @const {number}
- * @default
  */
 const MIN_PAGE_NUMBER = 1
 
 /**
  * Upper bound on the requested page number.
- *
- * @const {number}
- * @default
  */
 const MAX_PAGE_NUMBER = 100
 
 /**
  * Default page number when no value is provided.
- *
- * @const {number}
- * @default
  */
 const DEFAULT_PAGE_NUMBER = 1
 
 /**
- * Create the Image Search tool.
+ * Build the Image Search tool: queries Bing's image-search HTML page and returns discovery-only
+ * image records (no files written to disk; download lives in the Fetch Images tool).
  *
- * @param ctl Tools provider controller supplied by the LM Studio SDK.
- * @param impit Shared HTTP client used for outbound requests.
- * @param imageSearchCache Cache holding prior image search results, keyed by query/safe-search/page.
- * @param rateLimiter Shared limiter enforcing the minimum gap between requests.
- * @param retry Retry policy applied to every outbound request.
+ * @param ctl - Tools provider controller supplied by the LM Studio SDK.
+ * @param impit - Shared HTTP client used for outbound requests.
+ * @param imageSearchCache - Cache holding prior image search results, keyed by query/safe-search/page.
+ * @param rateLimiter - Shared limiter enforcing the minimum gap between requests.
+ * @param retry - Retry policy applied to every outbound request.
  * @returns The configured image search tool.
  */
 export function createImageSearchTool(
@@ -76,10 +68,8 @@ export function createImageSearchTool(
      * Executes an image search, honouring cached results when available before falling back
      * to a fresh Bing fetch.
      *
-     * @param arguments_ Validated tool parameters.
-     * @param arguments_.query Search query string.
-     * @param arguments_.page Page number being requested.
-     * @param context Runtime tool context supplied by the SDK.
+     * @param arguments_ - Validated tool parameters.
+     * @param context - Runtime tool context supplied by the SDK.
      * @returns Per-image records pairing each remote image URL with the source's title and page metadata, or a user-facing error string.
      */
     implementation: async (arguments_, context) => {

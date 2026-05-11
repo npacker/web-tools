@@ -33,7 +33,7 @@ export class RateLimiter {
   /**
    * Create a limiter configured with the given minimum interval and concurrency cap.
    *
-   * @param options Limiter configuration. `minIntervalMs` defaults to `0` and `maxConcurrent` defaults to `1`.
+   * @param options - Limiter configuration. `minIntervalMs` defaults to `0` and `maxConcurrent` defaults to `1`.
    */
   public constructor(options: RateLimiterOptions) {
     this.limiter = new Bottleneck({
@@ -56,7 +56,7 @@ export class RateLimiter {
    * Schedule an async task through the limiter, honouring both the minimum-interval and concurrency caps.
    * The returned promise settles with the task's result (or rejection), unchanged.
    *
-   * @param task Async task to execute once the limiter admits it.
+   * @param task - Async task to execute once the limiter admits it.
    * @returns The task's resolved value.
    */
   public async schedule<T>(task: () => Promise<T>): Promise<T> {

@@ -12,17 +12,11 @@ import type { ImpitResponse } from "impit"
 
 /**
  * Number of bytes in one megabyte, used when rendering the overflow message.
- *
- * @const {number}
- * @default
  */
 const BYTES_PER_MB = 1024 * 1024
 
 /**
  * Number of decimal places used when rendering the byte limit as megabytes.
- *
- * @const {number}
- * @default
  */
 const MB_MESSAGE_FRACTION_DIGITS = 1
 
@@ -41,11 +35,11 @@ interface RawBodyError {
 /**
  * Read a response body into a `Buffer`, rejecting payloads larger than `maxBytes`.
  *
- * @param response Response produced by the shared `impit` client.
- * @param maxBytes Hard upper bound on the accumulated payload, in bytes.
- * @param url Target URL used when composing the `FetchError` for diagnostics.
+ * @param response - Response produced by the shared `impit` client.
+ * @param maxBytes - Hard upper bound on the accumulated payload, in bytes.
+ * @param url - Target URL used when composing the `FetchError` for diagnostics.
  * @returns The fully received payload as a `Buffer`.
- * @throws {FetchError} When the body length exceeds `maxBytes`.
+ * @throws Whenthe body length exceeds `maxBytes`.
  */
 export async function readLimitedBytes(response: ImpitResponse, maxBytes: number, url: string): Promise<Buffer> {
   try {
@@ -59,7 +53,7 @@ export async function readLimitedBytes(response: ImpitResponse, maxBytes: number
  * Adapt the response's Web-Streams body into a Node `Readable` so `raw-body` can
  * consume it.
  *
- * @param response Response whose body stream is being drained.
+ * @param response - Response whose body stream is being drained.
  * @returns A Node `Readable` that proxies the response body.
  */
 function toNodeReadable(response: ImpitResponse): Readable {
@@ -70,9 +64,9 @@ function toNodeReadable(response: ImpitResponse): Readable {
  * Map a thrown value from `raw-body` into a `FetchError`, translating limit violations
  * to the user-facing overflow message and leaving other `Error` instances untouched.
  *
- * @param error Thrown value caught from `getRawBody`.
- * @param maxBytes Hard upper bound on the accumulated payload, in bytes.
- * @param url Target URL carried on the resulting error for diagnostics.
+ * @param error - Thrown value caught from `getRawBody`.
+ * @param maxBytes - Hard upper bound on the accumulated payload, in bytes.
+ * @param url - Target URL carried on the resulting error for diagnostics.
  * @returns An `Error` suitable for rethrowing to the caller.
  */
 function mapError(error: unknown, maxBytes: number, url: string): Error {
@@ -92,7 +86,7 @@ function mapError(error: unknown, maxBytes: number, url: string): Error {
 /**
  * Type-guard reporting whether a thrown value is `raw-body`'s limit-violation error.
  *
- * @param error Thrown value caught from `getRawBody`.
+ * @param error - Thrown value caught from `getRawBody`.
  * @returns `true` when the value carries the `"entity.too.large"` tag.
  */
 function isRawBodyLimitError(error: unknown): error is RawBodyError {

@@ -19,39 +19,31 @@ import type { Impit } from "impit"
 
 /**
  * Lower bound on the requested page number.
- *
- * @const {number}
- * @default
  */
 const MIN_PAGE_NUMBER = 1
 
 /**
  * Upper bound on the requested page number.
- *
- * @const {number}
- * @default
  */
 const MAX_PAGE_NUMBER = 100
 
 /**
  * Default page number when no value is provided.
- *
- * @const {number}
- * @default
  */
 const DEFAULT_PAGE_NUMBER = 1
 
 /**
- * Create the Web Search tool.
+ * Build the Web Search tool: queries DuckDuckGo, optionally enriches each result through the
+ * shared metascraper instance, caches results, and returns structured records.
  *
- * @param ctl Tools provider controller supplied by the LM Studio SDK.
- * @param impit Shared HTTP client used for outbound requests.
- * @param searchCache Cache holding prior web search results.
- * @param websiteCache Cache holding recent fetched pages keyed by URL; reused for per-result enrichment.
- * @param rateLimiter Shared limiter enforcing the minimum gap between outbound requests at the global level (used for the DuckDuckGo search itself).
- * @param hostLimiter Per-host limiter enforcing the minimum gap between requests to the same host; drives the per-result enrichment fan-out so different domains run in parallel.
- * @param scraper Shared metascraper instance used to extract metadata for each result.
- * @param retry Retry policy applied to every outbound request.
+ * @param ctl - Tools provider controller supplied by the LM Studio SDK.
+ * @param impit - Shared HTTP client used for outbound requests.
+ * @param searchCache - Cache holding prior web search results.
+ * @param websiteCache - Cache holding recent fetched pages keyed by URL; reused for per-result enrichment.
+ * @param rateLimiter - Shared limiter enforcing the minimum gap between outbound requests at the global level (used for the DuckDuckGo search itself).
+ * @param hostLimiter - Per-host limiter enforcing the minimum gap between requests to the same host; drives the per-result enrichment fan-out so different domains run in parallel.
+ * @param scraper - Shared metascraper instance used to extract metadata for each result.
+ * @param retry - Retry policy applied to every outbound request.
  * @returns The configured web search tool.
  */
 export function createWebSearchTool(
@@ -84,10 +76,8 @@ export function createWebSearchTool(
      * Executes a web search, honouring cached results when available and enriching each
      * fresh result with metascraper-extracted metadata before caching the payload.
      *
-     * @param arguments_ Validated tool parameters.
-     * @param arguments_.query Search query string.
-     * @param arguments_.page Page number being requested.
-     * @param context Runtime tool context supplied by the SDK.
+     * @param arguments_ - Validated tool parameters.
+     * @param context - Runtime tool context supplied by the SDK.
      * @returns Either the enriched result records or a user-facing error string.
      */
     implementation: async (arguments_, context) => {

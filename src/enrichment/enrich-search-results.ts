@@ -40,14 +40,14 @@ export interface EnrichSearchResultsOptions {
  * never hammered, while results pointing at distinct hosts run in parallel; cache hits skip
  * the limiter entirely so warm queries re-resolve quickly.
  *
- * @param results Base search results to enrich.
- * @param scraper Shared metascraper instance used to extract metadata from each fetched page.
- * @param impit Shared HTTP client used for outbound requests.
- * @param websiteCache Cache holding recent fetched pages keyed by URL; reused across tools.
- * @param hostLimiter Per-host limiter enforcing the minimum gap between requests to the same host.
- * @param options Cancellation, retry, status, and byte-cap controls for the fan-out.
+ * @param results - Base search results to enrich.
+ * @param scraper - Shared metascraper instance used to extract metadata from each fetched page.
+ * @param impit - Shared HTTP client used for outbound requests.
+ * @param websiteCache - Cache holding recent fetched pages keyed by URL; reused across tools.
+ * @param hostLimiter - Per-host limiter enforcing the minimum gap between requests to the same host.
+ * @param options - Cancellation, retry, status, and byte-cap controls for the fan-out.
  * @returns The input list with metadata merged onto each record.
- * @throws {DOMException} When `options.signal` aborts mid-fan-out — re-thrown so the caller can surface a uniform abort message.
+ * @throws When`options.signal` aborts mid-fan-out — re-thrown so the caller can surface a uniform abort message.
  */
 export async function enrichSearchResults(
   results: WebSearchResult[],
@@ -70,14 +70,14 @@ export async function enrichSearchResults(
  * (which the parser already normalized) so the model is not handed two near-identical fields
  * per result.
  *
- * @param result Base result being enriched.
- * @param scraper Shared metascraper instance used to extract metadata.
- * @param impit Shared HTTP client used for outbound requests.
- * @param websiteCache Cache holding recent fetched pages keyed by URL.
- * @param hostLimiter Per-host limiter enforcing the minimum gap between requests to the same host.
- * @param options Per-call options governing cancellation, retry, and status reporting.
+ * @param result - Base result being enriched.
+ * @param scraper - Shared metascraper instance used to extract metadata.
+ * @param impit - Shared HTTP client used for outbound requests.
+ * @param websiteCache - Cache holding recent fetched pages keyed by URL.
+ * @param hostLimiter - Per-host limiter enforcing the minimum gap between requests to the same host.
+ * @param options - Per-call options governing cancellation, retry, and status reporting.
  * @returns The result with any extracted metadata merged in.
- * @throws {DOMException} When `options.signal` aborts during the underlying page fetch.
+ * @throws When`options.signal` aborts during the underlying page fetch.
  */
 async function enrichOne(
   result: WebSearchResult,

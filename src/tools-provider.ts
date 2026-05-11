@@ -22,9 +22,6 @@ import type { Tool, ToolsProviderController } from "@lmstudio/sdk"
 
 /**
  * Root directory name used for the plugin's on-disk `cacache` store.
- *
- * @const {string}
- * @default
  */
 const CACHE_DIRECTORY_NAME = "lms-plugin-duckduckgo-cache"
 
@@ -32,17 +29,11 @@ const CACHE_DIRECTORY_NAME = "lms-plugin-duckduckgo-cache"
  * Subdirectory under the cache root dedicated to web search results. Bumped from
  * `search` when the cached payload shape gained per-result enrichment metadata; old entries
  * under the legacy directory are orphaned and may be deleted by hand.
- *
- * @const {string}
- * @default
  */
 const SEARCH_CACHE_SUBDIR = "search-enriched"
 
 /**
  * Maximum number of web search result entries retained in the search cache.
- *
- * @const {number}
- * @default
  */
 const SEARCH_CACHE_MAX_SIZE = 100
 
@@ -50,33 +41,21 @@ const SEARCH_CACHE_MAX_SIZE = 100
  * Subdirectory under the cache root dedicated to image search results. Kept separate from the
  * web search subdir so web and image entries do not compete for the same eviction slots and
  * the payload shapes stay typed independently on their respective TTLCache instances.
- *
- * @const {string}
- * @default
  */
 const IMAGE_SEARCH_CACHE_SUBDIR = "image-search"
 
 /**
  * Maximum number of image search result entries retained in the image search cache.
- *
- * @const {number}
- * @default
  */
 const IMAGE_SEARCH_CACHE_MAX_SIZE = 100
 
 /**
  * Subdirectory under the cache root dedicated to fetched website HTML payloads.
- *
- * @const {string}
- * @default
  */
 const WEBSITE_CACHE_SUBDIR = "website"
 
 /**
  * Maximum number of website HTML payloads retained in the website cache.
- *
- * @const {number}
- * @default
  */
 const WEBSITE_CACHE_MAX_SIZE = 50
 
@@ -84,9 +63,6 @@ const WEBSITE_CACHE_MAX_SIZE = 50
  * Maximum number of concurrent image downloads permitted across the plugin. Caps the fan-out
  * driven by a page with many `<img>` tags so a single tool invocation cannot open hundreds
  * of parallel connections against a target.
- *
- * @const {number}
- * @default
  */
 const MAX_IMAGE_CONCURRENCY = 6
 
@@ -96,7 +72,7 @@ const MAX_IMAGE_CONCURRENCY = 6
  * The rate limiter is constructed per-session (rather than module-scoped) so user-configured
  * intervals from plugin settings take effect on plugin reload.
  *
- * @param ctl Tools provider controller supplied by the LM Studio SDK.
+ * @param ctl - Tools provider controller supplied by the LM Studio SDK.
  * @returns The registered Web Search, Image Search, Visit Website, and Fetch Images tools.
  */
 export async function toolsProvider(ctl: ToolsProviderController): Promise<Tool[]> {

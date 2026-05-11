@@ -17,13 +17,14 @@ import type { FetchedPage } from "../website"
 import type { Impit } from "impit"
 
 /**
- * Create the Visit Website tool.
+ * Build the Visit Website tool: fetches a page, classifies the content, and returns the title,
+ * first-level headings, and a readable-content excerpt (no image download or link extraction).
  *
- * @param ctl Tools provider controller supplied by the LM Studio SDK.
- * @param impit Shared HTTP client used for page fetches.
- * @param websiteCache Cache holding recent fetched pages keyed by URL.
- * @param rateLimiter Shared limiter enforcing the minimum gap between outbound requests.
- * @param retry Retry policy applied to every outbound request.
+ * @param ctl - Tools provider controller supplied by the LM Studio SDK.
+ * @param impit - Shared HTTP client used for page fetches.
+ * @param websiteCache - Cache holding recent fetched pages keyed by URL.
+ * @param rateLimiter - Shared limiter enforcing the minimum gap between outbound requests.
+ * @param retry - Retry policy applied to every outbound request.
  * @returns The configured Visit Website tool.
  */
 export function createVisitWebsiteTool(
@@ -48,10 +49,8 @@ export function createVisitWebsiteTool(
     /**
      * Executes a website visit and parses the response.
      *
-     * @param arguments_ Validated tool parameters.
-     * @param arguments_.url URL of the website to visit.
-     * @param arguments_.findInPage Optional search terms that bias content slicing.
-     * @param context Runtime tool context supplied by the SDK.
+     * @param arguments_ - Validated tool parameters.
+     * @param context - Runtime tool context supplied by the SDK.
      * @returns The structured page summary or a user-facing error string.
      */
     implementation: async (arguments_, context) => {

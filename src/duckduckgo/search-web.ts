@@ -15,10 +15,10 @@ import type { Impit } from "impit"
 /**
  * Perform a DuckDuckGo web search and return the parsed result records.
  *
- * @param impit Shared HTTP client used for the request.
- * @param parameters Query and pagination parameters for the search.
- * @param maxResults Upper bound on the number of parsed results returned; `Infinity` for no cap.
- * @param options Options controlling the outbound request.
+ * @param impit - Shared HTTP client used for the request.
+ * @param parameters - Query and pagination parameters for the search.
+ * @param maxResults - Upper bound on the number of parsed results returned; `Infinity` for no cap.
+ * @param options - Options controlling the outbound request.
  * @returns The parsed search results along with their count, ready for enrichment.
  */
 export async function searchWeb(

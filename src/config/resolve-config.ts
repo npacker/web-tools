@@ -14,155 +14,98 @@ import type { Browser } from "impit"
  * Web-search page stride used when the results cap is disabled. Matches the ~30 results
  * DuckDuckGo's HTML endpoint returns per page, so the `s=` offset advances one DDG page
  * at a time rather than re-fetching overlapping windows.
- *
- * @const {number}
- * @default
  */
 const WEB_NATIVE_PAGE_SIZE = 30
 
 /**
  * Fallback cap used when a results-per-page field reads `null` before the UI has committed the
  * schematic default.
- *
- * @const {number}
- * @default
  */
 const DEFAULT_MAX_RESULTS = 10
 
 /**
  * Default safe-search mode when neither plugin nor override supplies a value.
- *
- * @const {"moderate"}
- * @default
  */
 const DEFAULT_SAFE_SEARCH = "moderate" as const
 
 /**
  * Default number of images scraped by the Fetch Images tool when no value is provided.
- *
- * @const {number}
- * @default
  */
 const DEFAULT_MAX_IMAGES = 10
 
 /**
  * Default visible-text character budget for the Visit Website tool when no value is provided.
- *
- * @const {number}
- * @default
  */
 const DEFAULT_CONTENT_LIMIT = 10_000
 
 /**
  * Default output format for the Visit Website tool's `content` field when no value is provided.
- *
- * @const {ContentFormat}
- * @default
  */
 const DEFAULT_CONTENT_FORMAT = "markdown" as const
 
 /**
  * Default for whether web search results should include preview snippets.
- *
- * @const {boolean}
- * @default
  */
 const DEFAULT_INCLUDE_SNIPPETS = true
 
 /**
  * Default for whether web search results should be enriched with metascraper-extracted metadata.
- *
- * @const {boolean}
- * @default
  */
 const DEFAULT_ENRICH_RESULTS = true
 
 /**
  * Default TTL for the web/image search result cache, in seconds.
- *
- * @const {number}
- * @default
  */
 const DEFAULT_SEARCH_CACHE_TTL_SECONDS = 15 * 60
 
 /**
  * Default TTL for the website HTML cache, in seconds.
- *
- * @const {number}
- * @default
  */
 const DEFAULT_WEBSITE_CACHE_TTL_SECONDS = 10 * 60
 
 /**
  * Default minimum interval enforced between outbound requests, in seconds.
- *
- * @const {number}
- * @default
  */
 const DEFAULT_REQUEST_INTERVAL_SECONDS = 5
 
 /**
  * Default number of retries after the initial attempt, applied to every outbound request.
  * Combined with the first try this yields three total attempts, the configured ceiling.
- *
- * @const {number}
- * @default
  */
 const DEFAULT_MAX_RETRIES = 2
 
 /**
  * Default base backoff before the first retry, in seconds.
- *
- * @const {number}
- * @default
  */
 const DEFAULT_RETRY_INITIAL_BACKOFF_SECONDS = 1
 
 /**
  * Default cap on a single retry backoff delay after exponential growth, in seconds.
- *
- * @const {number}
- * @default
  */
 const DEFAULT_RETRY_MAX_BACKOFF_SECONDS = 30
 
 /**
  * Default upper bound on the HTML payload fetched by Visit Website, in megabytes.
- *
- * @const {number}
- * @default
  */
 const DEFAULT_MAX_RESPONSE_MB = 5
 
 /**
  * Default upper bound on the per-image payload downloaded by Fetch Images, in megabytes.
- *
- * @const {number}
- * @default
  */
 const DEFAULT_MAX_IMAGE_MB = 10
 
 /**
  * Default browser fingerprint impit impersonates when no value is configured.
- *
- * @const {Browser}
- * @default
  */
 const DEFAULT_BROWSER: Browser = "firefox"
 
 /**
  * Conversion factor from seconds to milliseconds.
- *
- * @const {number}
- * @default
  */
 const MS_PER_SECOND = 1000
 
 /**
  * Conversion factor from megabytes to bytes.
- *
- * @const {number}
- * @default
  */
 const BYTES_PER_MB = 1024 * 1024
 
@@ -223,10 +166,10 @@ interface ConfigOverrides {
 
 /**
  * Resolves configuration by merging plugin config with runtime overrides.
- * Priority: plugin config > runtime override > default.
+ * Priority order, highest first: plugin config, then runtime override, then default.
  *
- * @param ctl Tools provider controller exposing plugin configuration.
- * @param overrides Per-call overrides supplied by the tool invocation.
+ * @param ctl - Tools provider controller exposing plugin configuration.
+ * @param overrides - Per-call overrides supplied by the tool invocation.
  * @returns The fully resolved configuration used to drive a request.
  */
 export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOverrides = {}): ResolvedConfig {
@@ -266,7 +209,7 @@ export function resolveConfig(ctl: ToolsProviderController, overrides: ConfigOve
  * Values feed into cache construction and the shared rate limiter, so they are
  * fixed for the lifetime of the session and require a plugin reload to change.
  *
- * @param ctl Tools provider controller exposing plugin configuration.
+ * @param ctl - Tools provider controller exposing plugin configuration.
  * @returns Timing values in milliseconds.
  */
 export function resolveTimingConfig(ctl: ToolsProviderController): ResolvedTimingConfig {
@@ -298,7 +241,7 @@ export function resolveTimingConfig(ctl: ToolsProviderController): ResolvedTimin
  * Read once at tools-provider initialization since the Impit instance is constructed up front
  * and shared across tools; changing the value requires a plugin reload.
  *
- * @param ctl Tools provider controller exposing plugin configuration.
+ * @param ctl - Tools provider controller exposing plugin configuration.
  * @returns The configured browser fingerprint, or the default when unset.
  */
 export function resolveBrowser(ctl: ToolsProviderController): Browser {
@@ -311,7 +254,7 @@ export function resolveBrowser(ctl: ToolsProviderController): Browser {
 /**
  * Resolves safe search from plugin configuration.
  *
- * @param pluginValue Value read from plugin configuration, possibly the auto sentinel.
+ * @param pluginValue - Value read from plugin configuration, possibly the auto sentinel.
  * @returns The effective safe-search mode.
  */
 function resolveSafeSearch(pluginValue: SafeSearch | typeof AUTO_CONFIG_VALUE): SafeSearch {

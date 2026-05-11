@@ -20,9 +20,6 @@ import type { Options as PRetryOptions } from "p-retry"
 /**
  * Timeout applied to each image download, in milliseconds. The timeout covers the entire
  * redirect chain rather than individual hops.
- *
- * @const {number}
- * @default
  */
 const IMAGE_DOWNLOAD_TIMEOUT_MS = 10_000
 
@@ -57,10 +54,10 @@ interface DownloadImageOptions {
 /**
  * Download a single image URL and save it to the working directory.
  *
- * @param url Source URL of the image to download.
- * @param impit Shared HTTP client used for the request.
- * @param options File placement and naming options.
- * @param context Logging and cancellation hooks provided by the caller.
+ * @param url - Source URL of the image to download.
+ * @param impit - Shared HTTP client used for the request.
+ * @param options - File placement and naming options.
+ * @param context - Logging and cancellation hooks provided by the caller.
  * @returns The local filesystem path to the saved image, or `undefined` when the download fails or is aborted.
  */
 export async function downloadImage(
@@ -78,8 +75,7 @@ export async function downloadImage(
       /**
        * Gate retries on the `FetchError.statusCode` allowlist so non-transient failures fail fast.
        *
-       * @param retryContext Retry context supplied by `p-retry`; only `error` is consulted.
-       * @param retryContext.error Error thrown by the most recent attempt.
+       * @param retryContext - Retry context supplied by `p-retry`; only `error` is consulted.
        * @returns `true` when the error is a transient fetch failure that warrants another attempt.
        */
       shouldRetry: ({ error }) => isRetryableFetchError(error),
@@ -116,11 +112,11 @@ export async function downloadImage(
  * an attacker cannot chain short requests to exceed the intended budget. Transport failures and
  * timeouts are normalised into `FetchError` so they can be retried uniformly.
  *
- * @param url Source URL of the image to download.
- * @param impit Shared HTTP client used for the request.
- * @param signal External abort signal combined with the download timeout.
+ * @param url - Source URL of the image to download.
+ * @param impit - Shared HTTP client used for the request.
+ * @param signal - External abort signal combined with the download timeout.
  * @returns The successful response.
- * @throws {FetchError} When the transport fails, the timeout fires, or the response carries a non-2xx status.
+ * @throws Whenthe transport fails, the timeout fires, or the response carries a non-2xx status.
  */
 async function attemptImageFetch(url: string, impit: Impit, signal: AbortSignal): Promise<ImpitResponse> {
   const timeoutSignal = AbortSignal.timeout(IMAGE_DOWNLOAD_TIMEOUT_MS)
@@ -137,9 +133,9 @@ async function attemptImageFetch(url: string, impit: Impit, signal: AbortSignal)
  * Resolve the extension for a downloaded image by first sniffing the raw bytes for a supported
  * image signature and otherwise falling back to the `content-type` header and URL pathname.
  *
- * @param bytes Downloaded image payload.
- * @param contentType HTTP `content-type` header value, or `null` when absent.
- * @param url Source URL used as a fallback when neither the bytes nor the header are conclusive.
+ * @param bytes - Downloaded image payload.
+ * @param contentType - HTTP `content-type` header value, or `null` when absent.
+ * @param url - Source URL used as a fallback when neither the bytes nor the header are conclusive.
  * @returns The canonical image extension for the payload.
  */
 async function sniffImageExtension(bytes: Uint8Array, contentType: string | null, url: string): Promise<string> {

@@ -14,33 +14,21 @@ import type { Impit, ImpitResponse } from "impit"
 
 /**
  * Default maximum number of redirect hops to follow before throwing.
- *
- * @const {number}
- * @default
  */
 const DEFAULT_MAX_REDIRECT_HOPS = 10
 
 /**
  * Lower bound of HTTP redirect status codes.
- *
- * @const {number}
- * @default
  */
 const HTTP_REDIRECT_MIN = 300
 
 /**
  * Upper bound (exclusive) of HTTP redirect status codes.
- *
- * @const {number}
- * @default
  */
 const HTTP_REDIRECT_MAX_EXCLUSIVE = 400
 
 /**
  * HTTP status code for `Not Modified`, which shares the 3xx range but is not a redirect.
- *
- * @const {number}
- * @default
  */
 const HTTP_NOT_MODIFIED = 304
 
@@ -49,9 +37,6 @@ const HTTP_NOT_MODIFIED = 304
  * `cf-mitigated: challenge` accompanies a `403` whose body is a JS challenge page
  * ("Just a moment..."); these are non-deterministic and worth retrying since the same
  * fingerprint may pass on a subsequent attempt.
- *
- * @const {string}
- * @default
  */
 const CF_MITIGATED_HEADER = "cf-mitigated"
 
@@ -59,9 +44,6 @@ const CF_MITIGATED_HEADER = "cf-mitigated"
  * Value of the `cf-mitigated` header indicating a transient JS challenge — the only
  * mitigation kind we treat as retryable. Other values (`block`, `dns_filtering`) reflect
  * deliberate site rules and should fail fast.
- *
- * @const {string}
- * @default
  */
 const CF_MITIGATED_CHALLENGE_VALUE = "challenge"
 
@@ -120,11 +102,11 @@ type HopResult =
  * `options.signal` did not are rethrown as a `FetchError` carrying `options.timeoutMessage` when
  * that field is set.
  *
- * @param impit Shared HTTP client used for the request.
- * @param url Target URL to fetch.
- * @param options Options controlling the request, headers, abort handling, and hop budget.
+ * @param impit - Shared HTTP client used for the request.
+ * @param url - Target URL to fetch.
+ * @param options - Options controlling the request, headers, abort handling, and hop budget.
  * @returns The successful (non-redirect) response.
- * @throws {FetchError} When the transport fails, the response is non-2xx, the redirect budget
+ * @throws Whenthe transport fails, the response is non-2xx, the redirect budget
  * is exhausted, or `fetchSignal` aborts while `signal` did not and `timeoutMessage` is set.
  */
 export async function followRedirects(
@@ -139,11 +121,11 @@ export async function followRedirects(
  * Recursively issue a GET against `currentUrl`, re-validating the SSRF guard on every hop,
  * until a non-redirect response is returned or the hop budget is exhausted.
  *
- * @param impit Shared HTTP client used for the request.
- * @param originalUrl URL originally requested by the caller, used in the "too many redirects" error and timeout message.
- * @param currentUrl URL to fetch in this attempt.
- * @param options Options controlling the request, headers, and abort handling.
- * @param hopsRemaining Number of redirect hops still permitted before aborting.
+ * @param impit - Shared HTTP client used for the request.
+ * @param originalUrl - URL originally requested by the caller, used in the "too many redirects" error and timeout message.
+ * @param currentUrl - URL to fetch in this attempt.
+ * @param options - Options controlling the request, headers, and abort handling.
+ * @param hopsRemaining - Number of redirect hops still permitted before aborting.
  * @returns The successful response.
  */
 async function followFromHop(
@@ -172,10 +154,10 @@ async function followFromHop(
 /**
  * Issue a single GET and classify the response as either a final success or a redirect instruction.
  *
- * @param impit Shared HTTP client used for the request.
- * @param originalUrl URL originally requested by the caller, used as the `url` on timeout errors.
- * @param currentUrl URL to fetch in this hop.
- * @param options Options controlling the request, headers, and abort handling.
+ * @param impit - Shared HTTP client used for the request.
+ * @param originalUrl - URL originally requested by the caller, used as the `url` on timeout errors.
+ * @param currentUrl - URL to fetch in this hop.
+ * @param options - Options controlling the request, headers, and abort handling.
  * @returns A `done` result carrying the final response, or a `redirect` result carrying the next `Location`.
  */
 async function performHop(
@@ -224,7 +206,7 @@ async function performHop(
  * `FetchError` is flagged retryable and `withRetry` will give it another attempt under
  * the configured backoff.
  *
- * @param response Response to inspect.
+ * @param response - Response to inspect.
  * @returns `true` when the response is a Cloudflare JS challenge.
  */
 function isCloudflareChallenge(response: ImpitResponse): boolean {
@@ -238,10 +220,10 @@ function isCloudflareChallenge(response: ImpitResponse): boolean {
  * `translateImpitError`; when translation matches, the original cryptic error is dropped from
  * `cause` so it cannot be reintroduced by the tool-error formatter's cause suffix.
  *
- * @param error Thrown value caught from the `impit.fetch` call.
- * @param originalUrl URL originally requested by the caller, attached to timeout errors.
- * @param currentUrl URL fetched in the current hop, attached to non-timeout transport errors.
- * @param options Options carrying the user signal and optional `timeoutMessage`.
+ * @param error - Thrown value caught from the `impit.fetch` call.
+ * @param originalUrl - URL originally requested by the caller, attached to timeout errors.
+ * @param currentUrl - URL fetched in the current hop, attached to non-timeout transport errors.
+ * @param options - Options carrying the user signal and optional `timeoutMessage`.
  * @returns The error to throw — either the original abort or a `FetchError`.
  */
 function translateTransportError(
@@ -271,7 +253,7 @@ function translateTransportError(
 /**
  * Determine whether an HTTP status code represents a followable redirect response.
  *
- * @param status HTTP status code to classify.
+ * @param status - HTTP status code to classify.
  * @returns `true` when the status is in the 3xx range excluding `304 Not Modified`.
  */
 function isRedirectStatus(status: number): boolean {

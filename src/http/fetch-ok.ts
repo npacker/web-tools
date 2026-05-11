@@ -28,11 +28,11 @@ export interface RequestOptions {
 /**
  * Issue a GET request through the shared `impit` client, throwing `FetchError` on failure or non-2xx.
  *
- * @param impit Shared HTTP client used for the request.
- * @param url Target URL to fetch.
- * @param options Options controlling the outbound request.
+ * @param impit - Shared HTTP client used for the request.
+ * @param url - Target URL to fetch.
+ * @param options - Options controlling the outbound request.
  * @returns The successful response.
- * @throws {FetchError} When the transport fails or the response carries a non-2xx status.
+ * @throws Whenthe transport fails or the response carries a non-2xx status.
  */
 export async function fetchOk(impit: Impit, url: string, options: RequestOptions): Promise<ImpitResponse> {
   return pRetry(async () => followRedirects(impit, url, { signal: options.signal, headers: options.headers }), {
@@ -43,8 +43,7 @@ export async function fetchOk(impit: Impit, url: string, options: RequestOptions
     /**
      * Gate retries on the `FetchError.statusCode` allowlist so non-transient failures fail fast.
      *
-     * @param context Retry context supplied by `p-retry`; only `error` is consulted.
-     * @param context.error Error thrown by the most recent attempt.
+     * @param context - Retry context supplied by `p-retry`; only `error` is consulted.
      * @returns `true` when the error is a transient fetch failure that warrants another attempt.
      */
     shouldRetry: ({ error }) => isRetryableFetchError(error),

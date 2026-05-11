@@ -49,9 +49,9 @@ export interface ExcerptInputs {
  * Assemble the per-kind response payload, narrowing on the fetched page's kind to select
  * between the HTML jsdom+Readability pipeline and the pre-extracted-text pipeline.
  *
- * @param url URL that was visited.
- * @param page Fetched and classified page payload.
- * @param inputs Shared excerpt inputs.
+ * @param url - URL that was visited.
+ * @param page - Fetched and classified page payload.
+ * @param inputs - Shared excerpt inputs.
  * @returns The user-facing result with content and (for HTML) headings populated.
  */
 export function renderVisitResult(url: string, page: FetchedPage, inputs: ExcerptInputs): VisitWebsiteResult {
@@ -117,7 +117,7 @@ interface ResultFields {
  * and zero-length counts. Callers pass every candidate field whether populated or not; this
  * helper owns the policy of "don't emit empties" so the per-kind branches stay linear.
  *
- * @param fields Candidate result fields.
+ * @param fields - Candidate result fields.
  * @returns The response with empty/zero fields removed.
  */
 function assembleResult(fields: ResultFields): VisitWebsiteResult {

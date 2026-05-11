@@ -65,6 +65,7 @@
     "eslint-plugin-regexp": "^3.1.0",
     "eslint-plugin-security": "^4.0.0",
     "eslint-plugin-sonarjs": "^4.0.3",
+    "eslint-plugin-tsdoc": "^0.5.2",
     "eslint-plugin-unicorn": "^64.0.0",
     "eslint-plugin-unused-imports": "^4.4.1",
     "globals": "^17.5.0",

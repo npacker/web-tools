@@ -4,9 +4,6 @@
 
 /**
  * Pattern matching a leading Windows drive letter, with or without a preceding slash.
- *
- * @const {RegExp}
- * @default
  */
 const WINDOWS_DRIVE_PATTERN = /^\/?[A-Z]:/
 
@@ -15,7 +12,7 @@ const WINDOWS_DRIVE_PATTERN = /^\/?[A-Z]:/
  * Flips Windows backslashes to forward slashes and strips any leading drive letter so the
  * result renders correctly on any host.
  *
- * @param filePath Absolute filesystem path produced by `path.join`.
+ * @param filePath - Absolute filesystem path produced by `path.join`.
  * @returns Path using forward slashes and with Windows drive letters removed.
  */
 export function toMarkdownPath(filePath: string): string {

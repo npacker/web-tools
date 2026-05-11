@@ -36,7 +36,7 @@ export interface BingImageResult {
  * Extract every image record from a Bing image-search results page. Filters out tiles whose
  * source URL does not end in a supported image extension and deduplicates by URL.
  *
- * @param html Raw HTML payload returned by Bing's image-search endpoint.
+ * @param html - Raw HTML payload returned by Bing's image-search endpoint.
  * @returns Deduplicated list of image records, in the order Bing rendered them.
  */
 export function parseBingImageResults(html: string): BingImageResult[] {
@@ -77,7 +77,7 @@ export function parseBingImageResults(html: string): BingImageResult[] {
  * non-tile elements that share the `iusc` class, and a single bad tile must not abort the
  * full result list.
  *
- * @param raw Raw attribute value as returned by `Element.getAttribute` (already entity-decoded by jsdom).
+ * @param raw - Raw attribute value as returned by `Element.getAttribute` (already entity-decoded by jsdom).
  * @returns The parsed tile object, or `undefined` when parsing fails.
  */
 function parseTile(raw: string): BingImageTile | undefined {
@@ -92,8 +92,8 @@ function parseTile(raw: string): BingImageTile | undefined {
  * Assemble a `BingImageResult` from a parsed tile, omitting optional fields that are
  * empty so the per-result merge in the tool layer never surfaces blank metadata.
  *
- * @param image Source image URL extracted from the tile.
- * @param tile Parsed tile object carrying the optional title and source-page fields.
+ * @param image - Source image URL extracted from the tile.
+ * @param tile - Parsed tile object carrying the optional title and source-page fields.
  * @returns A `BingImageResult` with `title` and `sourcePage` populated only when present.
  */
 function buildResult(image: string, tile: BingImageTile): BingImageResult {

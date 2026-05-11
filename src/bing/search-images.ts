@@ -16,19 +16,16 @@ import type { Impit } from "impit"
 /**
  * `Referer` value sent with image-search requests so Bing treats the call as a legitimate
  * in-page navigation rather than a scripted hit.
- *
- * @const {string}
- * @default
  */
 const IMAGE_SEARCH_REFERER = "https://www.bing.com/"
 
 /**
  * Perform a Bing image search and return the parsed result rows.
  *
- * @param impit Shared HTTP client used for the request.
- * @param parameters Query and pagination parameters for the search.
- * @param maxResults Upper bound on the number of records to return from the response.
- * @param options Options controlling the outbound request.
+ * @param impit - Shared HTTP client used for the request.
+ * @param parameters - Query and pagination parameters for the search.
+ * @param maxResults - Upper bound on the number of records to return from the response.
+ * @param options - Options controlling the outbound request.
  * @returns Image records extracted from the response HTML, capped at `maxResults`.
  */
 export async function searchImages(

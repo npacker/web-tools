@@ -14,8 +14,6 @@ import type { HtmlToTextOptions } from "html-to-text"
  * fragmented across lines, anchors render only their inner text (the URL is dropped), images and
  * `<noscript>`/`<template>` subtrees are excluded entirely, headings and table headers retain
  * their original case instead of being uppercased, and list items use a two-character prefix.
- *
- * @const {HtmlToTextOptions}
  */
 const CONVERT_OPTIONS: HtmlToTextOptions = {
   wordwrap: false,
@@ -39,7 +37,7 @@ const CONVERT_OPTIONS: HtmlToTextOptions = {
  * Convert an HTML fragment to plain text via the `html-to-text` package, then collapse runs of
  * blank lines and trim trailing whitespace.
  *
- * @param html HTML fragment to convert.
+ * @param html - HTML fragment to convert.
  * @returns The plain-text representation, with runs of blank lines collapsed and trailing whitespace trimmed.
  */
 export function htmlToText(html: string): string {

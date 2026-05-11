@@ -5,8 +5,6 @@ import { AUTO_CONFIG_VALUE } from "./auto-sentinel"
 /**
  * Plugin configuration schematics registered with LM Studio.
  * Exposes the settings shown in the plugin UI.
- *
- * @const {object}
  */
 export const configSchematics = createConfigSchematics()
   .field(

@@ -23,12 +23,10 @@ export class FetchError extends Error {
   /**
    * Create a fetch error carrying an optional HTTP status code, URL, and underlying cause.
    *
-   * @param message Human-readable error description.
-   * @param statusCode Optional HTTP status code associated with the failure.
-   * @param url Optional URL that failed to fetch.
-   * @param options Optional error options.
-   * @param options.cause Optional underlying error to chain for diagnostics.
-   * @param options.retryable Optional explicit retry-eligibility override.
+   * @param message - Human-readable error description.
+   * @param statusCode - Optional HTTP status code associated with the failure.
+   * @param url - Optional URL that failed to fetch.
+   * @param options - Optional error options.
    */
   public constructor(
     message: string,

@@ -45,8 +45,6 @@ export type ScrapeEnrichmentMetadata = (input: ScrapeInput) => Promise<Enrichmen
 /**
  * Options passed to every `helpers.description` call. The truncation cap keeps the per-result
  * payload bounded when sites embed very long descriptions in OpenGraph or JSON-LD.
- *
- * @const {{ truncateLength: number }}
  */
 const DESCRIPTION_OPTIONS = { truncateLength: 500 } as const
 
@@ -54,8 +52,6 @@ const DESCRIPTION_OPTIONS = { truncateLength: 500 } as const
  * Keys this plugin emits onto each enriched record. Drives the projection from metascraper's
  * looser `Metadata` shape into our narrower `EnrichmentMetadata` so adding or removing a
  * field here automatically updates both the type and the runtime filter.
- *
- * @const {readonly (keyof EnrichmentMetadata)[]}
  */
 const ENRICHMENT_KEYS = ["date", "type", "description"] as const
 
@@ -134,7 +130,7 @@ type Extractor = (dom: CheerioRoot) => unknown
 /**
  * Build an extractor that reads `selector`'s `content` attribute from the cheerio root.
  *
- * @param selector CSS selector matching a `<meta>` element.
+ * @param selector - CSS selector matching a `<meta>` element.
  * @returns Extractor returning the matched element's `content` attribute, or `undefined`.
  */
 function metaContent(selector: string): Extractor {
@@ -144,7 +140,7 @@ function metaContent(selector: string): Extractor {
 /**
  * Wrap an extractor so its raw output flows through `helpers.date` for ISO 8601 normalization.
  *
- * @param extract Extractor producing the raw date candidate.
+ * @param extract - Extractor producing the raw date candidate.
  * @returns A metascraper rule yielding an ISO 8601 timestamp or `undefined`.
  */
 function dateRule(extract: Extractor): RulesOptions {
@@ -155,7 +151,7 @@ function dateRule(extract: Extractor): RulesOptions {
  * Wrap an extractor so its raw output flows through `helpers.description` with the shared
  * truncation cap.
  *
- * @param extract Extractor producing the raw description candidate.
+ * @param extract - Extractor producing the raw description candidate.
  * @returns A metascraper rule yielding a bounded description or `undefined`.
  */
 function descriptionRule(extract: Extractor): RulesOptions {
@@ -167,7 +163,7 @@ function descriptionRule(extract: Extractor): RulesOptions {
  * rule chain. Used for `og:type` since `@metascraper/helpers` does not expose a generic
  * string sanitizer.
  *
- * @param value Raw attribute value, or `undefined` when the selector did not match.
+ * @param value - Raw attribute value, or `undefined` when the selector did not match.
  * @returns The trimmed string, or `undefined` when the trimmed value is empty.
  */
 function trimmed(value: string | undefined): string | undefined {

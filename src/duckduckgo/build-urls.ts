@@ -20,24 +20,18 @@ export interface SearchParameters {
 
 /**
  * Base URL used for all DuckDuckGo requests.
- *
- * @const {string}
- * @default
  */
 const DUCKDUCKGO_BASE_URL = "https://duckduckgo.com"
 
 /**
  * Path of the DuckDuckGo HTML web search endpoint.
- *
- * @const {string}
- * @default
  */
 const WEB_SEARCH_PATH = "/html/"
 
 /**
  * Build the URL for a DuckDuckGo web search.
  *
- * @param parameters Query and pagination parameters for the search.
+ * @param parameters - Query and pagination parameters for the search.
  * @returns Fully constructed web-search URL.
  */
 export function buildWebSearchUrl(parameters: SearchParameters): URL {
@@ -55,7 +49,7 @@ export function buildWebSearchUrl(parameters: SearchParameters): URL {
 /**
  * Encode a `SafeSearch` mode as the DuckDuckGo-specific `p` query parameter value.
  *
- * @param safeSearch Safe-search mode selected by the caller.
+ * @param safeSearch - Safe-search mode selected by the caller.
  * @returns The `p` parameter string: `"1"` for strict, `""` for moderate, `"-1"` for off.
  */
 function encodeSafeSearchParameter(safeSearch: SafeSearch): string {
@@ -69,8 +63,8 @@ function encodeSafeSearchParameter(safeSearch: SafeSearch): string {
 /**
  * Zero-based offset corresponding to a one-based page number at the given stride.
  *
- * @param pageStride Offset stride between pages.
- * @param page One-based page number.
+ * @param pageStride - Offset stride between pages.
+ * @param page - One-based page number.
  * @returns Zero-based offset for the requested page.
  */
 function pageOffset(pageStride: number, page: number): number {

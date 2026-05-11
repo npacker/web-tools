@@ -28,9 +28,9 @@ export interface PdfContent {
 /**
  * Extract readable Markdown and the document title from a PDF payload.
  *
- * @param bytes Raw PDF bytes.
+ * @param bytes - Raw PDF bytes.
  * @returns The extracted Markdown body and metadata title.
- * @throws {Error} When `pdf2md` or `unpdf` cannot parse the payload.
+ * @throws When`pdf2md` or `unpdf` cannot parse the payload.
  */
 export async function extractPdfContent(bytes: Buffer): Promise<PdfContent> {
   const data = new Uint8Array(bytes)

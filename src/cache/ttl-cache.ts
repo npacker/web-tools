@@ -17,7 +17,7 @@ interface CacheMetadata {
  * Protects against malformed or stale-schema metadata written by earlier plugin versions
  * producing silent `NaN` comparisons in the expiry check.
  *
- * @param value Untyped metadata value pulled from a cacache entry.
+ * @param value - Untyped metadata value pulled from a cacache entry.
  * @returns `true` when the value is a non-null object with a numeric `expiry` property.
  */
 function isCacheMetadata(value: unknown): value is CacheMetadata {
@@ -46,9 +46,9 @@ export class TTLCache<T> {
   /**
    * Create a new cache bound by TTL and capacity.
    *
-   * @param cachePath Filesystem path where cacache stores index and content.
-   * @param ttlMs Lifetime of each entry in milliseconds.
-   * @param maxSize Maximum number of entries retained before eviction.
+   * @param cachePath - Filesystem path where cacache stores index and content.
+   * @param ttlMs - Lifetime of each entry in milliseconds.
+   * @param maxSize - Maximum number of entries retained before eviction.
    */
   public constructor(cachePath: string, ttlMs: number, maxSize: number) {
     this.cachePath = cachePath
@@ -60,7 +60,7 @@ export class TTLCache<T> {
    * Retrieve a value by key, evicting and returning `undefined` when expired.
    * Always returns `undefined` when the cache is disabled (`ttlMs <= 0`).
    *
-   * @param key Lookup key.
+   * @param key - Lookup key.
    * @returns The stored value, or `undefined` when absent, expired, or disabled.
    */
   public async get(key: string): Promise<T | undefined> {
@@ -91,8 +91,8 @@ export class TTLCache<T> {
    * Store a value under the given key with the configured TTL.
    * Becomes a no-op when the cache is disabled (`ttlMs <= 0`).
    *
-   * @param key Key to store the value under.
-   * @param value Value to associate with the key.
+   * @param key - Key to store the value under.
+   * @param value - Value to associate with the key.
    */
   public async set(key: string, value: T): Promise<void> {
     if (this.ttlMs <= 0) {
@@ -107,7 +107,7 @@ export class TTLCache<T> {
   /**
    * Remove an entry by key, if present.
    *
-   * @param key Key to remove.
+   * @param key - Key to remove.
    */
   public async delete(key: string): Promise<void> {
     await cacache.rm.entry(this.cachePath, key)
@@ -116,7 +116,7 @@ export class TTLCache<T> {
   /**
    * Determine whether an entry has passed its expiry timestamp.
    *
-   * @param metadata Metadata to inspect.
+   * @param metadata - Metadata to inspect.
    * @returns `true` when the entry is expired.
    */
   private isExpired(metadata: CacheMetadata): boolean {

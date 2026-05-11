@@ -23,17 +23,11 @@ import type { Impit } from "impit"
 
 /**
  * Lower bound on the image count when a website URL is provided.
- *
- * @const {number}
- * @default
  */
 const MIN_FETCH_IMAGES_COUNT = 1
 
 /**
  * Upper bound on the image count when a website URL is provided.
- *
- * @const {number}
- * @default
  */
 const MAX_FETCH_IMAGES_COUNT = 200
 
@@ -68,14 +62,15 @@ interface FetchedImage {
 }
 
 /**
- * Create the Fetch Images tool.
+ * Build the Fetch Images tool: downloads explicit image URLs or scrapes images from a given
+ * page into the per-chat working directory and returns per-image markdown references.
  *
- * @param ctl Tools provider controller supplied by the LM Studio SDK.
- * @param impit Shared HTTP client used for HTML fetches and image downloads.
- * @param websiteCache Cache holding recent HTML payloads keyed by URL.
- * @param rateLimiter Shared limiter enforcing the minimum gap between outbound requests.
- * @param imageLimiter Shared limiter capping the number of image downloads in flight concurrently.
- * @param retry Retry policy applied to every outbound request.
+ * @param ctl - Tools provider controller supplied by the LM Studio SDK.
+ * @param impit - Shared HTTP client used for HTML fetches and image downloads.
+ * @param websiteCache - Cache holding recent HTML payloads keyed by URL.
+ * @param rateLimiter - Shared limiter enforcing the minimum gap between outbound requests.
+ * @param imageLimiter - Shared limiter capping the number of image downloads in flight concurrently.
+ * @param retry - Retry policy applied to every outbound request.
  * @returns The configured Fetch Images tool.
  */
 export function createFetchImagesTool(
@@ -108,11 +103,8 @@ export function createFetchImagesTool(
     /**
      * Executes an image download batch, optionally preceded by scraping image URLs from a page.
      *
-     * @param arguments_ Validated tool parameters.
-     * @param arguments_.imageURLs Explicit URLs to download.
-     * @param arguments_.websiteURL Optional page to scrape for additional image URLs.
-     * @param arguments_.maxImages Optional per-call override for the number of page-scraped images.
-     * @param context Runtime tool context supplied by the SDK.
+     * @param arguments_ - Validated tool parameters.
+     * @param context - Runtime tool context supplied by the SDK.
      * @returns Per-image records with filename, alt, title, and either a markdown reference or an error, or a user-facing error string.
      */
     implementation: async (arguments_, context) => {

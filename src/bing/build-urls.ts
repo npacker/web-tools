@@ -18,17 +18,11 @@ export interface BingImageSearchParameters {
 
 /**
  * Base URL used for Bing image search requests.
- *
- * @const {string}
- * @default
  */
 const BING_BASE_URL = "https://www.bing.com"
 
 /**
  * Path of the Bing image search HTML endpoint.
- *
- * @const {string}
- * @default
  */
 const IMAGE_SEARCH_PATH = "/images/search"
 
@@ -36,9 +30,6 @@ const IMAGE_SEARCH_PATH = "/images/search"
  * Native page size for Bing image search results. Each fetched page returns
  * approximately this many image tiles, regardless of how many the caller wants
  * to display, so pagination advances the `first` parameter by this stride.
- *
- * @const {number}
- * @default
  */
 const BING_IMAGE_PAGE_SIZE = 35
 
@@ -46,7 +37,7 @@ const BING_IMAGE_PAGE_SIZE = 35
  * Build the URL for a Bing image search. Bing's `adlt` query parameter accepts the literal
  * `SafeSearch` mode strings (`"strict"`, `"moderate"`, `"off"`) without further encoding.
  *
- * @param parameters Query and pagination parameters for the search.
+ * @param parameters - Query and pagination parameters for the search.
  * @returns Fully constructed image-search URL.
  */
 export function buildBingImageSearchUrl(parameters: BingImageSearchParameters): URL {

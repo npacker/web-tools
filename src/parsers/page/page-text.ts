@@ -14,25 +14,16 @@ import type { ContentFormat } from "../../config/resolve-config"
  * Maximum Fuse.js relevance score (0 = exact match, 1 = match anything) at which a paragraph
  * is considered a fuzzy hit for a search term. Tightened from the library default (0.6) to
  * avoid returning chunks whose match is essentially noise.
- *
- * @const {number}
- * @default
  */
 const FUSE_SCORE_THRESHOLD = 0.3
 
 /**
  * Paragraph separator used when joining the selected chunks back together for emission.
- *
- * @const {string}
- * @default
  */
 const CHUNK_JOIN_SEPARATOR = "\n\n"
 
 /**
  * Empty headings record used when jsdom cannot parse the input at all.
- *
- * @const {PageHeadings}
- * @default
  */
 const EMPTY_HEADINGS: PageHeadings = { title: "", h1: "", h2: "" }
 
@@ -75,11 +66,11 @@ export interface HtmlPageResult {
  * its input document, stripping the chrome (nav, sidebars) that might otherwise hide a page's
  * `<title>` or leading `<h1>` from later queries.
  *
- * @param html Raw HTML payload.
- * @param url Absolute URL of the page, used by Readability to resolve relative references.
- * @param contentLimit Character budget for the returned excerpt.
- * @param searchTerms Optional search terms biasing excerpt selection.
- * @param format Output format applied to the extracted content.
+ * @param html - Raw HTML payload.
+ * @param url - Absolute URL of the page, used by Readability to resolve relative references.
+ * @param contentLimit - Character budget for the returned excerpt.
+ * @param searchTerms - Optional search terms biasing excerpt selection.
+ * @param format - Output format applied to the extracted content.
  * @returns The combined headings and excerpt for the page.
  */
 export function extractHtmlPage(
@@ -107,9 +98,9 @@ export function extractHtmlPage(
 /**
  * Build a size-bounded excerpt from a pre-extracted text body (PDF text, raw text, JSON).
  *
- * @param text Full text payload already extracted by the caller.
- * @param contentLimit Character budget for the returned text.
- * @param searchTerms Optional search terms biasing content selection.
+ * @param text - Full text payload already extracted by the caller.
+ * @param contentLimit - Character budget for the returned text.
+ * @param searchTerms - Optional search terms biasing content selection.
  * @returns The excerpt and the total length of the full text before truncation.
  */
 export function buildTextExcerpt(text: string, contentLimit: number, searchTerms: string[] | undefined): PageExcerpt {
@@ -120,8 +111,8 @@ export function buildTextExcerpt(text: string, contentLimit: number, searchTerms
  * Parse HTML into a jsdom instance carrying the absolute URL so Readability can resolve
  * relative references, returning `undefined` when jsdom cannot construct the DOM.
  *
- * @param html Raw HTML payload.
- * @param url Absolute URL of the page.
+ * @param html - Raw HTML payload.
+ * @param url - Absolute URL of the page.
  * @returns The constructed jsdom instance, or `undefined` on parse failure.
  */
 function buildDom(html: string, url: string): JSDOM | undefined {
@@ -135,7 +126,7 @@ function buildDom(html: string, url: string): JSDOM | undefined {
 /**
  * Extract the document title and the first h1/h2 from a jsdom document.
  *
- * @param dom Jsdom instance wrapping the parsed HTML document.
+ * @param dom - Jsdom instance wrapping the parsed HTML document.
  * @returns The extracted heading fields, each empty when the corresponding element is missing.
  */
 function extractHeadingsFromDom(dom: JSDOM): PageHeadings {
@@ -152,8 +143,8 @@ function extractHeadingsFromDom(dom: JSDOM): PageHeadings {
  * Extract the main readable content via Mozilla Readability, falling back to the body's inner
  * HTML when Readability can't identify an article.
  *
- * @param dom Jsdom instance wrapping the parsed HTML document.
- * @param format Output format applied to the extracted content.
+ * @param dom - Jsdom instance wrapping the parsed HTML document.
+ * @param format - Output format applied to the extracted content.
  * @returns The extracted content, formatted into the requested output shape.
  */
 function extractVisibleText(dom: JSDOM, format: ContentFormat): string {
@@ -170,7 +161,7 @@ function extractVisibleText(dom: JSDOM, format: ContentFormat): string {
  * Run Mozilla Readability against the supplied document, returning its extracted article
  * HTML or `undefined` when Readability throws or finds nothing.
  *
- * @param dom Jsdom instance whose document Readability will parse and mutate in place.
+ * @param dom - Jsdom instance whose document Readability will parse and mutate in place.
  * @returns The article HTML, or `undefined` when extraction fails.
  */
 function runReadability(dom: JSDOM): string | undefined {
@@ -184,8 +175,8 @@ function runReadability(dom: JSDOM): string | undefined {
 /**
  * Convert an HTML fragment to the requested output format.
  *
- * @param htmlFragment HTML to convert.
- * @param format Target output format.
+ * @param htmlFragment - HTML to convert.
+ * @param format - Target output format.
  * @returns The formatted content string.
  */
 function formatHtml(htmlFragment: string, format: ContentFormat): string {
@@ -206,9 +197,9 @@ function formatHtml(htmlFragment: string, format: ContentFormat): string {
  * otherwise return a head slice. Also reports the pre-truncation length so callers can detect
  * truncation and refine with search terms or raise the plugin setting.
  *
- * @param text Full text to excerpt.
- * @param contentLimit Character budget for the returned text.
- * @param searchTerms Optional search terms biasing content selection.
+ * @param text - Full text to excerpt.
+ * @param contentLimit - Character budget for the returned text.
+ * @param searchTerms - Optional search terms biasing content selection.
  * @returns The excerpt and the total length of the full text before truncation.
  */
 function applyContentLimit(text: string, contentLimit: number, searchTerms: string[] | undefined): PageExcerpt {
@@ -238,9 +229,9 @@ function applyContentLimit(text: string, contentLimit: number, searchTerms: stri
  * `contentLimit` is actually filled with surrounding context instead of leaving budget unused
  * when only a handful of paragraphs match.
  *
- * @param text Full text from which to extract matching paragraphs.
- * @param terms Terms to locate inside `text`.
- * @param limit Total character budget for the concatenated output.
+ * @param text - Full text from which to extract matching paragraphs.
+ * @param terms - Terms to locate inside `text`.
+ * @param limit - Total character budget for the concatenated output.
  * @returns The concatenated paragraphs, emitted in source order, truncated to `limit`.
  */
 function sliceAroundTerms(text: string, terms: string[], limit: number): string {
@@ -284,9 +275,9 @@ function sliceAroundTerms(text: string, terms: string[], limit: number): string 
  * priority chunk is admitted unconditionally so an oversized top match never yields an empty
  * excerpt (the final slice will trim it to the budget).
  *
- * @param rankedIndices Chunk indices ordered from best to worst fuzzy match.
- * @param chunks Paragraph-level chunks of the page text, indexed in source order.
- * @param limit Character budget to fill, accounting for paragraph separators between chunks.
+ * @param rankedIndices - Chunk indices ordered from best to worst fuzzy match.
+ * @param chunks - Paragraph-level chunks of the page text, indexed in source order.
+ * @param limit - Character budget to fill, accounting for paragraph separators between chunks.
  * @returns Set of chunk indices chosen for inclusion, unordered.
  */
 function selectAroundMatches(rankedIndices: number[], chunks: string[], limit: number): Set<number> {
@@ -323,9 +314,9 @@ function selectAroundMatches(rankedIndices: number[], chunks: string[], limit: n
  * neighbour; the caller is expected to deduplicate. Lazy so callers that fill their budget
  * early avoid materializing the tail of the sequence.
  *
- * @param rankedIndices Chunk indices ordered from best to worst fuzzy match.
- * @param chunkCount Total number of chunks in the source document.
- * @yields {number} Candidate chunk indices in emission order.
+ * @param rankedIndices - Chunk indices ordered from best to worst fuzzy match.
+ * @param chunkCount - Total number of chunks in the source document.
+ * @yields Candidate chunk indices in emission order.
  */
 function* prioritizedCandidates(rankedIndices: number[], chunkCount: number): Generator<number> {
   const lastIndex = chunkCount - 1
@@ -362,8 +353,8 @@ function* prioritizedCandidates(rankedIndices: number[], chunkCount: number): Ge
  * Rank chunk indices by the best (lowest) Fuse.js score achieved across any of the supplied
  * terms, discarding chunks that fail the score threshold for every term.
  *
- * @param chunks Paragraph-level chunks of the page text, in source order.
- * @param terms Search terms to match against each chunk.
+ * @param chunks - Paragraph-level chunks of the page text, in source order.
+ * @param terms - Search terms to match against each chunk.
  * @returns Chunk indices ordered from best to worst match.
  */
 function rankChunksByTerms(chunks: string[], terms: string[]): number[] {
@@ -399,7 +390,7 @@ function rankChunksByTerms(chunks: string[], terms: string[]): number[] {
  * Split normalized page text into paragraph-level chunks on blank-line boundaries, discarding
  * any empty segments produced by the split.
  *
- * @param text Full page text already normalized to collapse runs of blank lines.
+ * @param text - Full page text already normalized to collapse runs of blank lines.
  * @returns Trimmed paragraph chunks in source order.
  */
 function splitIntoChunks(text: string): string[] {
