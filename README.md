@@ -4,21 +4,20 @@ An LM Studio plugin that gives local LLMs four web-oriented capabilities: search
 
 ## Key features
 
-- **Bot-resistant HTTP** — outbound requests use [`impit`](https://www.npmjs.com/package/impit), which applies real-browser TLS fingerprints and request headers for improved bot-detection evasion without the weight or security surface of a full browser stack.
+- **Bot-resistant requests** — outbound requests use [`impit`](https://www.npmjs.com/package/impit), which applies real-browser TLS fingerprints and request headers for improved bot-detection evasion without the weight or security surface of a full browser stack.
 - **SSRF protection** — every outbound URL is validated by [`dssrf`](https://www.npmjs.com/package/dssrf) before the request is issued, rejecting non-HTTP schemes, malformed URLs, and addresses that resolve to private or reserved IP ranges. A randomized double DNS resolution mitigates DNS rebinding.
-- **Resilient request pipeline** — disk-backed [`cacache`](https://www.npmjs.com/package/cacache) caching for search results and fetched HTML, a [`bottleneck`](https://www.npmjs.com/package/bottleneck)-backed rate limiter paces outbound requests, and [`p-retry`](https://www.npmjs.com/package/p-retry) wraps every request in randomized exponential backoff.
+- **Resilient request pipeline** — all requests are cached, rate-limited, and retried with randomized exponential backoff.
 - **Hard payload caps** — separate per-image and per-page byte limits keep memory exposure bounded when fetching arbitrarily large remote content.
-- **Search result enrichment** — web results can be optionally run through [`metascraper`](https://www.npmjs.com/package/metascraper) to surface publication date, OpenGraph type, and description alongside the title and URL, providing useful detail without needing to load the full page into context.
+- **Search result enrichment** — search results optionally run through [`metascraper`](https://www.npmjs.com/package/metascraper) to surface publication date, type, and description, providing useful detail without needing to load the full page into context.
 - **Intelligent content extraction** — Visit Website routes HTML through [`@mozilla/readability`](https://www.npmjs.com/package/@mozilla/readability), stripping navigation, sidebars, and ads, so the model only sees relevant content.
-- **Markdown or plain-text rendering** — Render content as Markdown or strip to plain text.
-- **PDF-to-Markdown** — Visit Website transparently handles PDFs via [`@opendocsg/pdf2md`](https://www.npmjs.com/package/@opendocsg/pdf2md).
-- **`findInPage` fuzzy slicing** — when a page is larger than the configured content length, Visit Website slices and returns content based on fuzzy-matched search terms, letting context-constrained models extract useful information from long pages.
+- **Markdown or plain-text rendering** — HTML content can be converted to Markdown, or stripped to plain text for token efficiency. PDFs are transparently converted to Markdown.
+- **Content fuzzy matching** — when a page is larger than the configured content length, relevant content is sliced and returned based on fuzzy-matched search terms, letting context-constrained models extract useful information from long pages.
 
 ## Tools
 
 ### Web Search
 
-Runs a query-string search against DuckDuckGo and returns the matching pages — title, URL, and a short snippet for each. Optionally enriches each result with publication date, OpenGraph type, and description pulled from the result page itself; enrichment is on by default but can be disabled in the plugin settings.
+Runs a query-string search against DuckDuckGo and returns relevant results.
 
 | Parameter | Type      | Notes                                        |
 | --------- | --------- | -------------------------------------------- |
@@ -38,7 +37,7 @@ Returns an array of records:
 
 ### Image Search
 
-Runs a query-string search against Bing's image index and returns candidate image URLs along with the page each one was found on. Pair with Fetch Images when the assistant wants to download and embed an image in its reply.
+Runs a query-string search against Bing's image index and returns candidate image URLs along with the source page.
 
 | Parameter | Type      | Notes                    |
 | --------- | --------- | ------------------------ |
@@ -55,31 +54,31 @@ Returns an array of records:
 
 ### Visit Website
 
-Fetches a URL and returns its title, top-level headings, and a readable-content excerpt. Handles HTML pages and PDFs (and surfaces plain-text and JSON responses too); the `kind` field on the result tells the assistant which one it got. Content is returned as Markdown by default, or as plain text when `Visit Website: Content Format` is set to plain text.
+Fetches a URL and returns its title, top-level headings, and a readable-content excerpt. Handles HTML pages and PDFs (and surfaces plain-text and JSON responses too). Content is returned as Markdown by default, with plain text as an option.
 
-When a page is longer than the configured character budget, supply the optional `findInPage` parameter — a list of search terms — to bias which slices of the page are returned. This is the primary tool for getting useful answers out of large pages.
+When a page is longer than the configured character budget, the Assistant has the option to refine the returned content by an array of search terms.
 
-| Parameter    | Type     | Notes                                                                                                |
-| ------------ | -------- | ---------------------------------------------------------------------------------------------------- |
-| `url`        | URL      | Required.                                                                                            |
-| `findInPage` | string[] | Optional. Biases content slices on pages exceeding the character budget. Recommended on large pages. |
+| Parameter    | Type     | Notes                                                                   |
+| ------------ | -------- | ----------------------------------------------------------------------- |
+| `url`        | URL      | Required.                                                               |
+| `findInPage` | string[] | Optional. Biases content slices on pages exceeding the character budget.|
 
 Returns a single record:
 
 | Field           | Type   | Notes                                                                                                                             |
-| --------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `url`           | string | Echoed input URL.                                                                                                                 |
-| `kind`          | string | One of `html`, `pdf`, `text`, or `json`.                                                                                          |
-| `mimeType`      | string | Server-reported or sniffed MIME type.                                                                                             |
-| `title`         | string | Omitted when unavailable.                                                                                                         |
-| `h1`            | string | First `<h1>`. Omitted when absent or non-HTML.                                                                                    |
-| `h2`            | string | First `<h2>`. Omitted when absent or non-HTML.                                                                                    |
-| `content`       | string | Excerpt, truncated to the configured character budget.                                                                            |
-| `contentLength` | number | Pre-truncation length. When greater than `content.length`, refine `findInPage` or raise `Visit Website: Content Character Limit`. |
+| --------------- | ------ | ----------------------------------------------------- |
+| `url`           | string | Echoed input URL.                                     |
+| `kind`          | string | One of `html`, `pdf`, `text`, or `json`.              |
+| `mimeType`      | string | Server-reported or sniffed MIME type.                 |
+| `title`         | string | Omitted when unavailable.                             |
+| `h1`            | string | First `<h1>`. Omitted when absent or non-HTML.        |
+| `h2`            | string | First `<h2>`. Omitted when absent or non-HTML.        |
+| `content`       | string | Excerpt, truncated to the configured character budget.|
+| `contentLength` | number | The length of the page content before any truncation. |
 
 ### Fetch Images
 
-Downloads images into the chat's working directory and returns a Markdown reference per image so the assistant can embed them inline. Inputs are HTTP(S) URLs — picks from Image Search, links seen in a Visit Website excerpt, or scraped automatically from a page when `websiteURL` is supplied.
+Downloads images into the chat's working directory and returns a Markdown reference so the assistant can embed them inline. Inputs are HTTP(S) URLs picked from Image Search, discovered in a Visit Website excerpt, or scraped automatically from a page when `websiteURL` is supplied.
 
 | Parameter    | Type      | Notes                                                                    |
 | ------------ | --------- | ------------------------------------------------------------------------ |
@@ -107,20 +106,11 @@ Install via the [LM Studio CLI](https://lmstudio.ai/docs/cli):
 lms get npacker/web-tools
 ```
 
-Or browse to the plugin on the [LM Studio Hub](https://lmstudio.ai/npacker/web-tools) and click "Run in LM Studio." Once enabled, the four tools become available to any model that supports tool calls.
+Or browse to the plugin on the [LM Studio Hub](https://lmstudio.ai/npacker/web-tools) and click "Run in LM Studio." Once enabled, the included tools become available to any model that supports tool calls.
 
-### Local development
+## Usage
 
-Requires **Node.js ≥ 22** (for `fetch` and `AbortSignal.any`).
-
-```bash
-git clone https://github.com/packern/web-tools.git
-cd web-tools
-npm install
-npm run dev    # runs `lms dev`
-```
-
-`npm run push` publishes the plugin to the LM Studio Hub (`lms push`).
+With the plugin enabled you can explicitly ask the assistant to search the web, search for images, visit a page, or fetch images, but you can also just ask a question whose answer requires the web and the assistant will pick the right tool on its own. Image displays follow the natural pipeline: Image Search surfaces candidate URLs, Fetch Images downloads the picks into the chat's working directory, and the assistant embeds the returned Markdown references in its reply.
 
 ## Configuration
 
@@ -193,34 +183,28 @@ Caches survive plugin reloads. To fully clear them, stop LM Studio and delete th
 
 ## Rate limiting and retry
 
-A shared [`bottleneck`](https://www.npmjs.com/package/bottleneck)-backed rate limiter enforces a 5-second minimum gap between outbound requests by default for the single-target flows (DuckDuckGo web search, Bing image search, Visit Website, Fetch Images downloads). Web Search enrichment instead uses a per-host limiter, so requests to distinct domains run in parallel while same-host requests still observe the interval — a 10-result enrichment costs roughly one fetch's wall-time rather than ten.
+A shared [`bottleneck`](https://www.npmjs.com/package/bottleneck)-backed rate limiter enforces a minimum gap between outbound requests for single-target requests (Web Search, Image Search, Visit Website, Fetch Images). Web Search enrichment uses a per-host limiter, so requests to distinct domains run in parallel.
 
-Every outbound HTTP request is wrapped by [`p-retry`](https://www.npmjs.com/package/p-retry) with randomized exponential backoff (factor 2) — 2 retry attempts (after the first try) with a 1-second base and 30-second cap by default. Set the interval or retry count to `0` to disable either behavior.
+Every outbound request is wrapped by [`p-retry`](https://www.npmjs.com/package/p-retry) with randomized exponential backoff.
 
-## Usage
+## Local development
 
-With the plugin enabled you can explicitly ask the assistant to search the web, search for images, visit a page, or fetch images, but you can also just ask a question whose answer requires the web and the assistant will pick the right tool on its own. Image displays follow the natural pipeline: Image Search surfaces candidate URLs, Fetch Images downloads the picks into the chat's working directory, and the assistant embeds the returned Markdown references in its reply.
+```bash
+git clone https://github.com/packern/web-tools.git
+cd web-tools
+npm install
+npm run dev    # runs `lms dev`
+```
 
-## Development scripts
-
-- `npm run dev` — run the plugin in LM Studio dev mode (`lms dev`).
-- `npm run push` — publish to the LM Studio Hub (`lms push`).
-- `npm run lint` / `npm run lint:fix` — ESLint on `src/**/*.ts`.
-- `npm run format` / `npm run format:check` — Prettier.
-- `npm run knip` — dead-code / unused-export check.
-
-A local pre-commit hook at `.git/hooks/pre-commit` can run `lint`, `format:check`, and `knip` sequentially and abort the commit on any failure. The hook is **not** committed to the repo — fresh clones need to reinstall it. Bypass with `git commit --no-verify` when necessary.
-
-No test suite is configured.
+`npm run push` publishes the plugin to the LM Studio Hub (`lms push`).
 
 ## Credits
 
 Built on top of Daniel Sig's original
 [lms-plugin-duckduckgo](https://github.com/danielsig/lms-plugin-duckduckgo) and
 [lms-plugin-visit-website](https://github.com/danielsig/lms-plugin-visit-website) plugins, now
-merged into a single tool suite and extended with the Fetch Images tool, Markdown-formatted
-website content, `findInPage`-biased content slicing, configurable rate limiting and retry,
-and a persistent `cacache`-backed store for web-search results and fetched HTML.
+merged into a single tool suite, Markdown-formatted website content, fuzzy-matching for content slicing,
+configurable rate limiting and retry, and a persistent cache for web-search results and fetched HTML.
 
 ## License
 
