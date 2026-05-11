@@ -163,12 +163,20 @@ export default [
         },
       ],
 
-      "sonarjs/cognitive-complexity": ["error", 15],
+      "sonarjs/cognitive-complexity": ["error", 12],
       "sonarjs/no-duplicate-string": ["error", { threshold: 4 }],
       "sonarjs/no-nested-template-literals": "error",
       "sonarjs/no-identical-functions": "error",
       "sonarjs/prefer-immediate-return": "error",
       "sonarjs/no-small-switch": "error",
+
+      complexity: ["error", 19],
+      "max-depth": ["error", 3],
+      "max-statements": ["error", 30],
+      "max-params": ["error", 8],
+      "max-nested-callbacks": ["error", 3],
+      "max-lines-per-function": ["error", { max: 120, skipBlankLines: true, skipComments: true }],
+      "max-lines": ["error", { max: 350, skipBlankLines: true, skipComments: true }],
 
       "import-x/no-cycle": ["error", { maxDepth: 3 }],
       "import-x/no-default-export": "error",
